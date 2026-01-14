@@ -87,7 +87,7 @@
   <div class="main-container">
     <h4 class="text-center text-danger mb-4">服務紀錄查詢與編輯 (管理端)</h4>
 
-    <div id="SearchArea" >
+    <div id="SearchArea">
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">服務日期 (yyyy-MM-dd)</label>
@@ -238,7 +238,8 @@
           <button class="btn btn-primary flex-fill" onclick="handleSubmit('update')">儲存變更</button>
           <button class="btn btn-outline-danger flex-fill" onclick="handleSubmit('delete')">刪除紀錄</button>
           <button class="btn btn-secondary flex-fill" onclick="backToSearch()">返回搜尋</button>
-        `);  }
+        `);
+        }
       }).queryServiceRecord(params);
     }
 
@@ -262,6 +263,11 @@
         Swal.fire("成功", msg, "success");
         runSearch();
       }).manageSRData(mode, form, currentRef);
+    };
+    
+    window.backToSearch = function () {
+      $('#SearchArea').removeClass('hidden');
+      $('#editArea').addClass('hidden');
     };
   </script>
 
