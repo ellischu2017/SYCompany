@@ -1,2 +1,35 @@
+# --- Node.js 相關 ---
+# 排除所有的套件資料夾（這是最大的部分，不應該上傳到 GitHub）
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# --- Google Apps Script (clasp) 相關 ---
+# 這是最重要的！.clasp.json 包含你的 Script ID。
+# 如果你的 GitHub 倉庫是公開的 (Public)，強烈建議排除它，以免他人修改你的腳本。
+# 如果是私有倉庫 (Private) 且你需要與團隊共用同一個 GAS 專案，則可以考慮不排除。
 .clasp.json
+
+# 排除 clasp 登入後的憑證檔案（包含你的 Google 帳號授權資訊，絕對不能外流）
+.clasprc.json
+
+# --- 編輯器與系統相關 ---
+# VS Code 個人設定
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# macOS 系統檔案
+.DS_Store
+
+# Windows 系統檔案
+Thumbs.db
+
+# --- 暫存與環境變數 ---
+.env
+.temp/
+.cache/
