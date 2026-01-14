@@ -723,7 +723,7 @@ function searchSheet(sheet, p) {
     // 關鍵修正：將試算表日期轉為字串進行比對，防止少一天
     let rowDateStr = (data[i][0] instanceof Date) ? 
       Utilities.formatDate(data[i][0], "GMT+8", "yyyy-MM-dd") : String(data[i][0]);
-
+      console.log(p);
     if (rowDateStr === p.date && data[i][2] === p.custN && data[i][3] === p.userN && data[i][4] === p.payType && data[i][5] === p.srId) {
       return { found: true, data: data[i], rowIndex: i + 1 };
     }
