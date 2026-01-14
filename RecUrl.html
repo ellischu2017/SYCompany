@@ -43,7 +43,6 @@
       justify-content: center;
       align-items: center;
     }
-   
   </style>
 </head>
 
@@ -55,9 +54,10 @@
 
   <nav class="navbar navbar-dark bg-secondary sticky-top">
     <div class="container-fluid">
-      <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
-          <i class="fas fa-bars"></i>
-        </button>
+      <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#offcanvasNavbar">
+        <i class="fas fa-bars"></i>
+      </button>
       <span class="navbar-brand mb-0 h1 mx-auto">紀錄單網址管理</span>
     </div>
   </nav>
@@ -78,8 +78,8 @@
         <h5 class="card-title">服務紀錄單網址查詢</h5>
         <div class="mb-3">
           <select class="form-select" id="selectSYName">
-              <option value="" disabled selected>載入中...</option>
-            </select>
+            <option value="" disabled selected>載入中...</option>
+          </select>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-primary flex-grow-1" id="btnQuery">查詢</button>
@@ -110,8 +110,9 @@
     </div>
     <div class="container mt-2 text-end">
       <small class="text-muted">
-            <i class="fas fa-user-circle"></i> 當前管理員：<?= userEmail ?>
-          </small>
+        <i class="fas fa-user-circle"></i> 當前管理員：
+        <?= userEmail ?>
+      </small>
     </div>
   </div>
 
@@ -120,144 +121,144 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
-    $(document).ready(function(){
-        loadDropdown();
+    $(document).ready(function () {
+      loadDropdown();
 
-        // 查詢按鈕
-        $('#btnQuery').click(function(){
-          const name = $('#selectSYName').val();
-          if(!name) return Swal.fire('提示', '服務紀錄單代碼', 'warning');
-          $('#loading').show();
-          google.script.run.withSuccessHandler(function(res){
-            $('#loading').hide();
-            if(res.found){
-              $('#displaySYName').text(res.rowResult.SY_N);
-              $('#inputSYName').val(res.rowResult.SY_N);
-              $('#inputRecUrl').val(res.rowResult.SY_Url);
-              switchToDetailMode('update');
-            }
-          }).queryRecUrlData(name);
-        });
+      // 查詢按鈕
+      $('#btnQuery').click(function () {
+        const name = $('#selectSYName').val();
+        if (!name) return Swal.fire('提示', '服務紀錄單代碼', 'warning');
+        $('#loading').show();
+        google.script.run.withSuccessHandler(function (res) {
+          $('#loading').hide();
+          if (res.found) {
+            $('#displaySYName').text(res.rowResult.SY_N);
+            $('#inputSYName').val(res.rowResult.SY_N);
+            $('#inputRecUrl').val(res.rowResult.SY_Url);
+            switchToDetailMode('update');
+          }
+        }).queryRecUrlData(name);
+      });
 
-        // 新增初始按鈕 (彈出視窗輸入姓名)
-        $('#btnAddInit').click(function(){
-          Swal.fire({
-            title: '輸入新服務紀錄單代碼',
-            input: 'text',
-            showCancelButton: true
-          }).then((result) => {
-            if (result.isConfirmed && result.value) {
-              $('#urlForm')[0].reset();
-              $('#displaySYName').text(result.value);
-              $('#inputSYName').val(result.value);
-              switchToDetailMode('add');
-            }
-          });
-        });
-
-        // 儲存按鈕 (不論新增或更新都調用 saveRecUrlData)
-        $('#btnSave').click(function(){
-          const data = {
-            syName: $('#inputSYName').val(),
-            recUrl: $('#inputRecUrl').val()
-          };
-          if(!data.recUrl) return Swal.fire('提示', '請輸入網址', 'warning');
-
-          $('#loading').show();
-          google.script.run.withSuccessHandler(function(res){
-            $('#loading').hide();
-            Swal.fire('成功', res.message, 'success').then(() => {
-              backToSearch();
-            });
-          }).saveRecUrlData(data);
-        });
-
-        // 刪除按鈕
-        $('#btnDelete').click(function(){
-          const name = $('#inputSYName').val();
-          Swal.fire({
-            title: '確定要刪除此網址?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33'
-          }).then((result) => {
-            if (result.isConfirmed) {
-              $('#loading').show();
-              google.script.run.withSuccessHandler(function(res){
-                $('#loading').hide();
-                Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
-              }).deleteRecUrlData(name);
-            }
-          });
+      // 新增初始按鈕 (彈出視窗輸入姓名)
+      $('#btnAddInit').click(function () {
+        Swal.fire({
+          title: '輸入新服務紀錄單代碼',
+          input: 'text',
+          showCancelButton: true
+        }).then((result) => {
+          if (result.isConfirmed && result.value) {
+            $('#urlForm')[0].reset();
+            $('#displaySYName').text(result.value);
+            $('#inputSYName').val(result.value);
+            switchToDetailMode('add');
+          }
         });
       });
 
-      function loadDropdown(){
-        google.script.run.withSuccessHandler(function(list){
-          const select = $('#selectSYName');
-          select.empty().append('<option value="" disabled selected>請選擇代碼...</option>');
-          list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
-        }).getRecUrlList();
-      }
+      // 儲存按鈕 (不論新增或更新都調用 saveRecUrlData)
+      $('#btnSave').click(function () {
+        const data = {
+          syName: $('#inputSYName').val(),
+          recUrl: $('#inputRecUrl').val()
+        };
+        if (!data.recUrl) return Swal.fire('提示', '請輸入網址', 'warning');
 
-      function switchToDetailMode(mode){
-        $('#searchSection').hide();
-        $('#detailSection').show();
-        if(mode === 'add') $('#btnDelete').hide(); else $('#btnDelete').show();
-      }
+        $('#loading').show();
+        google.script.run.withSuccessHandler(function (res) {
+          $('#loading').hide();
+          Swal.fire('成功', res.message, 'success').then(() => {
+            backToSearch();
+          });
+        }).saveRecUrlData(data);
+      });
 
-      function backToSearch() {
-        $('#detailSection').hide();
-        $('#searchSection').show();
-        loadDropdown();
-      }
-      /**
-      * 呼叫後端同步權限功能
-      */
-      function syncPermissions() {
-        // 檢查 Swal 是否存在，避免再次報錯
-        if (typeof Swal === 'undefined') {
-          alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
-          return;
-        }
-
-        // 1. 關閉 Offcanvas 導覽列
-        var offcanvasElement = document.querySelector('.offcanvas');
-        if (offcanvasElement) {
-          var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
-          if (offcanvas) offcanvas.hide();
-        }
-
-        // 2. 啟動 SweetAlert2 動態效果
+      // 刪除按鈕
+      $('#btnDelete').click(function () {
+        const name = $('#inputSYName').val();
         Swal.fire({
-          title: '同步權限中',
-          text: '正在更新所有試算表權限，並清理名單，請稍候...',
-          allowOutsideClick: false,
-          showConfirmButton: false,
-          didOpen: () => {
-            Swal.showLoading();
+          title: '確定要刪除此網址?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            $('#loading').show();
+            google.script.run.withSuccessHandler(function (res) {
+              $('#loading').hide();
+              Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
+            }).deleteRecUrlData(name);
           }
         });
+      });
+    });
 
-        // 3. 呼叫 GAS 後端
-        google.script.run
-          .withSuccessHandler(function() {
-            Swal.fire({
-              icon: 'success',
-              title: '同步完成',
-              text: '權限已成功更新',
-              timer: 2000
-            });
-          })
-          .withFailureHandler(function(err) {
-            Swal.fire({
-              icon: 'error',
-              title: '同步失敗',
-              text: err.message
-            });
-          })
-          .syncMasterTablePermissions();
-      }      
+    function loadDropdown() {
+      google.script.run.withSuccessHandler(function (list) {
+        const select = $('#selectSYName');
+        select.empty().append('<option value="" disabled selected>請選擇代碼...</option>');
+        list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
+      }).getRecUrlList();
+    }
+
+    function switchToDetailMode(mode) {
+      $('#searchSection').hide();
+      $('#detailSection').show();
+      if (mode === 'add') $('#btnDelete').hide(); else $('#btnDelete').show();
+    }
+
+    function backToSearch() {
+      $('#detailSection').hide();
+      $('#searchSection').show();
+      loadDropdown();
+    }
+    /**
+    * 呼叫後端同步權限功能
+    */
+    function syncPermissions() {
+      // 檢查 Swal 是否存在，避免再次報錯
+      if (typeof Swal === 'undefined') {
+        alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
+        return;
+      }
+
+      // 1. 關閉 Offcanvas 導覽列
+      var offcanvasElement = document.querySelector('.offcanvas');
+      if (offcanvasElement) {
+        var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (offcanvas) offcanvas.hide();
+      }
+
+      // 2. 啟動 SweetAlert2 動態效果
+      Swal.fire({
+        title: '同步權限中',
+        text: '正在更新所有試算表權限，並清理名單，請稍候...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 3. 呼叫 GAS 後端
+      google.script.run
+        .withSuccessHandler(function () {
+          Swal.fire({
+            icon: 'success',
+            title: '同步完成',
+            text: '權限已成功更新',
+            timer: 2000
+          });
+        })
+        .withFailureHandler(function (err) {
+          Swal.fire({
+            icon: 'error',
+            title: '同步失敗',
+            text: err.message
+          });
+        })
+        .syncMasterTablePermissions();
+    }
     function runManualMaintenance() {
       // 1. 關閉導航列
       var offcanvasElement = document.querySelector('.offcanvas');
@@ -274,15 +275,16 @@
 
       // 3. 呼叫後端函式
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function () {
           Swal.fire('完成', '資料維護與 User 同步已執行完畢。', 'success');
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function (err) {
           Swal.fire('執行失敗', err.message, 'error');
         })
         .dailyMaintenanceJob(); // 執行剛才寫的後端主函式
     }         
   </script>
 </body>
-  <?!= includeFooter(); ?>
+<?!= includeFooter(); ?>
+
 </html>

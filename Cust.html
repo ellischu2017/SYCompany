@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  
+
   <style>
     body {
       background-color: #f8f9fa;
@@ -47,7 +47,6 @@
       display: none;
       /* 預設隱藏 */
     }
-  
   </style>
 </head>
 
@@ -61,9 +60,10 @@
 
   <nav class="navbar navbar-dark bg-primary sticky-top">
     <div class="container-fluid">
-      <button class="btn btn-light text-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
-          <i class="fas fa-bars"></i>
-        </button>
+      <button class="btn btn-light text-primary" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#offcanvasNavbar">
+        <i class="fas fa-bars"></i>
+      </button>
       <span class="navbar-brand mb-0 h1 mx-auto">個案管理系統</span>
     </div>
   </nav>
@@ -86,8 +86,8 @@
         <div class="mb-3">
           <label for="selectCustName" class="form-label">請選擇個案姓名：</label>
           <select class="form-select" id="selectCustName">
-              <option value="" disabled selected>載入中...</option>
-            </select>
+            <option value="" disabled selected>載入中...</option>
+          </select>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-search"></i> 查詢</button>
@@ -155,10 +155,10 @@
 
           <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
             <button type="button" class="btn btn-primary" id="btnSave">
-                <i class="fas fa-save"></i> 更新資料
+              <i class="fas fa-save"></i> 更新資料
             </button>
             <button type="button" class="btn btn-danger" id="btnDelete">
-                            <i class="fas fa-trash-alt"></i> 刪除
+              <i class="fas fa-trash-alt"></i> 刪除
             </button>
 
             <button type="button" class="btn btn-outline-dark" id="btnBack">返回搜尋</button>
@@ -169,7 +169,8 @@
 
     <div class="container mt-2 text-end">
       <small class="text-muted">
-        <i class="fas fa-user-circle"></i> 當前管理員：<?= userEmail ?>
+        <i class="fas fa-user-circle"></i> 當前管理員：
+        <?= userEmail ?>
       </small>
     </div>
 
@@ -180,288 +181,288 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
-    $(document).ready(function(){
-        // 頁面載入時，先抓取下拉選單資料
-        loadDropdown();
+    $(document).ready(function () {
+      // 頁面載入時，先抓取下拉選單資料
+      loadDropdown();
 
-        // 當生日欄位數值改變時，自動更新年齡標註
-        $('#inputCustBirth').on('change', function() {
-          updateAgeDisplay($(this).val());
-        });
+      // 當生日欄位數值改變時，自動更新年齡標註
+      $('#inputCustBirth').on('change', function () {
+        updateAgeDisplay($(this).val());
+      });
 
-        // 查詢按鈕事件
-        $('#btnQuery').click(function(){
-          const selectedName = $('#selectCustName').val();
-          if(!selectedName) {
-            Swal.fire('提示', '請先選擇一位個案', 'warning');
-            return;
-          }
+      // 查詢按鈕事件
+      $('#btnQuery').click(function () {
+        const selectedName = $('#selectCustName').val();
+        if (!selectedName) {
+          Swal.fire('提示', '請先選擇一位個案', 'warning');
+          return;
+        }
         $('#loading').show();
-          
-        google.script.run.withSuccessHandler(function(response){
-            $('#loading').hide();
-            if(response.found){
-              populateForm(response.rowResult);
-              switchToDetailMode('update');
-            } else {
-              Swal.fire('錯誤', '找不到該個案資料', 'error');
-            }
-          }).queryCustData(selectedName);
-        });
 
-        // 新增按鈕事件 (初始畫面)
-        $('#btnAddInit').click(function(){
-          // 彈出對話框詢問新個案姓名
-          Swal.fire({
-            title: '請輸入新個案姓名',
-            input: 'text',
-            showCancelButton: true,
-            confirmButtonText: '確定',
-            cancelButtonText: '取消',
-            inputValidator: (value) => {
-              if (!value) {
-                return '姓名不能為空！';
-              }
-            }
-          }).then((result) => {
-            if (result.isConfirmed) {
-              const newName = result.value;
-              // 清空表單並填入姓名
-              clearForm();
-              $('#displayCustName').text(newName);
-              $('#inputCustName').val(newName);
-              switchToDetailMode('add');
-            }
-          });
-        });
-
-        // 儲存/更新按鈕事件
-        $('#btnSave').click(function(){
-          const mode = $('#formMode').val();
-          const formData = {
-            custName: $('#inputCustName').val(),
-            custBirth: $('#inputCustBirth').val(),
-            custAddr: $('#inputCustAddr').val(),
-            supName: $('#inputSupName').val(),
-            dsupName: $('#inputDSupName').val(),
-            supTel: $('#inputSupTel').val(),
-            officeTel: $('#inputOfficeTel').val(),
-            ecName: $('#inputEcName').val(),
-            ecTel: $('#inputEcTel').val()
-          };
-
-          if(!formData.custBirth){
-            Swal.fire('提示', '請輸入生日', 'warning');
-            return;
-          }
-
-          $('#loading').show();
-
-          if(mode === 'add'){
-            // 新增模式
-            google.script.run.withSuccessHandler(function(res){
-              $('#loading').hide();
-              if(res.success){
-                Swal.fire({
-                  title: '成功',
-                  text: res.message,
-                  icon: 'success',
-                  confirmButtonText: '確定'
-                }).then(() => {
-                  // 新增後「重新整理頁面」以載入新的下拉清單並回到初始狀態
-                  backToSearch(); 
-                });
-              } else {
-                Swal.fire('失敗', res.message, 'error');
-              }
-            }).addCustData(formData);
+        google.script.run.withSuccessHandler(function (response) {
+          $('#loading').hide();
+          if (response.found) {
+            populateForm(response.rowResult);
+            switchToDetailMode('update');
           } else {
-            // 更新模式
-            google.script.run.withSuccessHandler(function(res){
-              $('#loading').hide();
-              if(res.success){
-                Swal.fire({
-                  title: '更新成功',
-                  text: res.message,
-                  icon: 'success',
-                  confirmButtonText: '確定'
-                }).then(() => {
-                  // 更新後「回到查詢頁面」而不是重整，這樣速度較快
-                  // 也可以選擇用 window.location.reload();
-                  backToSearch(); 
-                });
-              } else {
-                Swal.fire('失敗', res.message, 'error');
-              }
-            }).updateCustData(formData);
+            Swal.fire('錯誤', '找不到該個案資料', 'error');
           }
-        });
+        }).queryCustData(selectedName);
+      });
 
-
-
-        // 刪除按鈕事件
-        $('#btnDelete').click(function(){
-          const custName = $('#inputCustName').val();
-          Swal.fire({
-            title: '確定刪除?',
-            text: `將刪除個案：${custName} 的所有資料，此動作無法復原！`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: '是的，刪除',
-            cancelButtonText: '取消'
-          }).then((result) => {
-            if (result.isConfirmed) {
-              $('#loading').show();
-              google.script.run.withSuccessHandler(function(res){
-                $('#loading').hide();
-                if(res.success){
-                  Swal.fire('已刪除', res.message, 'success').then(
-                    () => {backToSearch();});
-                } else {
-                  Swal.fire('錯誤', res.message, 'error');
-                }
-              }).deleteCustData(custName);
+      // 新增按鈕事件 (初始畫面)
+      $('#btnAddInit').click(function () {
+        // 彈出對話框詢問新個案姓名
+        Swal.fire({
+          title: '請輸入新個案姓名',
+          input: 'text',
+          showCancelButton: true,
+          confirmButtonText: '確定',
+          cancelButtonText: '取消',
+          inputValidator: (value) => {
+            if (!value) {
+              return '姓名不能為空！';
             }
-          });
-        });
-        $('#btnBack').click(function(){
-          $('#detailSection').hide();   // 隱藏詳細資料表單
-          $('#searchSection').show();   // 顯示查詢與新增區塊
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            const newName = result.value;
+            // 清空表單並填入姓名
+            clearForm();
+            $('#displayCustName').text(newName);
+            $('#inputCustName').val(newName);
+            switchToDetailMode('add');
+          }
         });
       });
 
-      //
+      // 儲存/更新按鈕事件
+      $('#btnSave').click(function () {
+        const mode = $('#formMode').val();
+        const formData = {
+          custName: $('#inputCustName').val(),
+          custBirth: $('#inputCustBirth').val(),
+          custAddr: $('#inputCustAddr').val(),
+          supName: $('#inputSupName').val(),
+          dsupName: $('#inputDSupName').val(),
+          supTel: $('#inputSupTel').val(),
+          officeTel: $('#inputOfficeTel').val(),
+          ecName: $('#inputEcName').val(),
+          ecTel: $('#inputEcTel').val()
+        };
 
-      // 載入下拉選單
-      function loadDropdown(){
-        google.script.run.withSuccessHandler(function(list){
-          const select = $('#selectCustName');
-          select.empty();
-          select.append('<option value="" disabled selected>請選擇個案...</option>');
-          if(list.length === 0){
-             select.append('<option value="" disabled>無資料</option>');
-          } else {
-            list.forEach(function(name){
-              select.append(`<option value="${name}">${name}</option>`);
-            });
-          }
-        }).getCustList();
-      }
-
-      // 切換顯示模式 (add/update)
-      function switchToDetailMode(mode){
-        $('#searchSection').hide(); // 隱藏查詢區塊 
-        $('#detailSection').show(); // 顯示編輯區塊 
-        $('#formMode').val(mode);
-
-        if(mode === 'add'){
-          $('#btnSave').html('<i class="fas fa-save"></i> 新增資料');
-          $('#btnDelete').hide(); // 新增模式不顯示刪除鈕
-        } else {
-          $('#btnSave').html('<i class="fas fa-sync"></i> 更新'); // 更新鈕 
-          $('#btnDelete').show(); // 刪除鈕 
-        }
-      }
-
-      // 填入表單資料
-      function populateForm(data){
-        $('#displayCustName').text(data.Cust_N); // 以標籤顯示 
-        $('#inputCustName').val(data.Cust_N);
-        $('#inputCustBirth').val(data.Cust_BD);
-        // 填入資料後立即計算年齡
-        updateAgeDisplay(data.Cust_BD);
-        $('#inputCustAddr').val(data.Cust_Add);
-        $('#inputSupName').val(data.Sup_N);
-        $('#inputDSupName').val(data.DSup_N);
-        $('#inputSupTel').val(data.Sup_Tel);
-        $('#inputOfficeTel').val(data.Office_Tel);
-        $('#inputEcName').val(data.Cust_EC);
-        $('#inputEcTel').val(data.Cust_EC_Tel);
-      }
-
-      // 清空表單
-      function clearForm(){
-        $('#custForm')[0].reset();
-        $('#displayCustName').text('');
-        $('#inputCustName').val('');
-      }
-
-      // 計算年齡的函式
-      function calculateAge(birthDateString) {
-        if (!birthDateString) return "--";
-        const today = new Date();
-        const birthDate = new Date(birthDateString);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        // 如果今天日期還沒到生日的月份，或到了月份但還沒到當天，年齡減 1
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-          age--;
-        }
-        return age >= 0 ? age : 0;
-      }
-
-      // 更新畫面上的年齡顯示
-      function updateAgeDisplay(birthDate) {
-        const age = calculateAge(birthDate);
-        $('#displayAge').text(`年齡：${age} 歲`);
-      }
-
-      // 新增一個輔助函式：回到查詢初始狀態
-      function backToSearch() {
-        $('#detailSection').hide();   // 隱藏詳細資料表單
-        $('#searchSection').show();   // 顯示查詢與新增區塊
-        clearForm();                  // 清空表單內容
-        loadDropdown();               // 重新整理下拉選單（確保資料同步）
-      }
-
-      /**
-      * 呼叫後端同步權限功能
-      */
-      function syncPermissions() {
-        // 檢查 Swal 是否存在，避免再次報錯
-        if (typeof Swal === 'undefined') {
-          alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
+        if (!formData.custBirth) {
+          Swal.fire('提示', '請輸入生日', 'warning');
           return;
         }
 
-        // 1. 關閉 Offcanvas 導覽列
-        var offcanvasElement = document.querySelector('.offcanvas');
-        if (offcanvasElement) {
-          var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
-          if (offcanvas) offcanvas.hide();
-        }
+        $('#loading').show();
 
-        // 2. 啟動 SweetAlert2 動態效果
+        if (mode === 'add') {
+          // 新增模式
+          google.script.run.withSuccessHandler(function (res) {
+            $('#loading').hide();
+            if (res.success) {
+              Swal.fire({
+                title: '成功',
+                text: res.message,
+                icon: 'success',
+                confirmButtonText: '確定'
+              }).then(() => {
+                // 新增後「重新整理頁面」以載入新的下拉清單並回到初始狀態
+                backToSearch();
+              });
+            } else {
+              Swal.fire('失敗', res.message, 'error');
+            }
+          }).addCustData(formData);
+        } else {
+          // 更新模式
+          google.script.run.withSuccessHandler(function (res) {
+            $('#loading').hide();
+            if (res.success) {
+              Swal.fire({
+                title: '更新成功',
+                text: res.message,
+                icon: 'success',
+                confirmButtonText: '確定'
+              }).then(() => {
+                // 更新後「回到查詢頁面」而不是重整，這樣速度較快
+                // 也可以選擇用 window.location.reload();
+                backToSearch();
+              });
+            } else {
+              Swal.fire('失敗', res.message, 'error');
+            }
+          }).updateCustData(formData);
+        }
+      });
+
+
+
+      // 刪除按鈕事件
+      $('#btnDelete').click(function () {
+        const custName = $('#inputCustName').val();
         Swal.fire({
-          title: '同步權限中',
-          text: '正在更新所有試算表權限，並清理名單，請稍候...',
-          allowOutsideClick: false,
-          showConfirmButton: false,
-          didOpen: () => {
-            Swal.showLoading();
+          title: '確定刪除?',
+          text: `將刪除個案：${custName} 的所有資料，此動作無法復原！`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          confirmButtonText: '是的，刪除',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            $('#loading').show();
+            google.script.run.withSuccessHandler(function (res) {
+              $('#loading').hide();
+              if (res.success) {
+                Swal.fire('已刪除', res.message, 'success').then(
+                  () => { backToSearch(); });
+              } else {
+                Swal.fire('錯誤', res.message, 'error');
+              }
+            }).deleteCustData(custName);
           }
         });
+      });
+      $('#btnBack').click(function () {
+        $('#detailSection').hide();   // 隱藏詳細資料表單
+        $('#searchSection').show();   // 顯示查詢與新增區塊
+      });
+    });
 
-        // 3. 呼叫 GAS 後端
-        google.script.run
-          .withSuccessHandler(function() {
-            Swal.fire({
-              icon: 'success',
-              title: '同步完成',
-              text: '權限已成功更新',
-              timer: 2000
-            });
-          })
-          .withFailureHandler(function(err) {
-            Swal.fire({
-              icon: 'error',
-              title: '同步失敗',
-              text: err.message
-            });
-          })
-          .syncMasterTablePermissions();
+    //
+
+    // 載入下拉選單
+    function loadDropdown() {
+      google.script.run.withSuccessHandler(function (list) {
+        const select = $('#selectCustName');
+        select.empty();
+        select.append('<option value="" disabled selected>請選擇個案...</option>');
+        if (list.length === 0) {
+          select.append('<option value="" disabled>無資料</option>');
+        } else {
+          list.forEach(function (name) {
+            select.append(`<option value="${name}">${name}</option>`);
+          });
+        }
+      }).getCustList();
+    }
+
+    // 切換顯示模式 (add/update)
+    function switchToDetailMode(mode) {
+      $('#searchSection').hide(); // 隱藏查詢區塊 
+      $('#detailSection').show(); // 顯示編輯區塊 
+      $('#formMode').val(mode);
+
+      if (mode === 'add') {
+        $('#btnSave').html('<i class="fas fa-save"></i> 新增資料');
+        $('#btnDelete').hide(); // 新增模式不顯示刪除鈕
+      } else {
+        $('#btnSave').html('<i class="fas fa-sync"></i> 更新'); // 更新鈕 
+        $('#btnDelete').show(); // 刪除鈕 
       }
+    }
+
+    // 填入表單資料
+    function populateForm(data) {
+      $('#displayCustName').text(data.Cust_N); // 以標籤顯示 
+      $('#inputCustName').val(data.Cust_N);
+      $('#inputCustBirth').val(data.Cust_BD);
+      // 填入資料後立即計算年齡
+      updateAgeDisplay(data.Cust_BD);
+      $('#inputCustAddr').val(data.Cust_Add);
+      $('#inputSupName').val(data.Sup_N);
+      $('#inputDSupName').val(data.DSup_N);
+      $('#inputSupTel').val(data.Sup_Tel);
+      $('#inputOfficeTel').val(data.Office_Tel);
+      $('#inputEcName').val(data.Cust_EC);
+      $('#inputEcTel').val(data.Cust_EC_Tel);
+    }
+
+    // 清空表單
+    function clearForm() {
+      $('#custForm')[0].reset();
+      $('#displayCustName').text('');
+      $('#inputCustName').val('');
+    }
+
+    // 計算年齡的函式
+    function calculateAge(birthDateString) {
+      if (!birthDateString) return "--";
+      const today = new Date();
+      const birthDate = new Date(birthDateString);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      // 如果今天日期還沒到生日的月份，或到了月份但還沒到當天，年齡減 1
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age >= 0 ? age : 0;
+    }
+
+    // 更新畫面上的年齡顯示
+    function updateAgeDisplay(birthDate) {
+      const age = calculateAge(birthDate);
+      $('#displayAge').text(`年齡：${age} 歲`);
+    }
+
+    // 新增一個輔助函式：回到查詢初始狀態
+    function backToSearch() {
+      $('#detailSection').hide();   // 隱藏詳細資料表單
+      $('#searchSection').show();   // 顯示查詢與新增區塊
+      clearForm();                  // 清空表單內容
+      loadDropdown();               // 重新整理下拉選單（確保資料同步）
+    }
+
+    /**
+    * 呼叫後端同步權限功能
+    */
+    function syncPermissions() {
+      // 檢查 Swal 是否存在，避免再次報錯
+      if (typeof Swal === 'undefined') {
+        alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
+        return;
+      }
+
+      // 1. 關閉 Offcanvas 導覽列
+      var offcanvasElement = document.querySelector('.offcanvas');
+      if (offcanvasElement) {
+        var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (offcanvas) offcanvas.hide();
+      }
+
+      // 2. 啟動 SweetAlert2 動態效果
+      Swal.fire({
+        title: '同步權限中',
+        text: '正在更新所有試算表權限，並清理名單，請稍候...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 3. 呼叫 GAS 後端
+      google.script.run
+        .withSuccessHandler(function () {
+          Swal.fire({
+            icon: 'success',
+            title: '同步完成',
+            text: '權限已成功更新',
+            timer: 2000
+          });
+        })
+        .withFailureHandler(function (err) {
+          Swal.fire({
+            icon: 'error',
+            title: '同步失敗',
+            text: err.message
+          });
+        })
+        .syncMasterTablePermissions();
+    }
 
     function runManualMaintenance() {
       // 1. 關閉導航列
@@ -479,15 +480,16 @@
 
       // 3. 呼叫後端函式
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function () {
           Swal.fire('完成', '資料維護與 User 同步已執行完畢。', 'success');
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function (err) {
           Swal.fire('執行失敗', err.message, 'error');
         })
         .dailyMaintenanceJob(); // 執行剛才寫的後端主函式
     }         
   </script>
 </body>
-  <?!= includeFooter(); ?>
+<?!= includeFooter(); ?>
+
 </html>

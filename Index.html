@@ -44,7 +44,6 @@
       /* Bootstrap Primary Color */
       color: white;
     }
-   
   </style>
 </head>
 
@@ -52,9 +51,10 @@
 
   <nav class="navbar navbar-custom sticky-top">
     <div class="container-fluid">
-      <button class="btn btn-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar" aria-controls="offcanvasNavbar">
-              <i class="fas fa-bars"></i>
-            </button>
+      <button class="btn btn-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar"
+        aria-controls="offcanvasNavbar">
+        <i class="fas fa-bars"></i>
+      </button>
       <span class="navbar-brand mb-0 h1 text-white mx-auto">舒漾長照服務紀錄單管理系統</span>
     </div>
   </nav>
@@ -64,11 +64,11 @@
       <h5 class="offcanvas-title" id="offcanvasNavbarLabel">系統導航</h5>
       <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-    
+
     <div class="offcanvas-body">
       <?!= includeNav(); ?>
     </div>
-    
+
   </div>
 
   <div class="container main-container">
@@ -114,7 +114,8 @@
     </div>
     <div class="container mt-2 text-end">
       <small class="text-muted">
-        <i class="fas fa-user-circle"></i> 當前管理員：<?= userEmail ?>
+        <i class="fas fa-user-circle"></i> 當前管理員：
+        <?= userEmail ?>
       </small>
     </div>
   </div>
@@ -126,9 +127,9 @@
 
   <script>
     // 頁面加載完成後的初始化邏輯
-      $(document).ready(function(){
-        console.log("舒漾長照系統 - Index 頁面載入完成");
-      });
+    $(document).ready(function () {
+      console.log("舒漾長照系統 - Index 頁面載入完成");
+    });
 
     /**
     * 呼叫後端同步權限功能
@@ -160,7 +161,7 @@
 
       // 3. 呼叫 GAS 後端
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function () {
           Swal.fire({
             icon: 'success',
             title: '同步完成',
@@ -168,7 +169,7 @@
             timer: 2000
           });
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function (err) {
           Swal.fire({
             icon: 'error',
             title: '同步失敗',
@@ -194,15 +195,16 @@
 
       // 3. 呼叫後端函式
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function () {
           Swal.fire('完成', '資料維護與 User 同步已執行完畢。', 'success');
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function (err) {
           Swal.fire('執行失敗', err.message, 'error');
         })
         .dailyMaintenanceJob(); // 執行剛才寫的後端主函式
     }    
   </script>
 </body>
-  <?!= includeFooter(); ?>
+<?!= includeFooter(); ?>
+
 </html>

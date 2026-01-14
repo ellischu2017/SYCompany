@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <base target="_top">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -7,15 +8,51 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
-    body { background-color: #fff5f5; font-family: "Microsoft JhengHei", sans-serif; }
-    .main-container { max-width: 750px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 30px auto; }
-    .section-title { border-left: 5px solid #dc3545; padding-left: 10px; margin: 20px 0; color: #dc3545; font-weight: bold; }
-    .readonly-field { background-color: #f1f3f5 !important; }
-    .hidden { display: none; }
-    .loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); 
-                display: flex; justify-content: center; align-items: center; z-index: 9999; }
+    body {
+      background-color: #fff5f5;
+      font-family: "Microsoft JhengHei", sans-serif;
+    }
+
+    .main-container {
+      max-width: 750px;
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      margin: 30px auto;
+    }
+
+    .section-title {
+      border-left: 5px solid #dc3545;
+      padding-left: 10px;
+      margin: 20px 0;
+      color: #dc3545;
+      font-weight: bold;
+    }
+
+    .readonly-field {
+      background-color: #f1f3f5 !important;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
   </style>
 </head>
+
 <body>
 
   <div id="loading" class="loading">
@@ -24,9 +61,12 @@
 
   <nav class="navbar navbar-dark bg-danger sticky-top">
     <div class="container-fluid">
-      <button class="btn btn-light text-danger" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-fill" viewBox="0 0 16 16">
-          <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L8 2.207l6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293z" />
+      <button class="btn btn-light text-danger" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#offcanvasNavbar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-fill"
+          viewBox="0 0 16 16">
+          <path
+            d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L8 2.207l6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293z" />
           <path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293z" />
         </svg>
       </button>
@@ -47,43 +87,43 @@
   <div class="main-container">
     <h4 class="text-center text-danger mb-4">服務紀錄查詢與編輯 (管理端)</h4>
 
-    <div class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label">服務日期 (yyyy-MM-dd)</label>
-        <input type="date" class="form-control" id="queryDate">
+    <div id="SearchArea" >
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">服務日期 (yyyy-MM-dd)</label>
+          <input type="date" class="form-control" id="queryDate">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">居服員姓名</label>
+          <select class="form-select" id="queryUserN"></select>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">居服員 Email</label>
+          <input type="text" class="form-control readonly-field" id="currentUserEmail" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">個案姓名</label>
+          <select class="form-select" id="queryCustN"></select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">給付類別</label>
+          <select class="form-select" id="queryPayType">
+            <option value="補助">補助</option>
+            <option value="自費">自費</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">服務編碼</label>
+          <select class="form-select" id="querySrId"></select>
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">居服員姓名</label>
-        <select class="form-select" id="queryUserN"></select>
-      </div>
-      <div class="col-md-12">
-        <label class="form-label">居服員 Email</label>
-        <input type="text" class="form-control readonly-field" id="currentUserEmail" readonly>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">個案姓名</label>
-        <select class="form-select" id="queryCustN"></select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">給付類別</label>
-        <select class="form-select" id="queryPayType">
-          <option value="補助">補助</option>
-          <option value="自費">自費</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">服務編碼</label>
-        <select class="form-select" id="querySrId"></select>
-      </div>
+
+      <button class="btn btn-danger w-100 mt-4" id="btnSearch">執行查詢</button>
     </div>
-
-    <button class="btn btn-danger w-100 mt-4" id="btnSearch">執行查詢</button>
-
-    <hr class="my-5">
 
     <div id="editArea" class="hidden">
       <h5 class="section-title">詳細紀錄內容 <span id="sourceTag" class="badge bg-secondary ms-2"></span></h5>
-      
+
       <div class="mb-3">
         <label class="form-label">服務紀錄內容 (SR_REC)</label>
         <textarea class="form-control" id="srRec" rows="3"></textarea>
@@ -118,109 +158,114 @@
     </div>
   </div>
 
-<script>
-  let userMap = {};
-  let currentRef = null;
+  <script>
+    let userMap = {};
+    let currentRef = null;
 
-  $(document).ready(function() {
-    // 1. 設定日期預設值：修正時區偏移導致少一天的寫法
-    const now = new Date();
-    const todayStr = now.getFullYear() + '-' + 
-                     String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-                     String(now.getDate()).padStart(2, '0');
-    $('#queryDate').val(todayStr);
+    $(document).ready(function () {
+      // 1. 設定日期預設值：修正時區偏移導致少一天的寫法
+      const now = new Date();
+      const todayStr = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
+      $('#queryDate').val(todayStr);
 
-    // 2. 初始化下拉選單
-    google.script.run.withSuccessHandler(function(data) {
-      const $uSelect = $('#queryUserN');
-      $.each(data.users, function(i, u) {
-        $uSelect.append($('<option>', { value: u.name, text: u.name }));
-        userMap[u.name] = u.email;
-      });
-      syncEmail();
+      // 2. 初始化下拉選單
+      google.script.run.withSuccessHandler(function (data) {
+        const $uSelect = $('#queryUserN');
+        $.each(data.users, function (i, u) {
+          $uSelect.append($('<option>', { value: u.name, text: u.name }));
+          userMap[u.name] = u.email;
+        });
+        syncEmail();
 
-      $.each(data.customers, function(i, c) {
-        $('#queryCustN').append($('<option>', { value: c, text: c }));
-      });
+        $.each(data.customers, function (i, c) {
+          $('#queryCustN').append($('<option>', { value: c, text: c }));
+        });
 
-      $.each(data.ltcCodes, function(i, id) {
-        $('#querySrId').append($('<option>', { value: id, text: id }));
-      });
+        $.each(data.ltcCodes, function (i, id) {
+          $('#querySrId').append($('<option>', { value: id, text: id }));
+        });
 
-      if (data.triggerSync) google.script.run.processUserSync();
-      $('#loading').fadeOut();
-    }).getAdminInitialData();
+        if (data.triggerSync) google.script.run.processUserSync();
+        $('#loading').fadeOut();
+      }).getAdminInitialData();
 
-    // 3. 事件監聽
-    $('#queryUserN').on('change', syncEmail);
-    $('#btnSearch').on('click', runSearch);
-  });
+      // 3. 事件監聽
+      $('#queryUserN').on('change', syncEmail);
+      $('#btnSearch').on('click', runSearch);
+    });
 
-  function syncEmail() {
-    const name = $('#queryUserN').val();
-    $('#currentUserEmail').val(userMap[name] || "");
-  }
+    function syncEmail() {
+      const name = $('#queryUserN').val();
+      $('#currentUserEmail').val(userMap[name] || "");
+    }
 
-  function runSearch() {
-    const params = {
-      date: $('#queryDate').val(), // 傳送 yyyy-MM-dd 字串
-      userN: $('#queryUserN').val(),
-      custN: $('#queryCustN').val(),
-      payType: $('#queryPayType').val(),
-      srId: $('#querySrId').val()
-    };
+    function runSearch() {
+      const params = {
+        date: $('#queryDate').val(), // 傳送 yyyy-MM-dd 字串
+        userN: $('#queryUserN').val(),
+        custN: $('#queryCustN').val(),
+        payType: $('#queryPayType').val(),
+        srId: $('#querySrId').val()
+      };
 
-    if (!params.date) return Swal.fire("錯誤", "請選擇日期", "error");
+      if (!params.date) return Swal.fire("錯誤", "請選擇日期", "error");
 
-    $('#loading').show();
-    google.script.run.withSuccessHandler(function(res) {
-      $('#loading').hide();
-      $('#editArea').removeClass('hidden');
+      $('#loading').show();
+      $('#SearchArea').addClass('hidden');  // 新增此行
+      google.script.run.withSuccessHandler(function (res) {
+        $('#loading').hide();
+        $('#editArea').removeClass('hidden');
 
-      if (res.found) {
-        currentRef = { source: res.source, ssId: res.ssId, sheetName: res.sheetName, rowIndex: res.rowIndex };
-        $('#srRec').val(res.data[6] || "");
-        $('#srLoc').val(res.data[7] || "清醒");
-        $('#srMood').val(res.data[8] || "穩定");
-        $('#srSpcons').val(res.data[9] || "");
-        $('#sourceTag').text("來源: " + res.source);
-        
-        $('#actionBtns').html(`
+        if (res.found) {
+          currentRef = { source: res.source, ssId: res.ssId, sheetName: res.sheetName, rowIndex: res.rowIndex };
+          $('#srRec').val(res.data[6] || "");
+          $('#srLoc').val(res.data[7] || "清醒");
+          $('#srMood').val(res.data[8] || "穩定");
+          $('#srSpcons').val(res.data[9] || "");
+          $('#sourceTag').text("來源: " + res.source);
+
+          $('#actionBtns').html(`
           <button class="btn btn-primary flex-fill" onclick="handleSubmit('update')">儲存變更</button>
           <button class="btn btn-outline-danger flex-fill" onclick="handleSubmit('delete')">刪除紀錄</button>
         `);
-      } else {
-        currentRef = null;
-        $('#editArea').find('textarea, select').val("");
-        $('#sourceTag').text("查無此筆紀錄");
-        $('#actionBtns').html(`<button class="btn btn-success w-100" onclick="handleSubmit('add')">查無資料，新增至 SYTemp</button>`);
-      }
-    }).queryServiceRecord(params);
-  }
+        } else {
+          currentRef = null;
+          $('#editArea').find('textarea, select').val("");
+          $('#sourceTag').text("查無此筆紀錄");
+          $('#actionBtns').html(`
+          <button class="btn btn-primary flex-fill" onclick="handleSubmit('update')">儲存變更</button>
+          <button class="btn btn-outline-danger flex-fill" onclick="handleSubmit('delete')">刪除紀錄</button>
+          <button class="btn btn-secondary flex-fill" onclick="backToSearch()">返回搜尋</button>
+        `);  }
+      }).queryServiceRecord(params);
+    }
 
-  window.handleSubmit = function(mode) {
-    const form = {
-      date: $('#queryDate').val(),
-      email: $('#currentUserEmail').val(),
-      userN: $('#queryUserN').val(),
-      custN: $('#queryCustN').val(),
-      payType: $('#queryPayType').val(),
-      srId: $('#querySrId').val(),
-      srRec: $('#srRec').val(),
-      loc: $('#srLoc').val(),
-      mood: $('#srMood').val(),
-      spcons: $('#srSpcons').val()
+    window.handleSubmit = function (mode) {
+      const form = {
+        date: $('#queryDate').val(),
+        email: $('#currentUserEmail').val(),
+        userN: $('#queryUserN').val(),
+        custN: $('#queryCustN').val(),
+        payType: $('#queryPayType').val(),
+        srId: $('#querySrId').val(),
+        srRec: $('#srRec').val(),
+        loc: $('#srLoc').val(),
+        mood: $('#srMood').val(),
+        spcons: $('#srSpcons').val()
+      };
+
+      $('#loading').show();
+      google.script.run.withSuccessHandler(function (msg) {
+        $('#loading').hide();
+        Swal.fire("成功", msg, "success");
+        runSearch();
+      }).manageSRData(mode, form, currentRef);
     };
-
-    $('#loading').show();
-    google.script.run.withSuccessHandler(function(msg) {
-      $('#loading').hide();
-      Swal.fire("成功", msg, "success");
-      runSearch();
-    }).manageSRData(mode, form, currentRef);
-  };
-</script>
+  </script>
 
 </body>
-  <?!= includeFooter(); ?>
+<?!= includeFooter(); ?>
+
 </html>

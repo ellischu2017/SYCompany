@@ -43,7 +43,6 @@
       justify-content: center;
       align-items: center;
     }
-  
   </style>
 </head>
 
@@ -55,9 +54,10 @@
 
   <nav class="navbar navbar-dark bg-success sticky-top">
     <div class="container-fluid">
-      <button class="btn btn-light text-success" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar">
-          <i class="fas fa-bars"></i>
-        </button>
+      <button class="btn btn-light text-success" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#offcanvasNavbar">
+        <i class="fas fa-bars"></i>
+      </button>
       <span class="navbar-brand mb-0 h1 mx-auto">居服員管理系統</span>
     </div>
   </nav>
@@ -78,8 +78,8 @@
         <h5 class="card-title">居服員選擇</h5>
         <div class="mb-3">
           <select class="form-select" id="selectUserName">
-              <option value="" disabled selected>載入中...</option>
-            </select>
+            <option value="" disabled selected>載入中...</option>
+          </select>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-primary flex-grow-1" id="btnQuery">查詢</button>
@@ -115,7 +115,8 @@
     </div>
     <div class="container mt-2 text-end">
       <small class="text-muted">
-        <i class="fas fa-user-circle"></i> 當前管理員：<?= userEmail ?>
+        <i class="fas fa-user-circle"></i> 當前管理員：
+        <?= userEmail ?>
       </small>
     </div>
 
@@ -126,151 +127,151 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
-    $(document).ready(function(){
-        loadDropdown();
+    $(document).ready(function () {
+      loadDropdown();
 
-        $('#btnQuery').click(function(){
-          const name = $('#selectUserName').val();
-          if(!name) return Swal.fire('提示', '請選擇居服員', 'warning');
-          $('#loading').show();
-          google.script.run.withSuccessHandler(function(res){
-            $('#loading').hide();
-            if(res.found){
-              $('#displayUserName').text(res.rowResult.User_N);
-              $('#inputUserName').val(res.rowResult.User_N);
-              $('#inputUserEmail').val(res.rowResult.User_Email);
-              $('#inputUserTel').val(res.rowResult.User_Tel);
-              switchToDetailMode('update');
-            }
-          }).queryUserData(name);
-        });
+      $('#btnQuery').click(function () {
+        const name = $('#selectUserName').val();
+        if (!name) return Swal.fire('提示', '請選擇居服員', 'warning');
+        $('#loading').show();
+        google.script.run.withSuccessHandler(function (res) {
+          $('#loading').hide();
+          if (res.found) {
+            $('#displayUserName').text(res.rowResult.User_N);
+            $('#inputUserName').val(res.rowResult.User_N);
+            $('#inputUserEmail').val(res.rowResult.User_Email);
+            $('#inputUserTel').val(res.rowResult.User_Tel);
+            switchToDetailMode('update');
+          }
+        }).queryUserData(name);
+      });
 
-        $('#btnAddInit').click(function(){
-          Swal.fire({
-            title: '輸入新居服員姓名',
-            input: 'text',
-            showCancelButton: true
-          }).then((result) => {
-            if (result.isConfirmed && result.value) {
-              $('#userForm')[0].reset();
-              $('#displayUserName').text(result.value);
-              $('#inputUserName').val(result.value);
-              switchToDetailMode('add');
-            }
-          });
-        });
-
-        $('#btnSave').click(function(){
-          const mode = $('#formMode').val();
-          const data = {
-            userName: $('#inputUserName').val(),
-            userEmail: $('#inputUserEmail').val(),
-            userTel: $('#inputUserTel').val()
-          };
-          $('#loading').show();
-          const action = (mode === 'add') ? 'addUserData' : 'updateUserData';
-          
-          google.script.run.withSuccessHandler(function(res){
-            $('#loading').hide();
-            if(res.success){
-              Swal.fire('成功', res.message, 'success').then(() => {
-                if(mode === 'add') backToSearch();
-                else backToSearch();
-              });
-            } else {
-              Swal.fire('失敗', res.message, 'error');
-            }
-          })[action](data);
-        });
-
-        $('#btnDelete').click(function(){
-          const name = $('#inputUserName').val();
-          Swal.fire({
-            title: '確定刪除?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33'
-          }).then((result) => {
-            if (result.isConfirmed) {
-              $('#loading').show();
-              google.script.run.withSuccessHandler(function(res){
-                $('#loading').hide();
-                Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
-              }).deleteUserData(name);
-            }
-          });
+      $('#btnAddInit').click(function () {
+        Swal.fire({
+          title: '輸入新居服員姓名',
+          input: 'text',
+          showCancelButton: true
+        }).then((result) => {
+          if (result.isConfirmed && result.value) {
+            $('#userForm')[0].reset();
+            $('#displayUserName').text(result.value);
+            $('#inputUserName').val(result.value);
+            switchToDetailMode('add');
+          }
         });
       });
 
-      function loadDropdown(){
-        google.script.run.withSuccessHandler(function(list){
-          const select = $('#selectUserName');
-          select.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
-          list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
-        }).getUserList();
-      }
+      $('#btnSave').click(function () {
+        const mode = $('#formMode').val();
+        const data = {
+          userName: $('#inputUserName').val(),
+          userEmail: $('#inputUserEmail').val(),
+          userTel: $('#inputUserTel').val()
+        };
+        $('#loading').show();
+        const action = (mode === 'add') ? 'addUserData' : 'updateUserData';
 
-      function switchToDetailMode(mode){
-        $('#searchSection').hide();
-        $('#detailSection').show();
-        $('#formMode').val(mode);
-        $('#btnSave').text(mode === 'add' ? '新增資料' : '更新資料');
-        if(mode === 'add') $('#btnDelete').hide(); else $('#btnDelete').show();
-      }
+        google.script.run.withSuccessHandler(function (res) {
+          $('#loading').hide();
+          if (res.success) {
+            Swal.fire('成功', res.message, 'success').then(() => {
+              if (mode === 'add') backToSearch();
+              else backToSearch();
+            });
+          } else {
+            Swal.fire('失敗', res.message, 'error');
+          }
+        })[action](data);
+      });
 
-      function backToSearch() {
-        $('#detailSection').hide();
-        $('#searchSection').show();
-        loadDropdown();
-      }
-      /**
-      * 呼叫後端同步權限功能
-      */
-      function syncPermissions() {
-        // 檢查 Swal 是否存在，避免再次報錯
-        if (typeof Swal === 'undefined') {
-          alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
-          return;
-        }
-
-        // 1. 關閉 Offcanvas 導覽列
-        var offcanvasElement = document.querySelector('.offcanvas');
-        if (offcanvasElement) {
-          var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
-          if (offcanvas) offcanvas.hide();
-        }
-
-        // 2. 啟動 SweetAlert2 動態效果
+      $('#btnDelete').click(function () {
+        const name = $('#inputUserName').val();
         Swal.fire({
-          title: '同步權限中',
-          text: '正在更新所有試算表權限，並清理名單，請稍候...',
-          allowOutsideClick: false,
-          showConfirmButton: false,
-          didOpen: () => {
-            Swal.showLoading();
+          title: '確定刪除?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            $('#loading').show();
+            google.script.run.withSuccessHandler(function (res) {
+              $('#loading').hide();
+              Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
+            }).deleteUserData(name);
           }
         });
+      });
+    });
 
-        // 3. 呼叫 GAS 後端
-        google.script.run
-          .withSuccessHandler(function() {
-            Swal.fire({
-              icon: 'success',
-              title: '同步完成',
-              text: '權限已成功更新',
-              timer: 2000
-            });
-          })
-          .withFailureHandler(function(err) {
-            Swal.fire({
-              icon: 'error',
-              title: '同步失敗',
-              text: err.message
-            });
-          })
-          .syncMasterTablePermissions();
-      }      
-      
+    function loadDropdown() {
+      google.script.run.withSuccessHandler(function (list) {
+        const select = $('#selectUserName');
+        select.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
+        list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
+      }).getUserList();
+    }
+
+    function switchToDetailMode(mode) {
+      $('#searchSection').hide();
+      $('#detailSection').show();
+      $('#formMode').val(mode);
+      $('#btnSave').text(mode === 'add' ? '新增資料' : '更新資料');
+      if (mode === 'add') $('#btnDelete').hide(); else $('#btnDelete').show();
+    }
+
+    function backToSearch() {
+      $('#detailSection').hide();
+      $('#searchSection').show();
+      loadDropdown();
+    }
+    /**
+    * 呼叫後端同步權限功能
+    */
+    function syncPermissions() {
+      // 檢查 Swal 是否存在，避免再次報錯
+      if (typeof Swal === 'undefined') {
+        alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
+        return;
+      }
+
+      // 1. 關閉 Offcanvas 導覽列
+      var offcanvasElement = document.querySelector('.offcanvas');
+      if (offcanvasElement) {
+        var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (offcanvas) offcanvas.hide();
+      }
+
+      // 2. 啟動 SweetAlert2 動態效果
+      Swal.fire({
+        title: '同步權限中',
+        text: '正在更新所有試算表權限，並清理名單，請稍候...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 3. 呼叫 GAS 後端
+      google.script.run
+        .withSuccessHandler(function () {
+          Swal.fire({
+            icon: 'success',
+            title: '同步完成',
+            text: '權限已成功更新',
+            timer: 2000
+          });
+        })
+        .withFailureHandler(function (err) {
+          Swal.fire({
+            icon: 'error',
+            title: '同步失敗',
+            text: err.message
+          });
+        })
+        .syncMasterTablePermissions();
+    }
+
     function runManualMaintenance() {
       // 1. 關閉導航列
       var offcanvasElement = document.querySelector('.offcanvas');
@@ -287,15 +288,16 @@
 
       // 3. 呼叫後端函式
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function () {
           Swal.fire('完成', '資料維護與 User 同步已執行完畢。', 'success');
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function (err) {
           Swal.fire('執行失敗', err.message, 'error');
         })
         .dailyMaintenanceJob(); // 執行剛才寫的後端主函式
     }         
   </script>
 </body>
-  <?!= includeFooter(); ?>
+<?!= includeFooter(); ?>
+
 </html>
