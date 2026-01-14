@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "push:gas": "clasp push",
+    "pull:gas": "clasp pull",
+    "deploy:gas": "clasp deploy"
+  },
   "devDependencies": {
-    "@types/google-apps-script": "^2.0.8"
+    "@types/google-apps-script": "^2.0.8",
+    "@google/clasp": "^2.4.1"
   }
 }
