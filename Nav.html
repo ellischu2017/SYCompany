@@ -1,0 +1,37 @@
+<ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=Index"><i class="fas fa-home me-2"></i>首頁</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=Cust"><i class="fas fa-user-injured me-2"></i>個案管理系統</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=User"><i class="fas fa-user-nurse me-2"></i>居服員管理系統</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=Manager"><i class="fas fa-user-nurse me-2"></i>管理員管理系統</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=LTC_Code"><i class="fas fa-list-ol me-2"></i>長照編碼管理</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=RecUrl"><i class="fas fa-link me-2"></i>服務紀錄單網址管理</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?!= getScriptUrl() ?>?page=SR_server"><i class="fas fa-file-medical me-2"></i>電子服務紀錄管理</a>
+  </li>
+
+  <hr class="my-2">
+
+  <li class="nav-item">
+    <a class="nav-link text-primary fw-bold" href="#" onclick="event.preventDefault(); runManualMaintenance();">
+      <i class="fas fa-sync-alt me-2"></i>每日資料維護
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link text-danger fw-bold" href="#" onclick="event.preventDefault(); syncPermissions();">
+      <i class="fas fa-shield-alt me-2"></i>同步試算表權限
+    </a>
+  </li>
+</ul>
