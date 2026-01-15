@@ -188,6 +188,7 @@
         });
 
         if (data.triggerSync) google.script.run.processUserSync();
+        console.log("Initial data loaded:", data); // 新增：輸出初始資料以利偵錯
         $('#loading').fadeOut();
       }).getAdminInitialData();
 
@@ -209,7 +210,9 @@
         payType: $('#queryPayType').val(),
         srId: $('#querySrId').val()
       };
-
+      
+      console.log("runSearch params:", params); // 新增：輸出參數以利偵錯
+      
       if (!params.date) return Swal.fire("錯誤", "請選擇日期", "error");
 
       $('#loading').show();
@@ -264,7 +267,7 @@
         runSearch();
       }).manageSRData(mode, form, currentRef);
     };
-    
+
     window.backToSearch = function () {
       $('#SearchArea').removeClass('hidden');
       $('#editArea').addClass('hidden');

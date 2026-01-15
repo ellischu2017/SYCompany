@@ -9,21 +9,23 @@ function doGet(e) {
   if (!userEmail || userEmail === "") {
     var output = HtmlService.createHtmlOutput(
       "<div style='font-family: sans-serif; text-align: center; padding-top: 50px;'>" +
-      "<h3>需要授權以存取系統</h3>" +
-      "<p>請確保您已登入 Google 帳號。如果仍看到此訊息，請點擊下方按鈕進行授權。</p>" +
-      "<a href='" + ScriptApp.getService().getUrl() + "' target='_top' " +
-      "style='padding: 10px 20px; background: #4285f4; color: white; text-decoration: none; border-radius: 5px;'>重新驗證身份</a>" +
-      "</div>"
+        "<h3>需要授權以存取系統</h3>" +
+        "<p>請確保您已登入 Google 帳號。如果仍看到此訊息，請點擊下方按鈕進行授權。</p>" +
+        "<a href='" +
+        ScriptApp.getService().getUrl() +
+        "' target='_top' " +
+        "style='padding: 10px 20px; background: #4285f4; color: white; text-decoration: none; border-radius: 5px;'>重新驗證身份</a>" +
+        "</div>"
     );
     return output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL); //[cite: 6]
   }
 
   // 2. 檢查是否在 Manager 工作表的允許名單內
-  var page = e.parameter.page || 'Index';
+  var page = e.parameter.page || "Index";
   var isManager = checkManagerPrivilege(userEmail);
 
   // 3. 根據檢查結果決定顯示的頁面
-  var pageToLoad = isManager ? page : 'SR_server01';
+  var pageToLoad = isManager ? page : "SR_server01";
 
   // 建立 HTML 模板
   var template = HtmlService.createTemplateFromFile(pageToLoad);
@@ -32,42 +34,42 @@ function doGet(e) {
   template.userEmail = userEmail;
   template.webAppUrl = ScriptApp.getService().getUrl();
 
-  return template.evaluate()
-    .setTitle(isManager ? '舒漾長照管理系統' : '舒漾電子服務紀錄管理')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+  return template
+    .evaluate()
+    .setTitle(isManager ? "舒漾長照管理系統" : "舒漾電子服務紀錄管理")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
- 
-  }
+}
 
-  /**
-   * 檢查 Email 是否存在於 Manager 工作表的 Mana_Email 欄位
-   */
-  function checkManagerPrivilege(email) {
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var sheet = ss.getSheetByName("Manager");
-      if (!sheet) return false;
+/**
+ * 檢查 Email 是否存在於 Manager 工作表的 Mana_Email 欄位
+ */
+function checkManagerPrivilege(email) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Manager");
+    if (!sheet) return false;
 
-      var data = sheet.getDataRange().getValues();
-      var headers = data[0];
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
 
-      // 尋找 Mana_Email 欄位的索引
-      var emailColIndex = headers.indexOf("Mana_Email");
-      if (emailColIndex === -1) return false;
+    // 尋找 Mana_Email 欄位的索引
+    var emailColIndex = headers.indexOf("Mana_Email");
+    if (emailColIndex === -1) return false;
 
-      // 比對每一列的 Email (忽略大小寫)
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][emailColIndex].toString().toLowerCase() === email.toLowerCase()) {
-          return true;
-        }
+    // 比對每一列的 Email (忽略大小寫)
+    for (var i = 1; i < data.length; i++) {
+      if (
+        data[i][emailColIndex].toString().toLowerCase() === email.toLowerCase()
+      ) {
+        return true;
       }
-    } catch (f) {
-      console.log("驗證過程出錯: " + f.toString());
     }
-    return false;
+  } catch (f) {
+    console.log("驗證過程出錯: " + f.toString());
   }
-
-
+  return false;
+}
 
 /**
  * 取得當前 Web App 的 URL
@@ -88,7 +90,7 @@ function include(filename) {
  * 從試算表動態取得意見反應連結並生成 Footer HTML
  */
 function includeFooter() {
-  let suggestUrl = ""; 
+  let suggestUrl = "";
 
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -108,10 +110,10 @@ function includeFooter() {
   }
 
   // --- 關鍵改寫部分 ---
-  
+
   // 1. 從檔案建立模板
-  const template = HtmlService.createTemplateFromFile('Footer');
-  
+  const template = HtmlService.createTemplateFromFile("Footer");
+
   // 2. 將變數賦值給模板對象 (名稱必須與 HTML 內的 <?= ... ?> 一致)
   template.suggestUrl = suggestUrl;
 
@@ -125,18 +127,17 @@ function includeFooter() {
  */
 function includeNav() {
   // 使用 createTemplateFromFile 而非 createHtmlOutputFromFile
-  var template = HtmlService.createTemplateFromFile('Nav');
-  
+  var template = HtmlService.createTemplateFromFile("Nav");
+
   // 執行並回傳解析後的內容
   return template.evaluate().getContent();
 }
-
 
 // --- 個案管理系統 (Cust) 相關功能 ----------------------------------------------
 
 /**
  * 取得「Cust」工作表的個案姓名列表，用於下拉選單
- * 來源: 
+ * 來源:
  */
 function getCustList() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -149,12 +150,12 @@ function getCustList() {
   // 取得第一欄 (Cust_N) 的所有資料
   const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
   // 過濾空值並轉為一維陣列
-  return data.map(r => r[0]).filter(n => n !== "");
+  return data.map((r) => r[0]).filter((n) => n !== "");
 }
 
 /**
  * 根據個案姓名查詢詳細資料
- * 來源: 
+ * 來源:
  */
 function queryCustData(custName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -163,13 +164,18 @@ function queryCustData(custName) {
 
   // 遍歷資料尋找匹配的姓名 (假設第一列是標題，從第二列開始)
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == custName) { // Cust_N 在第 1 欄 (index 0)
+    if (data[i][0] == custName) {
+      // Cust_N 在第 1 欄 (index 0)
       const row = data[i];
 
       // 處理日期格式 yyyy-MM-dd [cite: 10]
       let birthDate = row[1];
       if (birthDate instanceof Date) {
-        birthDate = Utilities.formatDate(birthDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+        birthDate = Utilities.formatDate(
+          birthDate,
+          Session.getScriptTimeZone(),
+          "yyyy-MM-dd"
+        );
       }
 
       return {
@@ -183,8 +189,8 @@ function queryCustData(custName) {
           Sup_Tel: row[5].toString(), // 強制轉文字 [cite: 23]
           Office_Tel: row[6].toString(),
           Cust_EC: row[7],
-          Cust_EC_Tel: row[8].toString() // 強制轉文字 [cite: 33]
-        }
+          Cust_EC_Tel: row[8].toString(), // 強制轉文字 [cite: 33]
+        },
       };
     }
   }
@@ -193,7 +199,7 @@ function queryCustData(custName) {
 
 /**
  * 新增個案資料
- * 來源: 
+ * 來源:
  */
 function addCustData(formObj) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -213,10 +219,10 @@ function addCustData(formObj) {
     formObj.custAddr,
     formObj.supName,
     formObj.dsupName,
-    "'" + formObj.supTel,    // 電話強制文字格式
+    "'" + formObj.supTel, // 電話強制文字格式
     "'" + formObj.officeTel,
     formObj.ecName,
-    "'" + formObj.ecTel
+    "'" + formObj.ecTel,
   ];
 
   sheet.appendRow(newRow);
@@ -225,7 +231,7 @@ function addCustData(formObj) {
 
 /**
  * 更新個案資料
- * 來源: 
+ * 來源:
  */
 function updateCustData(formObj) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -233,7 +239,8 @@ function updateCustData(formObj) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == formObj.custName) { // 根據姓名鎖定列
+    if (data[i][0] == formObj.custName) {
+      // 根據姓名鎖定列
       // 欄位索引: 0=Name, 1=BD, 2=Add, 3=SupN, 4=DSupN, 5=SupTel, 6=OffTel, 7=EC, 8=ECTel
       const rowNum = i + 1; // 實際列號
 
@@ -255,7 +262,7 @@ function updateCustData(formObj) {
 
 /**
  * 刪除個案資料
- * 來源: 
+ * 來源:
  */
 function deleteCustData(custName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -285,7 +292,7 @@ function getUserList() {
   if (lastRow < 2) return [];
 
   const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  return data.map(r => r[0]).filter(n => n !== "");
+  return data.map((r) => r[0]).filter((n) => n !== "");
 }
 
 /**
@@ -297,14 +304,15 @@ function queryUserData(userName) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == userName) { // User_N 在第 1 欄
+    if (data[i][0] == userName) {
+      // User_N 在第 1 欄
       return {
         found: true,
         rowResult: {
           User_N: data[i][0],
           User_Email: data[i][1],
-          User_Tel: data[i][2].toString()
-        }
+          User_Tel: data[i][2].toString(),
+        },
       };
     }
   }
@@ -326,7 +334,7 @@ function addUserData(formObj) {
   const newRow = [
     formObj.userName,
     formObj.userEmail,
-    "'" + formObj.userTel // 強制文字格式
+    "'" + formObj.userTel, // 強制文字格式
   ];
 
   sheet.appendRow(newRow);
@@ -383,7 +391,7 @@ function getManaList() {
   if (lastRow < 2) return [];
 
   const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  return data.map(r => r[0]).filter(n => n !== "");
+  return data.map((r) => r[0]).filter((n) => n !== "");
 }
 
 /**
@@ -395,14 +403,15 @@ function queryManaData(manaName) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == manaName) { // User_N 在第 1 欄
+    if (data[i][0] == manaName) {
+      // User_N 在第 1 欄
       return {
         found: true,
         rowResult: {
           Mana_N: data[i][0],
           Mana_Email: data[i][1],
-          Mana_Tel: data[i][2].toString()
-        }
+          Mana_Tel: data[i][2].toString(),
+        },
       };
     }
   }
@@ -424,7 +433,7 @@ function addManaData(formObj) {
   const newRow = [
     formObj.manaName,
     formObj.manaEmail,
-    "'" + formObj.manaTel // 強制文字格式
+    "'" + formObj.manaTel, // 強制文字格式
   ];
 
   sheet.appendRow(newRow);
@@ -467,8 +476,6 @@ function deleteManaData(manaName) {
   return { success: false, message: "刪除失敗。" };
 }
 
-
-
 // --- 長照編碼管理 (LTC_Code) 相關功能 --------------------------
 
 /**
@@ -484,7 +491,7 @@ function getLtcCodeList() {
 
   // 取得第一欄 (SR_ID) 的所有資料
   const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  return data.map(r => r[0]).filter(n => n !== "");
+  return data.map((r) => r[0]).filter((n) => n !== "");
 }
 
 /**
@@ -502,8 +509,8 @@ function queryLtcCodeData(srId) {
         rowResult: {
           SR_ID: data[i][0],
           SR_Name: data[i][1],
-          SR_Detail: data[i][2] // 新增第 3 欄：服務內容
-        }
+          SR_Detail: data[i][2], // 新增第 3 欄：服務內容
+        },
       };
     }
   }
@@ -525,7 +532,7 @@ function addLtcCodeData(formObj) {
   const newRow = [
     formObj.srId,
     formObj.srName,
-    formObj.srDetail // 新增 SR_Detail 資料
+    formObj.srDetail, // 新增 SR_Detail 資料
   ];
 
   sheet.appendRow(newRow);
@@ -568,7 +575,6 @@ function deleteLtcCodeData(srId) {
   return { success: false, message: "刪除失敗。" };
 }
 
-
 // --- 服務紀錄單網址管理 (RecUrl) 相關功能 ----------------------------------
 
 /**
@@ -583,7 +589,7 @@ function getRecUrlList() {
   if (lastRow < 2) return [];
 
   const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  return data.map(r => r[0]).filter(n => n !== "");
+  return data.map((r) => r[0]).filter((n) => n !== "");
 }
 
 /**
@@ -595,13 +601,14 @@ function queryRecUrlData(syName) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == syName) { // Cust_N 在第 1 欄
+    if (data[i][0] == syName) {
+      // Cust_N 在第 1 欄
       return {
         found: true,
         rowResult: {
           SY_N: data[i][0],
-          SY_Url: data[i][1]
-        }
+          SY_Url: data[i][1],
+        },
       };
     }
   }
@@ -645,7 +652,6 @@ function deleteRecUrlData(syName) {
   return { success: false, message: "刪除失敗。" };
 }
 
-
 // --- 服務紀錄單管理 (SR_server) 相關功能 ----------------------------------
 
 /**
@@ -654,25 +660,44 @@ function deleteRecUrlData(syName) {
  */
 function getAdminInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+
   const userSheet = ss.getSheetByName("User");
-  const users = userSheet ? userSheet.getDataRange().getValues().slice(1).map(r => ({ name: r[0], email: r[1] })) : [];
+  const users = userSheet
+    ? userSheet
+        .getDataRange()
+        .getValues()
+        .slice(1)
+        .map((r) => ({ name: r[0], email: r[1] }))
+    : [];
 
   const custSheet = ss.getSheetByName("Cust");
-  const customers = custSheet ? custSheet.getDataRange().getValues().slice(1).map(r => r[0]) : [];
+  const customers = custSheet
+    ? custSheet
+        .getDataRange()
+        .getValues()
+        .slice(1)
+        .map((r) => r[0])
+    : [];
 
   const ltcSheet = ss.getSheetByName("LTC_Code");
-  const ltcCodes = ltcSheet ? ltcSheet.getDataRange().getValues().slice(1).map(r => r[0]) : [];
+  const ltcCodes = ltcSheet
+    ? ltcSheet
+        .getDataRange()
+        .getValues()
+        .slice(1)
+        .map((r) => r[0])
+    : [];
 
   // 檢查 SYTemp 是否有待同步資料
-  const tempUserSheet = ss.getSheetByName("SYTemp_User") || ss.getSheetByName("User"); 
-  const hasTempData = tempUserSheet && tempUserSheet.getLastRow() > 1;
+  const tempsheet = getSYTempSpreadsheet();
+  const tempUserSheet = tempsheet.getSheetByName("User");
+  const hasTempData = tempsheet && tempUserSheet.getLastRow() > 1;
 
   return {
     users: users,
     customers: customers,
     ltcCodes: ltcCodes,
-    triggerSync: hasTempData
+    triggerSync: hasTempData,
   };
 }
 
@@ -682,7 +707,7 @@ function getAdminInitialData() {
  */
 function queryServiceRecord(params) {
   const { date, custN, userN, payType, srId } = params; // date 為 "yyyy-MM-dd" 字串
-  const year = date.split('-')[0];
+  const year = date.split("-")[0];
   const syYearKey = "SY" + year;
 
   // 1. 查詢年度表 (SYCompany 體系)
@@ -691,17 +716,20 @@ function queryServiceRecord(params) {
     try {
       const targetSs = SpreadsheetApp.openByUrl(recUrlData.rowResult.SY_Url);
       const result = searchAcrossSheets(targetSs, params);
-      if (result) return { ...result, source: "SYCompany", ssId: targetSs.getId() };
-    } catch(e) { console.log("年度表開啟失敗"); }
+      if (result)
+        return { ...result, source: "SYCompany", ssId: targetSs.getId() };
+    } catch (e) {
+      console.log("年度表開啟失敗");
+    }
   }
 
   // 2. 查詢臨時表 (SYTemp)
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const tempSheet = ss.getSheetByName("SR_Data");
+  const ssTemp = getSYTempSpreadsheet();
+  const tempSheet = ssTemp.getSheetByName("SR_Data");
   const tempResult = searchSheet(tempSheet, params);
-  
+
   if (tempResult) {
-    return { ...tempResult, source: "SYTemp", ssId: ss.getId() };
+    return { ...tempResult, source: "SYTemp", ssId: ssTemp.getId() };
   }
 
   return { found: false };
@@ -721,14 +749,22 @@ function searchSheet(sheet, p) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     // 關鍵修正：將試算表日期轉為字串進行比對，防止少一天
-    let rowDateStr = (data[i][0] instanceof Date) ? 
-      Utilities.formatDate(data[i][0], "GMT+8", "yyyy-MM-dd") : String(data[i][0]);
-      console.log(p);
-    if (rowDateStr === p.date && data[i][2] === p.custN && data[i][3] === p.userN && data[i][4] === p.payType && data[i][5] === p.srId) {
+    let rowDateStr =
+      data[i][0] instanceof Date
+        ? Utilities.formatDate(data[i][0], "GMT+8", "yyyy-MM-dd")
+        : String(data[i][0]);
+    console.log(p);
+    if (
+      rowDateStr === p.date &&
+      data[i][2] === p.custN &&
+      data[i][3] === p.userN &&
+      data[i][4] === p.payType &&
+      data[i][5] === p.srId
+    ) {
       return { found: true, data: data[i], rowIndex: i + 1 };
     }
   }
-  return null;
+  return { found: false, data: null };
 }
 
 /**
@@ -736,7 +772,18 @@ function searchSheet(sheet, p) {
  */
 function manageSRData(action, form, sourceInfo) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const row = [form.date, form.email, form.custN, form.userN, form.payType, form.srId, form.srRec, form.loc, form.mood, form.spcons];
+  const row = [
+    form.date,
+    form.email,
+    form.custN,
+    form.userN,
+    form.payType,
+    form.srId,
+    form.srRec,
+    form.loc,
+    form.mood,
+    form.spcons,
+  ];
 
   if (action === "add") {
     const tempSheet = ss.getSheetByName("SR_Data");
@@ -746,10 +793,15 @@ function manageSRData(action, form, sourceInfo) {
   }
 
   const targetSs = SpreadsheetApp.openById(sourceInfo.ssId);
-  const targetSheet = sourceInfo.source === "SYTemp" ? targetSs.getSheetByName("SR_Data") : targetSs.getSheetByName(sourceInfo.sheetName);
-  
+  const targetSheet =
+    sourceInfo.source === "SYTemp"
+      ? targetSs.getSheetByName("SR_Data")
+      : targetSs.getSheetByName(sourceInfo.sheetName);
+
   if (action === "update") {
-    targetSheet.getRange(sourceInfo.rowIndex, 1, 1, row.length).setValues([row]);
+    targetSheet
+      .getRange(sourceInfo.rowIndex, 1, 1, row.length)
+      .setValues([row]);
     targetSheet.getRange(sourceInfo.rowIndex, 1).setNumberFormat("yyyy-MM-dd");
     return `資料已於 ${sourceInfo.source} 更新成功。`;
   } else if (action === "delete") {
@@ -757,7 +809,6 @@ function manageSRData(action, form, sourceInfo) {
     return `資料已從 ${sourceInfo.source} 刪除。`;
   }
 }
-
 
 // --- 服務紀錄單管理 (SR_server01) 相關功能 ----------------------------------
 /**
@@ -767,24 +818,31 @@ function manageSRData(action, form, sourceInfo) {
 
 function processSRData(formObj, actionType) {
   try {
-    var targetSs = getTargetSpreadsheet(); // 取得 SYTemp 試算表
-    
+    var targetSs = getSYTempSpreadsheet(); // 取得 SYTemp 試算表
+
     // --- 處理新使用者邏輯 (需求 2) ---
     // 如果前端傳來了電話號碼，代表這是新使用者，需要寫入 SYTemp > User
     if (formObj.userTel && formObj.userName && formObj.email) {
       var userSheet = targetSs.getSheetByName("User");
       if (!userSheet) userSheet = targetSs.insertSheet("User");
-      
+
       // 雙重檢查避免重複 (依 Email)
       var uData = userSheet.getDataRange().getValues();
       var uExists = false;
-      for(var k=1; k<uData.length; k++){
-        if(uData[k][1] === formObj.email) { uExists = true; break; }
+      for (var k = 1; k < uData.length; k++) {
+        if (uData[k][1] === formObj.email) {
+          uExists = true;
+          break;
+        }
       }
-      
-      if(!uExists) {
+
+      if (!uExists) {
         // 寫入格式：User_N, User_Email, User_Tel
-        userSheet.appendRow([formObj.userName, formObj.email, "'" + formObj.userTel]);
+        userSheet.appendRow([
+          formObj.userName,
+          formObj.email,
+          "'" + formObj.userTel,
+        ]);
       }
     }
 
@@ -794,7 +852,18 @@ function processSRData(formObj, actionType) {
     if (!targetSheet) {
       targetSheet = targetSs.insertSheet("SR_Data");
       // 確保標頭存在
-      targetSheet.appendRow(["Date", "E-mail", "CUST_N", "USER_N", "Pay_Type", "SR_ID", "SR_REC", "LOC", "MOOD", "SPCONS"]);
+      targetSheet.appendRow([
+        "Date",
+        "E-mail",
+        "CUST_N",
+        "USER_N",
+        "Pay_Type",
+        "SR_ID",
+        "SR_REC",
+        "LOC",
+        "MOOD",
+        "SPCONS",
+      ]);
     }
 
     // 準備寫入的資料列
@@ -810,30 +879,37 @@ function processSRData(formObj, actionType) {
       formObj.srRec || "",
       formObj.loc || "清醒",
       formObj.mood || "穩定",
-      formObj.spcons || "無"
+      formObj.spcons || "無",
     ];
 
     // 新增模式
-    if (actionType === 'add') {
+    if (actionType === "add") {
       targetSheet.appendRow(rowData);
       return { success: true, message: "新增紀錄成功" };
     }
 
     // 查詢、更新、刪除模式
     var data = targetSheet.getDataRange().getValues();
-    
+
     for (let i = 1; i < data.length; i++) {
-      let sheetDate = (data[i][0] instanceof Date) ?
-        Utilities.formatDate(data[i][0], Session.getScriptTimeZone(), "yyyy-MM-dd") : data[i][0].toString();
+      let sheetDate =
+        data[i][0] instanceof Date
+          ? Utilities.formatDate(
+              data[i][0],
+              Session.getScriptTimeZone(),
+              "yyyy-MM-dd"
+            )
+          : data[i][0].toString();
 
       // 比對條件：日期 + 個案名 + 居服員 + 服務編碼
-      if (sheetDate === formObj.date &&
-          data[i][2].toString().trim() === formObj.custName.trim() &&
-          data[i][3].toString().trim() === formObj.userName.trim() &&
-          data[i][4].toString().trim() === formObj.payType.trim() &&
-          data[i][5].toString().trim() === formObj.srId.trim()) {
-
-        if (actionType === 'query') {
+      if (
+        sheetDate === formObj.date &&
+        data[i][2].toString().trim() === formObj.custName.trim() &&
+        data[i][3].toString().trim() === formObj.userName.trim() &&
+        data[i][4].toString().trim() === formObj.payType.trim() &&
+        data[i][5].toString().trim() === formObj.srId.trim()
+      ) {
+        if (actionType === "query") {
           return {
             found: true,
             data: {
@@ -846,25 +922,24 @@ function processSRData(formObj, actionType) {
               srRec: data[i][6],
               loc: data[i][7],
               mood: data[i][8],
-              spcons: data[i][9]
-            }
+              spcons: data[i][9],
+            },
           };
-        } else if (actionType === 'update') {
+        } else if (actionType === "update") {
           targetSheet.getRange(i + 1, 1, 1, 10).setValues([rowData]);
           return { success: true, message: "資料已更新" };
-        } else if (actionType === 'delete') {
+        } else if (actionType === "delete") {
           targetSheet.deleteRow(i + 1);
           return { success: true, message: "資料已刪除" };
         }
       }
     }
 
-    if (actionType === 'query') {
+    if (actionType === "query") {
       return { found: false, message: "在該日期下找不到對應的紀錄" };
     } else {
       return { success: false, message: "操作失敗，找不到該筆資料" };
     }
-
   } catch (e) {
     return { success: false, message: "錯誤：" + e.toString() };
   }
@@ -875,9 +950,8 @@ function processSRData(formObj, actionType) {
  * 這是前端呼叫 getSRServer01InitData() 時對應的後端邏輯
  */
 
-
 function getSRServer01InitData() {
-var userEmail = Session.getActiveUser().getEmail();
+  var userEmail = Session.getActiveUser().getEmail();
   var currentUserName = "";
   var found = false;
 
@@ -887,7 +961,8 @@ var userEmail = Session.getActiveUser().getEmail();
   if (localUserSheet) {
     var localData = localUserSheet.getDataRange().getValues();
     for (var i = 1; i < localData.length; i++) {
-      if (localData[i][1] === userEmail) { // User_Email column
+      if (localData[i][1] === userEmail) {
+        // User_Email column
         currentUserName = localData[i][0]; // User_N
         found = true;
         break;
@@ -898,7 +973,7 @@ var userEmail = Session.getActiveUser().getEmail();
   // 2. 如果本地沒找到，檢查 SYTemp (外部) 的 User 表
   if (!found) {
     try {
-      var remoteSS = getTargetSpreadsheet();
+      var remoteSS = getSYTempSpreadsheet();
       var remoteUserSheet = remoteSS.getSheetByName("User");
       if (remoteUserSheet) {
         var remoteData = remoteUserSheet.getDataRange().getValues();
@@ -920,7 +995,7 @@ var userEmail = Session.getActiveUser().getEmail();
     custNames: getCustList(),
     srIds: getLtcCodeList(),
     currentUserName: currentUserName, // 若為空字串，前端將啟用輸入框
-    userEmail: userEmail || ""
+    userEmail: userEmail || "",
   };
 }
 
@@ -928,7 +1003,7 @@ var userEmail = Session.getActiveUser().getEmail();
  * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 SYTemp 工作表取得外部試算表物件
  * 對應需求 4
  */
-function getTargetSpreadsheet() {
+function getSYTempSpreadsheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet(); // SYCompany (ReadOnly context)
   var sheet = ss.getSheetByName("SYTemp"); // 設定檔所在的工作表
   if (!sheet) throw new Error("找不到 SYCompany 中的 SYTemp 設定工作表");
@@ -944,8 +1019,9 @@ function getTargetSpreadsheet() {
     }
   }
 
-  if (!url) throw new Error("無法在 SYTemp 工作表中找到名稱為 'SYTemp' 的對應網址");
-  
+  if (!url)
+    throw new Error("無法在 SYTemp 工作表中找到名稱為 'SYTemp' 的對應網址");
+
   return SpreadsheetApp.openByUrl(url); // 回傳外部試算表物件
 }
 
@@ -960,7 +1036,7 @@ function getTargetSpreadsheet() {
  */
 function syncMasterTablePermissions() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+
   // 1. 取得管理員 Email 名單
   var managerSheet = ss.getSheetByName("Manager");
   var managerData = managerSheet.getDataRange().getValues();
@@ -980,42 +1056,42 @@ function syncMasterTablePermissions() {
       if (url && url.indexOf("docs.google.com") !== -1) {
         try {
           targetFileIds.push(SpreadsheetApp.openByUrl(url).getId());
-        } catch(e) {}
+        } catch (e) {}
       }
     }
   }
 
   // 3. 執行權限操作
-  targetFileIds.forEach(function(fileId) {
+  targetFileIds.forEach(function (fileId) {
     try {
       // --- 核心：使用 Drive API 授權但不發信 ---
-      managerEmails.forEach(function(email) {
+      managerEmails.forEach(function (email) {
         var resource = {
-          'role': 'writer', // 設為編輯者
-          'type': 'user',
-          'value': email
+          role: "writer", // 設為編輯者
+          type: "user",
+          value: email,
         };
-        
+
         // 關鍵參數：sendNotificationEmails: false
         Drive.Permissions.insert(resource, fileId, {
-          'sendNotificationEmails': false
+          sendNotificationEmails: false,
         });
       });
 
       // --- 移除不在名單內的人員 (這部分仍可使用 DriveApp) ---
       var file = DriveApp.getFileById(fileId);
       var ownerEmail = file.getOwner().getEmail().toLowerCase();
-      
+
       // 清理編輯者
-      file.getEditors().forEach(function(editor) {
+      file.getEditors().forEach(function (editor) {
         var e = editor.getEmail().toLowerCase();
         if (managerEmails.indexOf(e) === -1 && e !== ownerEmail) {
           file.removeEditor(editor);
         }
       });
-      
+
       // 清理檢視者
-      file.getViewers().forEach(function(viewer) {
+      file.getViewers().forEach(function (viewer) {
         var v = viewer.getEmail().toLowerCase();
         if (managerEmails.indexOf(v) === -1) {
           file.removeViewer(viewer);
@@ -1023,8 +1099,10 @@ function syncMasterTablePermissions() {
       });
 
       // 設定一般存取權：知道連結的人可檢視
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
+      file.setSharing(
+        DriveApp.Access.ANYONE_WITH_LINK,
+        DriveApp.Permission.VIEW
+      );
     } catch (e) {
       console.error("檔案 ID " + fileId + " 處理失敗: " + e.message);
     }
@@ -1037,8 +1115,8 @@ function syncMasterTablePermissions() {
  */
 function dailyMaintenanceJob() {
   const ss = SpreadsheetApp.getActiveSpreadsheet(); // 目前應為 SYCompany
-  const tempSS = getTargetSpreadsheet(); // 呼叫您現有的函式取得 SYTemp 試算表
-  
+  const tempSS = getSYTempSpreadsheet(); // 呼叫您現有的函式取得 SYTemp 試算表
+
   // --- 任務 A: 處理 User 名單同步 (需求 4) ---
   processUserSync(ss, tempSS);
 
@@ -1055,15 +1133,17 @@ function dailyMaintenanceJob() {
 function processUserSync(mainSS, tempSS) {
   const tempUserSheet = tempSS.getSheetByName("User");
   const mainUserSheet = mainSS.getSheetByName("User");
-  
+
   if (!tempUserSheet || !mainUserSheet) return;
-  
+
   const tempData = tempUserSheet.getDataRange().getValues();
   if (tempData.length <= 1) return; // 只有標題列
 
   // 1. 取得主表 (SYCompany) 現有的 Email 名單
   const mainData = mainUserSheet.getDataRange().getValues();
-  const existingEmails = mainData.slice(1).map(row => row[1].toString().trim().toLowerCase());
+  const existingEmails = mainData
+    .slice(1)
+    .map((row) => row[1].toString().trim().toLowerCase());
 
   const newRowsToAppend = [];
   const headers = tempData[0];
@@ -1084,8 +1164,13 @@ function processUserSync(mainSS, tempSS) {
   // 3. 執行寫入主表 (如果有新資料)
   if (newRowsToAppend.length > 0) {
     const startRow = mainUserSheet.getLastRow() + 1;
-    const targetRange = mainUserSheet.getRange(startRow, 1, newRowsToAppend.length, headers.length);
-    
+    const targetRange = mainUserSheet.getRange(
+      startRow,
+      1,
+      newRowsToAppend.length,
+      headers.length
+    );
+
     // 強制設定為文字格式防止電話 0 消失
     targetRange.setNumberFormat("@");
     targetRange.setValues(newRowsToAppend);
@@ -1113,16 +1198,16 @@ function processSRDataMigration(mainSS, tempSS) {
   const headers = data[0];
   const today = new Date();
   const cutoffDate = new Date();
-  cutoffDate.setDate(today.getDate() - 7); 
+  cutoffDate.setDate(today.getDate() - 7);
 
-  const migrationMap = {}; 
+  const migrationMap = {};
   const rowsToKeep = [headers];
   let createdNewSS = false;
 
   for (let i = 1; i < data.length; i++) {
     let row = [...data[i]];
     let rawDate = row[0];
-    
+
     // 修正日期少一天的關鍵：處理字串並指定時區
     let dateObj;
     if (rawDate instanceof Date) {
@@ -1131,9 +1216,13 @@ function processSRDataMigration(mainSS, tempSS) {
       // 避免字串解析時區偏移，將 "-" 取代為 "/" 有助於部分瀏覽器引擎正確解析
       dateObj = new Date(rawDate.toString().replace(/-/g, "/"));
     }
-    
+
     // 強制格式化為 yyyy-MM-dd 字串，確保搬運過程不失真
-    let formattedDate = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    let formattedDate = Utilities.formatDate(
+      dateObj,
+      Session.getScriptTimeZone(),
+      "yyyy-MM-dd"
+    );
     row[0] = formattedDate;
 
     if (dateObj < cutoffDate) {
@@ -1148,9 +1237,9 @@ function processSRDataMigration(mainSS, tempSS) {
   for (let year in migrationMap) {
     let syName = "SY" + year;
     let targetUrl = getUrlFromRecUrl(mainSS, syName);
-    
+
     if (!targetUrl) {
-      targetUrl = createNewYearlySS(mainSS, syName); 
+      targetUrl = createNewYearlySS(mainSS, syName);
       createdNewSS = true;
     }
 
@@ -1160,11 +1249,13 @@ function processSRDataMigration(mainSS, tempSS) {
   }
 
   if (createdNewSS) {
-    syncMasterTablePermissions(); 
+    syncMasterTablePermissions();
   }
 
   srSheet.clearContents();
-  srSheet.getRange(1, 1, rowsToKeep.length, headers.length).setValues(rowsToKeep);
+  srSheet
+    .getRange(1, 1, rowsToKeep.length, headers.length)
+    .setValues(rowsToKeep);
 }
 
 /**
@@ -1191,27 +1282,44 @@ function appendDataToExternalSS(url, year, rows) {
     const targetSS = SpreadsheetApp.openByUrl(url);
     const firstDateStr = rows[0][0].toString().replace(/-/g, "/");
     const firstDate = new Date(firstDateStr);
-    const monthStr = Utilities.formatDate(firstDate, Session.getScriptTimeZone(), "yyyyMM");
-    
+    const monthStr = Utilities.formatDate(
+      firstDate,
+      Session.getScriptTimeZone(),
+      "yyyyMM"
+    );
+
     let targetSheet = targetSS.getSheetByName(monthStr);
-    
+
     // 如果是新工作表
     if (!targetSheet) {
       targetSheet = targetSS.insertSheet(monthStr);
-      const headers = ["Date", "E-mail", "CUST_N", "USER_N", "Pay_Type", "SR_ID", "SR_REC", "LOC", "MOOD", "SPCONS"];
+      const headers = [
+        "Date",
+        "E-mail",
+        "CUST_N",
+        "USER_N",
+        "Pay_Type",
+        "SR_ID",
+        "SR_REC",
+        "LOC",
+        "MOOD",
+        "SPCONS",
+      ];
       targetSheet.appendRow(headers);
       targetSheet.setFrozenRows(1);
       targetSheet.getRange("A:A").setNumberFormat("yyyy-MM-dd");
     }
-    
+
     // 1. 寫入新資料
     const startRow = targetSheet.getLastRow() + 1;
     const numCols = rows[0].length;
     const targetRange = targetSheet.getRange(startRow, 1, rows.length, numCols);
-    
+
     // 寫入前先針對非日期欄位設定純文字格式
     if (numCols > 1) {
-      targetSheet.getRange(startRow, 2, rows.length, numCols - 1).setNumberFormat("@");
+      targetSheet
+        .getRange(startRow, 2, rows.length, numCols - 1)
+        .setNumberFormat("@");
     }
     targetRange.setValues(rows);
 
@@ -1224,15 +1332,17 @@ function appendDataToExternalSS(url, year, rows) {
 
     // 取得目前所有資料範圍 (從 A1 到最後一列最後一欄)
     const fullRange = targetSheet.getDataRange();
-    
+
     // 建立新的篩選器
     const newFilter = fullRange.createFilter();
-    
+
     // 3. 執行排序：針對第 1 欄 (Date) 進行 A 到 Z 排序
     // 參數 1 代表第一欄，true 代表由小到大 (A-Z)
     newFilter.sort(1, true);
 
-    console.log(`成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`);
+    console.log(
+      `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`
+    );
   } catch (e) {
     console.error("寫入外部試算表失敗: " + e.toString());
   }
