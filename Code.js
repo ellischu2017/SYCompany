@@ -2,22 +2,19 @@
  * 處理 HTTP GET 請求
  * 根據參數 'page' 決定顯示哪個 HTML 檔案
  */
+
+const MainSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
 function doGet(e) {
   // 1. 取得當前登入使用者的 Email
   var userEmail = Session.getActiveUser().getEmail();
   // 如果因為權限設定抓不到 Email，會引導使用者登入
   if (!userEmail || userEmail === "") {
-    var output = HtmlService.createHtmlOutput(
-      "<div style='font-family: sans-serif; text-align: center; padding-top: 50px;'>" +
-        "<h3>需要授權以存取系統</h3>" +
-        "<p>請確保您已登入 Google 帳號。如果仍看到此訊息，請點擊下方按鈕進行授權。</p>" +
-        "<a href='" +
-        ScriptApp.getService().getUrl() +
-        "' target='_top' " +
-        "style='padding: 10px 20px; background: #4285f4; color: white; text-decoration: none; border-radius: 5px;'>重新驗證身份</a>" +
-        "</div>"
-    );
-    return output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL); //[cite: 6]
+    var template = HtmlService.createTemplateFromFile("Auth");
+    template.scriptUrl = getScriptUrl();
+    return template
+      .evaluate()
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL); //[cite: 6]
   }
 
   // 2. 檢查是否在 Manager 工作表的允許名單內
@@ -32,7 +29,7 @@ function doGet(e) {
 
   // 傳遞參數給前端 (選用)
   template.userEmail = userEmail;
-  template.webAppUrl = ScriptApp.getService().getUrl();
+  template.webAppUrl = getScriptUrl(); // 用於前端按鈕跳轉
 
   return template
     .evaluate()
@@ -46,8 +43,7 @@ function doGet(e) {
  */
 function checkManagerPrivilege(email) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Manager");
+    var sheet = MainSpreadsheet.getSheetByName("Manager");
     if (!sheet) return false;
 
     var data = sheet.getDataRange().getValues();
@@ -93,8 +89,7 @@ function includeFooter() {
   let suggestUrl = "";
 
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("SYTemp");
+    const sheet = MainSpreadsheet.getSheetByName("SYTemp");
 
     if (sheet) {
       const data = sheet.getDataRange().getValues();
@@ -140,8 +135,7 @@ function includeNav() {
  * 來源:
  */
 function getCustList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Cust"); // [cite: 3]
+  const sheet = MainSpreadsheet.getSheetByName("Cust"); // [cite: 3]
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -158,8 +152,7 @@ function getCustList() {
  * 來源:
  */
 function queryCustData(custName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Cust");
+  const sheet = MainSpreadsheet.getSheetByName("Cust");
   const data = sheet.getDataRange().getValues();
 
   // 遍歷資料尋找匹配的姓名 (假設第一列是標題，從第二列開始)
@@ -202,8 +195,7 @@ function queryCustData(custName) {
  * 來源:
  */
 function addCustData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Cust");
+  const sheet = MainSpreadsheet.getSheetByName("Cust");
 
   // 檢查是否已存在
   const list = getCustList();
@@ -234,8 +226,7 @@ function addCustData(formObj) {
  * 來源:
  */
 function updateCustData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Cust");
+  const sheet = MainSpreadsheet.getSheetByName("Cust");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -265,8 +256,7 @@ function updateCustData(formObj) {
  * 來源:
  */
 function deleteCustData(custName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Cust");
+  const sheet = MainSpreadsheet.getSheetByName("Cust");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -284,8 +274,7 @@ function deleteCustData(custName) {
  * 取得「User」工作表的居服員姓名列表
  */
 function getUserList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("User");
+  const sheet = MainSpreadsheet.getSheetByName("User");
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -299,8 +288,7 @@ function getUserList() {
  * 查詢居服員詳細資料
  */
 function queryUserData(userName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("User");
+  const sheet = MainSpreadsheet.getSheetByName("User");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -323,8 +311,7 @@ function queryUserData(userName) {
  * 新增居服員資料
  */
 function addUserData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("User");
+  const sheet = MainSpreadsheet.getSheetByName("User");
   const list = getUserList();
 
   if (list.includes(formObj.userName)) {
@@ -345,8 +332,7 @@ function addUserData(formObj) {
  * 更新居服員資料
  */
 function updateUserData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("User");
+  const sheet = MainSpreadsheet.getSheetByName("User");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -364,8 +350,7 @@ function updateUserData(formObj) {
  * 刪除居服員資料
  */
 function deleteUserData(userName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("User");
+  const sheet = MainSpreadsheet.getSheetByName("User");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -383,8 +368,7 @@ function deleteUserData(userName) {
  * 取得「Manager」工作表的管理員姓名列表
  */
 function getManaList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Manager");
+  const sheet = MainSpreadsheet.getSheetByName("Manager");
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -398,8 +382,7 @@ function getManaList() {
  * 查詢管理員詳細資料
  */
 function queryManaData(manaName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Manager");
+  const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -422,8 +405,7 @@ function queryManaData(manaName) {
  * 新增管理員資料
  */
 function addManaData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Manager");
+  const sheet = MainSpreadsheet.getSheetByName("Manager");
   const list = getManaList();
 
   if (list.includes(formObj.manaName)) {
@@ -444,8 +426,7 @@ function addManaData(formObj) {
  * 更新管理員資料
  */
 function updateManaData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Manager");
+  const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -463,8 +444,7 @@ function updateManaData(formObj) {
  * 刪除管理員資料
  */
 function deleteManaData(manaName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Manager");
+  const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -482,8 +462,7 @@ function deleteManaData(manaName) {
  * 取得「LTC_Code」工作表的服務編碼列表 (SR_ID)
  */
 function getLtcCodeList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("LTC_Code");
+  const sheet = MainSpreadsheet.getSheetByName("LTC_Code");
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -498,8 +477,7 @@ function getLtcCodeList() {
  * 查詢服務編碼詳細資料
  */
 function queryLtcCodeData(srId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("LTC_Code");
+  const sheet = MainSpreadsheet.getSheetByName("LTC_Code");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -521,8 +499,7 @@ function queryLtcCodeData(srId) {
  * 新增服務編碼
  */
 function addLtcCodeData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("LTC_Code");
+  const sheet = MainSpreadsheet.getSheetByName("LTC_Code");
   const list = getLtcCodeList();
 
   if (list.includes(formObj.srId)) {
@@ -543,8 +520,7 @@ function addLtcCodeData(formObj) {
  * 更新服務編碼資料
  */
 function updateLtcCodeData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("LTC_Code");
+  const sheet = MainSpreadsheet.getSheetByName("LTC_Code");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -562,8 +538,7 @@ function updateLtcCodeData(formObj) {
  * 刪除服務編碼
  */
 function deleteLtcCodeData(srId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("LTC_Code");
+  const sheet = MainSpreadsheet.getSheetByName("LTC_Code");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -581,8 +556,7 @@ function deleteLtcCodeData(srId) {
  * 取得「RecUrl」工作表的個案姓名列表
  */
 function getRecUrlList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("RecUrl");
+  const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -596,8 +570,7 @@ function getRecUrlList() {
  * 查詢特定個案的網址資料
  */
 function queryRecUrlData(syName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("RecUrl");
+  const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -619,8 +592,7 @@ function queryRecUrlData(syName) {
  * 儲存網址資料 (新增或更新)
  */
 function saveRecUrlData(formObj) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("RecUrl");
+  const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   const data = sheet.getDataRange().getValues();
 
   // 檢查是否已存在，存在則更新，不存在則新增
@@ -639,8 +611,7 @@ function saveRecUrlData(formObj) {
  * 刪除網址資料
  */
 function deleteRecUrlData(syName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("RecUrl");
+  const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -659,9 +630,7 @@ function deleteRecUrlData(syName) {
  * 管理員頁面初始化資料
  */
 function getAdminInitialData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  const userSheet = ss.getSheetByName("User");
+  const userSheet = MainSpreadsheet.getSheetByName("User");
   const users = userSheet
     ? userSheet
         .getDataRange()
@@ -670,7 +639,7 @@ function getAdminInitialData() {
         .map((r) => ({ name: r[0], email: r[1] }))
     : [];
 
-  const custSheet = ss.getSheetByName("Cust");
+  const custSheet = MainSpreadsheet.getSheetByName("Cust");
   const customers = custSheet
     ? custSheet
         .getDataRange()
@@ -679,7 +648,7 @@ function getAdminInitialData() {
         .map((r) => r[0])
     : [];
 
-  const ltcSheet = ss.getSheetByName("LTC_Code");
+  const ltcSheet = MainSpreadsheet.getSheetByName("LTC_Code");
   const ltcCodes = ltcSheet
     ? ltcSheet
         .getDataRange()
@@ -689,7 +658,7 @@ function getAdminInitialData() {
     : [];
 
   // 檢查 SYTemp 是否有待同步資料
-  const tempsheet = getSYTempSpreadsheet();
+  const tempsheet = getTargetsheet("SYTemp", "SYTemp");
   const tempUserSheet = tempsheet.getSheetByName("User");
   const hasTempData = tempsheet && tempUserSheet.getLastRow() > 1;
 
@@ -724,7 +693,7 @@ function queryServiceRecord(params) {
   }
 
   // 2. 查詢臨時表 (SYTemp)
-  const ssTemp = getSYTempSpreadsheet();
+  const ssTemp = getTargetsheet("SYTemp", "SYTemp");
   const tempSheet = ssTemp.getSheetByName("SR_Data");
   const tempResult = searchSheet(tempSheet, params);
 
@@ -736,7 +705,7 @@ function queryServiceRecord(params) {
 }
 
 function searchAcrossSheets(ss, p) {
-  const sheets = ss.getSheets();
+  const sheets = MainSpreadsheet.getSheets();
   for (let sheet of sheets) {
     const res = searchSheet(sheet, p);
     if (res) return { ...res, sheetName: sheet.getName() };
@@ -771,7 +740,6 @@ function searchSheet(sheet, p) {
  * 管理員 CRUD 操作
  */
 function manageSRData(action, form, sourceInfo) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const row = [
     form.date,
     form.email,
@@ -786,7 +754,7 @@ function manageSRData(action, form, sourceInfo) {
   ];
 
   if (action === "add") {
-    const tempSheet = ss.getSheetByName("SR_Data");
+    const tempSheet = MainSpreadsheet.getSheetByName("SR_Data");
     tempSheet.appendRow(row);
     tempSheet.getRange(tempSheet.getLastRow(), 1).setNumberFormat("yyyy-MM-dd");
     return "已成功新增至 SYTemp。";
@@ -818,7 +786,7 @@ function manageSRData(action, form, sourceInfo) {
 
 function processSRData(formObj, actionType) {
   try {
-    var targetSs = getSYTempSpreadsheet(); // 取得 SYTemp 試算表
+    var targetSs = getTargetsheet("SYTemp", "SYTemp"); // 取得 SYTemp 試算表
 
     // --- 處理新使用者邏輯 (需求 2) ---
     // 如果前端傳來了電話號碼，代表這是新使用者，需要寫入 SYTemp > User
@@ -956,8 +924,7 @@ function getSRServer01InitData() {
   var found = false;
 
   // 1. 先檢查 SYCompany (本地) 的 User 表
-  var localSS = SpreadsheetApp.getActiveSpreadsheet();
-  var localUserSheet = localSS.getSheetByName("User");
+  var localUserSheet = MainSpreadsheet.getSheetByName("User");
   if (localUserSheet) {
     var localData = localUserSheet.getDataRange().getValues();
     for (var i = 1; i < localData.length; i++) {
@@ -973,7 +940,7 @@ function getSRServer01InitData() {
   // 2. 如果本地沒找到，檢查 SYTemp (外部) 的 User 表
   if (!found) {
     try {
-      var remoteSS = getSYTempSpreadsheet();
+      var remoteSS = getTargetsheet("SYTemp", "SYTemp");
       var remoteUserSheet = remoteSS.getSheetByName("User");
       if (remoteUserSheet) {
         var remoteData = remoteUserSheet.getDataRange().getValues();
@@ -1000,31 +967,28 @@ function getSRServer01InitData() {
 }
 
 /**
- * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 SYTemp 工作表取得外部試算表物件
- * 對應需求 4
+ * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物件
  */
-function getSYTempSpreadsheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet(); // SYCompany (ReadOnly context)
-  var sheet = ss.getSheetByName("SYTemp"); // 設定檔所在的工作表
-  if (!sheet) throw new Error("找不到 SYCompany 中的 SYTemp 設定工作表");
+function getTargetsheet(sheetName,targetName) {
+  var sheet = MainSpreadsheet.getSheetByName(sheetName); // 設定檔所在的工作表
+  if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName +"工作表");
 
   var data = sheet.getDataRange().getValues();
   var url = "";
 
   // 尋找 SYT_N 為 "SYTemp" 的網址
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === "SYTemp") {
+    if (data[i][0] === targetName) {
       url = data[i][1];
       break;
     }
   }
 
   if (!url)
-    throw new Error("無法在 SYTemp 工作表中找到名稱為 'SYTemp' 的對應網址");
+    throw new Error("無法在"+ sheetName +"工作表中找到名稱為"+ targetName +"的對應網址");
 
   return SpreadsheetApp.openByUrl(url); // 回傳外部試算表物件
 }
-
 //------自動更新部份------------------------------------
 
 /**
@@ -1035,10 +999,8 @@ function getSYTempSpreadsheet() {
  * 4. 將「一般存取權」設為「知道連結的人即可檢視」。
  */
 function syncMasterTablePermissions() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
   // 1. 取得管理員 Email 名單
-  var managerSheet = ss.getSheetByName("Manager");
+  var managerSheet = MainSpreadsheet.getSheetByName("Manager");
   var managerData = managerSheet.getDataRange().getValues();
   var managerEmails = [];
   for (var i = 1; i < managerData.length; i++) {
@@ -1047,8 +1009,8 @@ function syncMasterTablePermissions() {
   }
 
   // 2. 取得所有目標檔案 ID (包含 SYCompany 與 RecUrl 中的網址)
-  var targetFileIds = [ss.getId()];
-  var recUrlSheet = ss.getSheetByName("RecUrl");
+  var targetFileIds = [MainSpreadsheet.getId()];
+  var recUrlSheet = MainSpreadsheet.getSheetByName("RecUrl");
   if (recUrlSheet) {
     var urlData = recUrlSheet.getDataRange().getValues();
     for (var j = 1; j < urlData.length; j++) {
@@ -1114,14 +1076,13 @@ function syncMasterTablePermissions() {
  * 建議觸發時間：每日 00:00 - 01:00
  */
 function dailyMaintenanceJob() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet(); // 目前應為 SYCompany
-  const tempSS = getSYTempSpreadsheet(); // 呼叫您現有的函式取得 SYTemp 試算表
+  const tempSS = getTargetsheet("SYTemp", "SYTemp"); // 呼叫您現有的函式取得 SYTemp 試算表
 
   // --- 任務 A: 處理 User 名單同步 (需求 4) ---
-  processUserSync(ss, tempSS);
+  processUserSync(MainSpreadsheet, tempSS);
 
   // --- 任務 B: 處理過期 SR_Data 遷移 (需求 2 & 3) ---
-  processSRDataMigration(ss, tempSS);
+  processSRDataMigration(MainSpreadsheet, tempSS);
 }
 
 /**
