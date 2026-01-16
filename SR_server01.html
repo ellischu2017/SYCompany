@@ -1,393 +1,466 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <base target="_top" />
+    <title>舒漾電子服務紀錄管理</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      body {
+        background-color: #fff5f5;
+        font-family: "Microsoft JhengHei", sans-serif;
+        padding: 20px;
+      }
 
-<head>
-  <base target="_top">
-  <title>舒漾電子服務紀錄管理</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    body {
-      background-color: #fff5f5;
-      font-family: "Microsoft JhengHei", sans-serif;
-      padding: 20px;
-    }
+      .container {
+        max-width: 700px;
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        margin: auto;
+      }
 
-    .container {
-      max-width: 700px;
-      background: white;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      margin: auto;
-    }
+      .loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+      }
 
-    .loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
+      .label-value {
+        font-weight: bold;
+        color: #d63384;
+        font-size: 1.1rem;
+        padding: 5px 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        display: inline-block;
+        min-width: 100px;
+      }
 
-    .label-value {
-      font-weight: bold;
-      color: #d63384;
-      font-size: 1.1rem;
-      padding: 5px 10px;
-      background: #f8f9fa;
-      border-radius: 5px;
-      display: inline-block;
-      min-width: 100px;
-    }
+      .hidden-section {
+        display: none;
+      }
 
-    .hidden-section {
-      display: none;
-    }
+      .section-title {
+        border-left: 5px solid #dc3545;
+        padding-left: 10px;
+        margin-bottom: 20px;
+        color: #dc3545;
+      }
+    </style>
+  </head>
 
-    .section-title {
-      border-left: 5px solid #dc3545;
-      padding-left: 10px;
-      margin-bottom: 20px;
-      color: #dc3545;
-    }
-  </style>
-</head>
-
-<body>
-
-  <div id="loading" class="loading">
-    <div class="spinner-border text-danger"></div>
-  </div>
-
-  <div class="container">
-    <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理</h2>
-
-    <div id="searchSection">
-      <div class="mb-3">
-        <label class="form-label">登入 E-mail</label>
-        <div class="input-group">
-          <input type="email" class="form-control" id="currentUserEmail" readonly>
-        </div>
-        <a href="https://accounts.google.com/AccountChooser?continue=<?= getScriptUrl() ?>?page=Index" target="_top"
-          class="btn btn-outline-danger">
-          更換 Email 登入
-        </a>
-      </div>
-
-      <h5 class="section-title">查詢條件</h5>
-      <div class="row">
-        <div class="col-md-4 mb-3">
-          <label class="form-label">日期 (Date)</label>
-          <input type="date" class="form-control" id="queryDate">
-        </div>
-        <div class="col-md-4 mb-3">
-          <label class="form-label">居服員姓名 (User_N)</label>
-          <input type="text" class="form-control" id="queryUserN" disabled placeholder="系統載入中...">
-        </div>
-        <div class="col-md-4 mb-3">
-          <label class="form-label">個案姓名 (Cust_N)</label>
-          <select class="form-select" id="queryCustN"></select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="col-md-6 mb-3">
-          <label class="form-label">服務編碼 (Pay_Type)</label>
-          <select class="form-select" id="queryPType">
-            <option value="補助" selected>補助</option>
-            <option value="自費">自費</option>
-          </select>
-        </div>
-
-        <div class="col-md-6 mb-3">
-          <label class="form-label">服務編碼 (SR_ID)</label>
-          <select class="form-select" id="querySrId"></select>
-        </div>
-      </div>
-
-      <div class="d-grid gap-2 mt-3">
-        <button class="btn btn-danger btn-lg" onclick="handleAction('query')">查詢紀錄</button>
-      </div>
+  <body>
+    <div id="loading" class="loading">
+      <div class="spinner-border text-danger"></div>
     </div>
 
-    <div id="detailSection" class="hidden-section mt-4 border-top pt-4">
-      <h5 class="section-title">紀錄內容</h5>
-      <div class="row mb-3">
-        <div class="col-6">
-          <label class="form-label d-block text-muted small">個案姓名</label>
-          <span id="labCustN" class="label-value"></span>
+    <div class="container">
+      <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理</h2>
+
+      <div id="searchSection">
+        <div class="mb-3">
+          <label class="form-label">登入 E-mail</label>
+          <div class="input-group">
+            <input
+              type="email"
+              class="form-control"
+              id="currentUserEmail"
+              readonly
+            />
+          </div>
+          <a
+            href="https://accounts.google.com/AccountChooser?continue=<?= getScriptUrl() ?>?page=Index"
+            target="_top"
+            class="btn btn-outline-danger"
+          >
+            更換 Email 登入
+          </a>
         </div>
-        <div class="col-6">
-          <label class="form-label d-block text-muted small">服務編碼</label>
-          <span id="labPType" class="label-value"></span>
-          <span id="labSrId" class="label-value"></span>
+
+        <h5 class="section-title">查詢條件</h5>
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label">日期 (Date)</label>
+            <input type="date" class="form-control" id="queryDate" />
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">居服員姓名 (User_N)</label>
+            <input
+              type="text"
+              class="form-control"
+              id="queryUserN"
+              disabled
+              placeholder="系統載入中..."
+            />
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">個案姓名 (Cust_N)</label>
+            <select class="form-select" id="queryCustN"></select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">服務編碼 (Pay_Type)</label>
+            <select class="form-select" id="queryPType">
+              <option value="補助" selected>補助</option>
+              <option value="自費">自費</option>
+            </select>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label">服務編碼 (SR_ID)</label>
+            <select class="form-select" id="querySrId"></select>
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-danger btn-lg" onclick="handleAction('query')">
+            查詢紀錄
+          </button>
         </div>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">服務紀錄內容 (SR_REC)</label>
-        <textarea class="form-control" id="inputSrRec" rows="4" placeholder="請詳細輸入服務內容..."></textarea>
-      </div>
-      <div class="row">
-        <div class="col-md-6 mb-3">
-          <label class="form-label">意識狀況 (LOC)</label>
-          <select class="form-select" id="inputLoc">
-            <option value="清醒">清醒</option>
-            <option value="混亂">混亂</option>
-            <option value="木僵">木僵</option>
-            <option value="嗜睡">嗜睡</option>
-            <option value="昏迷">昏迷</option>
-          </select>
+      <div id="detailSection" class="hidden-section mt-4 border-top pt-4">
+        <h5 class="section-title">紀錄內容</h5>
+        <div class="row mb-3">
+          <div class="col-6">
+            <!-- <label class="form-label d-block text-muted small">個案姓名</label> -->
+            <span id="labQuery" class="label-value"></span>
+          </div>
+          <!-- <div class="col-6">
+        <label class="form-label d-block text-muted small">服務編碼</label> 
+        </div> -->
         </div>
-        <div class="col-md-6 mb-3">
-          <label class="form-label">身心狀況 (Mood)</label>
-          <select class="form-select" id="inputMood">
-            <option value="穩定">穩定</option>
-            <option value="不穩定">不穩定</option>
-          </select>
-        </div>
+
         <div class="mb-3">
-          <label class="form-label">特殊狀況說明及處理 (SPCONS)</label>
-          <textarea class="form-control" id="inputSpcons" rows="2"></textarea>
+          <label class="form-label">服務紀錄內容 (SR_REC)</label>
+          <textarea
+            class="form-control"
+            id="inputSrRec"
+            rows="4"
+            placeholder="請詳細輸入服務內容..."
+          ></textarea>
         </div>
-      </div>
-      <div class="d-grid gap-2">
-        <button class="btn btn-primary btn-lg" id="btnUpdate" onclick="handleAction('update')">更新紀錄</button>
-        <button class="btn btn-success btn-lg" id="btnAdd" onclick="handleAction('add')">確認存檔</button>
-        <!--
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">意識狀況 (LOC)</label>
+            <select class="form-select" id="inputLoc">
+              <option value="清醒">清醒</option>
+              <option value="混亂">混亂</option>
+              <option value="木僵">木僵</option>
+              <option value="嗜睡">嗜睡</option>
+              <option value="昏迷">昏迷</option>
+            </select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">身心狀況 (Mood)</label>
+            <select class="form-select" id="inputMood">
+              <option value="穩定">穩定</option>
+              <option value="不穩定">不穩定</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">特殊狀況說明及處理 (SPCONS)</label>
+            <textarea class="form-control" id="inputSpcons" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="d-grid gap-2">
+          <button
+            class="btn btn-primary btn-lg"
+            id="btnUpdate"
+            onclick="handleAction('update')"
+          >
+            更新紀錄
+          </button>
+          <button
+            class="btn btn-success btn-lg"
+            id="btnAdd"
+            onclick="handleAction('add')"
+          >
+            確認存檔
+          </button>
+          <!--
           <button class="btn btn-danger flex-grow-1" id="btnDelete" onclick="handleAction('delete')">刪除</button> 
           -->
-        <button class="btn btn-secondary btn-lg" onclick="backToSearch()">返回查詢</button>
+          <button class="btn btn-secondary btn-lg" onclick="backToSearch()">
+            返回查詢
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-  <script>
-    $(document).ready(function () {
-      // --- 需求 1：日期前後只能 7 天 ---
-      const today = new Date();
-      const formatDate = (date) => date.toISOString().split('T')[0];
+    <script>
+      $(document).ready(function () {
+        // --- 需求 1：日期前後只能 7 天 ---
+        const today = new Date();
+        const formatDate = (date) => date.toISOString().split("T")[0];
 
-      // 設定 input 預設值為今日
-      $('#queryDate').val(formatDate(today));
+        // 設定 input 預設值為今日
+        $("#queryDate").val(formatDate(today));
 
-      // 計算並設定 min (前7天) 與 max (後7天)
-      const minDate = new Date(today);
-      minDate.setDate(today.getDate() - 7);
-      const maxDate = new Date(today);
-      maxDate.setDate(today.getDate() + 7);
+        // 計算並設定 min (前7天) 與 max (後7天)
+        const minDate = new Date(today);
+        minDate.setDate(today.getDate() - 7);
+        const maxDate = new Date(today);
+        maxDate.setDate(today.getDate() + 7);
 
-      $('#queryDate').attr('min', formatDate(minDate));
-      $('#queryDate').attr('max', formatDate(maxDate));
-      // ---------------------------------
+        $("#queryDate").attr("min", formatDate(minDate));
+        $("#queryDate").attr("max", formatDate(maxDate));
+        // ---------------------------------
 
-      $('#loading').show();
+        $("#loading").show();
 
-      google.script.run
-        .withSuccessHandler(function (data) {
-          $('#loading').hide();
+        google.script.run
+          .withSuccessHandler(function (data) {
+            $("#loading").hide();
 
-          if (data.userEmail) {
-            $('#currentUserEmail').val(data.userEmail);
-          } else {
-            $('#currentUserEmail').val("未取得登入資訊");
-          }
-
-          fillSelect('#queryCustN', data.custNames, '');
-          fillSelect('#querySrId', data.srIds, '');
-
-          // --- 需求 2：處理 User_N 欄位 ---
-          const userInput = $('#queryUserN');
-          if (data.currentUserName) {
-            // 找到資料：設定姓名並鎖定，標記為舊用戶
-            userInput.val(data.currentUserName).prop('disabled', true);
-            isNewUser = false;
-          } else {
-            // 沒找到資料：啟用輸入，標記為新用戶
-            userInput.val('').prop('disabled', false).attr('placeholder', '請輸入姓名...');
-            isNewUser = true;
-          }
-        })
-        .withFailureHandler(function (err) {
-          $('#loading').hide();
-          Swal.fire('系統錯誤', '初始化失敗：' + err.message, 'error');
-        })
-        .getSRServer01InitData();
-    });
-
-    function fillSelect(id, list, selec) {
-      let el = $(id);
-      el.empty().append('<option value="" disabled selected>請選擇...</option>');
-      list.forEach(item => {
-        let isSelected = (item === selec) ? 'selected' : '';
-        el.append(`<option value="${item}" ${isSelected}>${item}</option>`);
-      });
-    }
-
-    // 1. 執行 Google 的更換登入帳號畫面
-    function changeEmail() {
-      Swal.fire({
-        title: '更換帳號',
-        text: '系統將引導您至 Google 帳號選擇頁面，切換帳號後請手動重新整理或點擊連結返回。',
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: '前往切換',
-        cancelButtonText: '取消'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          // 獲取目前 Web App 的網址
-          //const currentUrl = getScriptUrl();
-          const currentUrl = window.location.href;
-          // 強制導向 Google 帳號切換器，並在切換後嘗試導回原網址
-          const authUrl = "https://accounts.google.com/AccountChooser?continue=" + encodeURIComponent(currentUrl);
-
-          // 使用 top.location 嘗試跳出 iframe 限制
-          window.top.location.href = authUrl;
-        }
-      });
-    }
-
-    function initAdd() {
-      if (!validateQuery()) return;
-
-      $('#inputSrRec').val('');
-      $('#inputLoc').val('清醒');
-      $('#inputMood').val('穩定');
-      $('#inputSpcons').val('無');
-      $('#labCustN').text($('#queryCustN').val());
-      $('#labPType').text($('#queryPType').val());
-      $('#labSrId').text($('#querySrId').val());
-      $('#detailSection').show();
-      $('#searchSection').hide();
-      $('#btnUpdate').hide();
-      $('#btnAdd').show();
-    }
-
-    function validateQuery() {
-      if (!$('#queryDate').val() || !$('#queryCustN').val() || !$('#querySrId').val() || !$('#queryUserN').val() || !$('#queryPType').val()) {
-        Swal.fire('提示', '請填齊：日期、個案、居服員與編碼', 'warning');
-        return false;
-      }
-      return true;
-    }
-
-    // --- 需求 2 核心：處理按鈕動作，並在新用戶時詢問電話 ---
-    async function handleAction(type) {
-      if (!validateQuery()) return;
-
-      // 準備傳送給後端的物件
-      const formObj = {
-        email: $('#currentUserEmail').val(),
-        date: $('#queryDate').val(),
-        userName: $('#queryUserN').val(),
-        custName: $('#queryCustN').val(),
-        payType: $('#queryPType').val(),
-        srId: $('#querySrId').val(),
-        srRec: $('#inputSrRec').val(),
-        loc: $('#inputLoc').val(),
-        mood: $('#inputMood').val(),
-        spcons: $('#inputSpcons').val(),
-        userTel: "" // 預設為空
-      };
-
-      // 如果是「查詢」之後的「新增」或「更新」動作，且被標記為新用戶
-      // 查詢本身不需要電話，只有寫入資料時需要
-      if ((type === 'add' || type === 'update') && isNewUser) {
-
-        // 使用 SweetAlert 詢問電話
-        const { value: tel } = await Swal.fire({
-          title: '初次使用資料登錄',
-          text: '系統檢測到您是新居服員，請輸入您的聯絡電話以建檔',
-          input: 'text',
-          inputLabel: '聯絡電話 (User_Tel)',
-          inputPlaceholder: '例：0912345678',
-          showCancelButton: true,
-          inputValidator: (value) => {
-            if (!value) {
-              return '電話號碼不能為空！';
+            if (data.userEmail) {
+              $("#currentUserEmail").val(data.userEmail);
+            } else {
+              $("#currentUserEmail").val("未取得登入資訊");
             }
+
+            fillSelect("#queryCustN", data.custNames, "");
+            fillSelect("#querySrId", data.srIds, "");
+
+            // --- 需求 2：處理 User_N 欄位 ---
+            const userInput = $("#queryUserN");
+            if (data.currentUserName) {
+              // 找到資料：設定姓名並鎖定，標記為舊用戶
+              userInput.val(data.currentUserName).prop("disabled", true);
+              isNewUser = false;
+            } else {
+              // 沒找到資料：啟用輸入，標記為新用戶
+              userInput
+                .val("")
+                .prop("disabled", false)
+                .attr("placeholder", "請輸入姓名...");
+              isNewUser = true;
+            }
+          })
+          .withFailureHandler(function (err) {
+            $("#loading").hide();
+            Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
+          })
+          .getSRServer01InitData();
+      });
+
+      function fillSelect(id, list, selec) {
+        let el = $(id);
+        el.empty().append(
+          '<option value="" disabled selected>請選擇...</option>'
+        );
+        list.forEach((item) => {
+          let isSelected = item === selec ? "selected" : "";
+          el.append(`<option value="${item}" ${isSelected}>${item}</option>`);
+        });
+      }
+
+      // 1. 執行 Google 的更換登入帳號畫面
+      function changeEmail() {
+        Swal.fire({
+          title: "更換帳號",
+          text: "系統將引導您至 Google 帳號選擇頁面，切換帳號後請手動重新整理或點擊連結返回。",
+          icon: "info",
+          showCancelButton: true,
+          confirmButtonText: "前往切換",
+          cancelButtonText: "取消",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // 獲取目前 Web App 的網址
+            //const currentUrl = getScriptUrl();
+            const currentUrl = window.location.href;
+            // 強制導向 Google 帳號切換器，並在切換後嘗試導回原網址
+            const authUrl =
+              "https://accounts.google.com/AccountChooser?continue=" +
+              encodeURIComponent(currentUrl);
+
+            // 使用 top.location 嘗試跳出 iframe 限制
+            window.top.location.href = authUrl;
           }
         });
-
-        if (tel) {
-          formObj.userTel = tel;
-          // 用戶輸入完電話後，將狀態改為非新用戶 (避免同一次操作重複詢問)
-          // 註：若後端寫入失敗，下次重新整理頁面會重置，邏輯正確
-          // isNewUser = false; // 這裡先不改，確保這次請求有送出
-        } else {
-          // 如果用戶按取消，則終止動作
-          return;
-        }
       }
 
-      $('#loading').show();
+      function initAdd() {
+        if (!validateQuery()) return;
 
-      google.script.run.withSuccessHandler(function (res) {
-        $('#loading').hide();
+        $("#inputSrRec").val("");
+        $("#inputLoc").val("清醒");
+        $("#inputMood").val("穩定");
+        $("#inputSpcons").val("無");
 
-        // 如果成功寫入新用戶資料，下次就不需要再問了
-        if ((type === 'add' || type === 'update') && res.success && isNewUser) {
-          isNewUser = false;
-          $('#queryUserN').prop('disabled', true); // 鎖定姓名欄位
+        $("#labQuery").text(
+          $("#queryDate").val() +
+            "::" +
+          $("#queryUserN").val() +
+            "::" +
+          $("#queryCustN").val() +
+            "::" +
+          $("#queryPType").val() +
+            "::" +
+          $("#querySrId").val()
+        );
+
+        $("#detailSection").show();
+        $("#searchSection").hide();
+        $("#btnUpdate").hide();
+        $("#btnAdd").show();
+      }
+
+      function validateQuery() {
+        if (
+          !$("#queryDate").val() ||
+          !$("#queryCustN").val() ||
+          !$("#querySrId").val() ||
+          !$("#queryUserN").val() ||
+          !$("#queryPType").val()
+        ) {
+          Swal.fire("提示", "請填齊：日期、個案、居服員與編碼", "warning");
+          return false;
         }
+        return true;
+      }
 
-        if (type === 'query') {
-          if (res.found) {
-            $('#labCustN').text(res.data.custName);
-            $('#labPType').text(res.data.payType);
-            $('#labSrId').text(res.data.srId);
-            $('#inputSrRec').val(res.data.srRec);
-            $('#inputLoc').val(res.data.loc);
-            $('#inputMood').val(res.data.mood);
-            $('#inputSpcons').val(res.data.spcons);
-            $('#detailSection').show();
-            $('#searchSection').hide();
-            $('#btnAdd').hide();
-            $('#btnUpdate').show();
-          } else {
-            Swal.fire({
-              title: '查無此紀錄，是否要新增一筆紀錄並開始編輯？',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonColor: '#d33',
-              confirmButtonText: '是，新增紀錄',
-              cancelButtonText: '否'
-            }).then((result) => {
-              if (result.isConfirmed) {
-                initAdd();
+      // --- 需求 2 核心：處理按鈕動作，並在新用戶時詢問電話 ---
+      async function handleAction(type) {
+        if (!validateQuery()) return;
+
+        // 準備傳送給後端的物件
+        const formObj = {
+          email: $("#currentUserEmail").val(),
+          date: $("#queryDate").val(),
+          userName: $("#queryUserN").val(),
+          custName: $("#queryCustN").val(),
+          payType: $("#queryPType").val(),
+          srId: $("#querySrId").val(),
+          srRec: $("#inputSrRec").val(),
+          loc: $("#inputLoc").val(),
+          mood: $("#inputMood").val(),
+          spcons: $("#inputSpcons").val(),
+          userTel: "", // 預設為空
+        };
+
+        // 如果是「查詢」之後的「新增」或「更新」動作，且被標記為新用戶
+        // 查詢本身不需要電話，只有寫入資料時需要
+        if ((type === "add" || type === "update") && isNewUser) {
+          // 使用 SweetAlert 詢問電話
+          const { value: tel } = await Swal.fire({
+            title: "初次使用資料登錄",
+            text: "系統檢測到您是新居服員，請輸入您的聯絡電話以建檔",
+            input: "text",
+            inputLabel: "聯絡電話 (User_Tel)",
+            inputPlaceholder: "例：0912345678",
+            showCancelButton: true,
+            inputValidator: (value) => {
+              if (!value) {
+                return "電話號碼不能為空！";
               }
-            });
-          }
-        } else {
-          Swal.fire({
-            icon: res.success ? 'success' : 'error',
-            title: res.success ? '成功' : '失敗',
-            text: res.message
-          }).then(() => {
-            if (res.success) backToSearch();
+            },
           });
+
+          if (tel) {
+            formObj.userTel = tel;
+            // 用戶輸入完電話後，將狀態改為非新用戶 (避免同一次操作重複詢問)
+            // 註：若後端寫入失敗，下次重新整理頁面會重置，邏輯正確
+            // isNewUser = false; // 這裡先不改，確保這次請求有送出
+          } else {
+            // 如果用戶按取消，則終止動作
+            return;
+          }
         }
-      }).processSRData(formObj, type);
-    }
 
-    function backToSearch() {
-      $('#detailSection').hide();
-      $('#searchSection').show();
-      loadDropdown();
-    }
-  </script>
-</body>
+        $("#loading").show();
 
-<?!= includeFooter(); ?>
+        google.script.run
+          .withSuccessHandler(function (res) {
+            $("#loading").hide();
 
+            // 如果成功寫入新用戶資料，下次就不需要再問了
+            if (
+              (type === "add" || type === "update") &&
+              res.success &&
+              isNewUser
+            ) {
+              isNewUser = false;
+              $("#queryUserN").prop("disabled", true); // 鎖定姓名欄位
+            }
+
+            if (type === "query") {
+              if (res.found) {
+                $("#labQuery").text(
+                  res.data.date +
+                    "::" +  
+                  res.data.userName +
+                    "::" +
+                  res.data.custName +
+                    "::" +
+                  res.data.payType +
+                    "::" +
+                  res.data.srId
+                );
+
+                $("#inputSrRec").val(res.data.srRec);
+                $("#inputLoc").val(res.data.loc);
+                $("#inputMood").val(res.data.mood);
+                $("#inputSpcons").val(res.data.spcons);
+                $("#detailSection").show();
+                $("#searchSection").hide();
+                $("#btnAdd").hide();
+                $("#btnUpdate").show();
+              } else {
+                Swal.fire({
+                  title: "查無此紀錄，是否要新增一筆紀錄並開始編輯？",
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonColor: "#d33",
+                  confirmButtonText: "是，新增紀錄",
+                  cancelButtonText: "否",
+                }).then((result) => {
+                  if (result.isConfirmed) {
+                    initAdd();
+                  }
+                });
+              }
+            } else {
+              Swal.fire({
+                icon: res.success ? "success" : "error",
+                title: res.success ? "成功" : "失敗",
+                text: res.message,
+              }).then(() => {
+                if (res.success) backToSearch();
+              });
+            }
+          })
+          .processSRData(formObj, type);
+      }
+
+      function backToSearch() {
+        $("#detailSection").hide();
+        $("#searchSection").show();
+        loadDropdown();
+      }
+    </script>
+  </body>
+
+  <?!= includeFooter(); ?>
 </html>
