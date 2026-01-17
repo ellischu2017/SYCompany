@@ -49,7 +49,7 @@ function getSRServer01InitData() {
  * 核心處理：處理服務紀錄 (查詢/新增/修改/刪除)
  * 對應需求 1 (儲存新 User) & 需求 3 (寫入 SR_Data)
  */
-function processSRData(formObj, actionType) {
+function processSR01Data(formObj, actionType) {
   try {
     var targetSs = getTargetsheet("SYTemp", "SYTemp");
 

@@ -50,6 +50,8 @@ function checkManagerPrivilege(email) {
       if (
         data[i][emailColIndex].toString().toLowerCase() === email.toLowerCase()
       ) {
+        // 先執行同步
+        processUserSync();
         return true;
       }
     }
