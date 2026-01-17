@@ -1,280 +1,465 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <base target="_top" />
+    <title>舒漾電子服務紀錄管理</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      body {
+        background-color: #fff5f5;
+        font-family: "Microsoft JhengHei", sans-serif;
+        padding: 20px;
+      }
 
-<head>
-  <base target="_top">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <style>
-    body {
-      background-color: #fff5f5;
-      font-family: "Microsoft JhengHei", sans-serif;
-    }
+      .container {
+        max-width: 700px;
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        margin: auto;
+      }
 
-    .main-container {
-      max-width: 750px;
-      background: white;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      margin: 30px auto;
-    }
+      .loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+      }
 
-    .section-title {
-      border-left: 5px solid #dc3545;
-      padding-left: 10px;
-      margin: 20px 0;
-      color: #dc3545;
-      font-weight: bold;
-    }
+      .label-value {
+        font-weight: bold;
+        color: #d63384;
+        font-size: 1.1rem;
+        padding: 5px 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        display: inline-block;
+        min-width: 100px;
+      }
 
-    .readonly-field {
-      background-color: #f1f3f5 !important;
-    }
+      .hidden-section {
+        display: none;
+      }
 
-    .hidden {
-      display: none;
-    }
+      .section-title {
+        border-left: 5px solid #dc3545;
+        padding-left: 10px;
+        margin-bottom: 20px;
+        color: #dc3545;
+      }
+    </style>
+  </head>
 
-    .loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.8);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-  </style>
-</head>
-
-<body>
-
-  <div id="loading" class="loading">
-    <div class="spinner-border text-danger"></div>
-  </div>
-
-  <nav class="navbar navbar-dark bg-danger sticky-top">
-    <div class="container-fluid">
-      <button class="btn btn-light text-danger" type="button" data-bs-toggle="offcanvas"
-        data-bs-target="#offcanvasNavbar">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-fill"
-          viewBox="0 0 16 16">
-          <path
-            d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L8 2.207l6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293z" />
-          <path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293z" />
-        </svg>
-      </button>
-      <span class="navbar-brand mb-0 h1 mx-auto">舒漾電子服務紀錄管理</span>
+  <body>
+    <div id="loading" class="loading">
+      <div class="spinner-border text-danger"></div>
     </div>
-  </nav>
 
-  <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar">
-    <div class="offcanvas-header">
-      <h5 class="fw-bold text-danger">系統導航</h5>
-      <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-    </div>
-    <div class="offcanvas-body">
-      <?!= includeNav(); ?>
-    </div>
-  </div>
+    <div class="container">
+      <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理(用戶端)</h2>
 
-  <div class="main-container">
-    <h4 class="text-center text-danger mb-4">服務紀錄查詢與編輯 (管理端)</h4>
+      <div id="searchSection">
+        <div class="mb-3">
+          <label class="form-label">登入 E-mail</label>
+          <div class="input-group">
+            <input
+              type="email"
+              class="form-control"
+              id="currentUserEmail"
+              readonly
+            />
+          </div>
+          <a
+            href="https://accounts.google.com/AccountChooser?continue=<?= getScriptUrl() ?>?page=Index"
+            target="_top"
+            class="btn btn-outline-danger"
+          >
+            更換 Email 登入
+          </a>
+        </div>
 
-    <div id="SearchArea">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">服務日期 (yyyy-MM-dd)</label>
-          <input type="date" class="form-control" id="queryDate">
+        <h5 class="section-title">查詢條件</h5>
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label">日期 (Date)</label>
+            <input type="date" class="form-control" id="queryDate" />
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">居服員姓名 (User_N)</label>
+            <input
+              type="text"
+              class="form-control"
+              id="queryUserN"
+              disabled
+              placeholder="系統載入中..."
+            />
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">個案姓名 (Cust_N)</label>
+            <select class="form-select" id="queryCustN"></select>
+          </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">居服員姓名</label>
-          <select class="form-select" id="queryUserN"></select>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">服務編碼 (Pay_Type)</label>
+            <select class="form-select" id="queryPType">
+              <option value="補助" selected>補助</option>
+              <option value="自費">自費</option>
+            </select>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label">服務編碼 (SR_ID)</label>
+            <select class="form-select" id="querySrId"></select>
+          </div>
         </div>
-        <div class="col-md-12">
-          <label class="form-label">居服員 Email</label>
-          <input type="text" class="form-control readonly-field" id="currentUserEmail" readonly>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">個案姓名</label>
-          <select class="form-select" id="queryCustN"></select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">給付類別</label>
-          <select class="form-select" id="queryPayType">
-            <option value="補助">補助</option>
-            <option value="自費">自費</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">服務編碼</label>
-          <select class="form-select" id="querySrId"></select>
+
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-danger btn-lg" onclick="handleAction('query')">
+            查詢紀錄
+          </button>
         </div>
       </div>
 
-      <button class="btn btn-danger w-100 mt-4" id="btnSearch">執行查詢</button>
+      <div id="detailSection" class="hidden-section mt-4 border-top pt-4">
+        <h5 class="section-title">紀錄內容</h5>
+        <div class="row mb-3">
+          <div class="col-12">
+            <!-- <label class="form-label d-block text-muted small">個案姓名</label> -->
+            <span id="labQuery" class="label-value fs-6" style="color:#cdb5f8;"></span>
+          </div>
+          <!-- <div class="col-6">
+        <label class="form-label d-block text-muted small">服務編碼</label> 
+        </div> -->
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">服務紀錄內容 (SR_REC)</label>
+          <textarea
+            class="form-control"
+            id="inputSrRec"
+            rows="4"
+            placeholder="請詳細輸入服務內容..."
+          ></textarea>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">意識狀況 (LOC)</label>
+            <select class="form-select" id="inputLoc">
+              <option value="清醒">清醒</option>
+              <option value="混亂">混亂</option>
+              <option value="木僵">木僵</option>
+              <option value="嗜睡">嗜睡</option>
+              <option value="昏迷">昏迷</option>
+            </select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">身心狀況 (Mood)</label>
+            <select class="form-select" id="inputMood">
+              <option value="穩定">穩定</option>
+              <option value="不穩定">不穩定</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">特殊狀況說明及處理 (SPCONS)</label>
+            <textarea class="form-control" id="inputSpcons" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="d-grid gap-2">
+          <button
+            class="btn btn-primary btn-lg"
+            id="btnUpdate"
+            onclick="handleAction('update')"
+          >
+            更新紀錄
+          </button>
+          <button
+            class="btn btn-success btn-lg"
+            id="btnAdd"
+            onclick="handleAction('add')"
+          >
+            確認存檔
+          </button>
+          <!--
+          <button class="btn btn-danger flex-grow-1" id="btnDelete" onclick="handleAction('delete')">刪除</button> 
+          -->
+          <button class="btn btn-secondary btn-lg" onclick="backToSearch()">
+            返回查詢
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div id="editArea" class="hidden">
-      <h5 class="section-title">詳細紀錄內容 <span id="sourceTag" class="badge bg-secondary ms-2"></span></h5>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-      <div class="mb-3">
-        <label class="form-label">服務紀錄內容 (SR_REC)</label>
-        <textarea class="form-control" id="srRec" rows="3"></textarea>
-      </div>
+    <script>
+      $(document).ready(function () {
+        // --- 需求 1：日期前後只能 7 天 ---
+        const today = new Date();
+        const formatDate = (date) => date.toISOString().split("T")[0];
 
-      <div class="row g-3 mb-3">
-        <div class="col-md-6">
-          <label class="form-label">意識狀態 (LOC)</label>
-          <select class="form-select" id="srLoc">
-            <option value="清醒">清醒</option>
-            <option value="混亂">混亂</option>
-            <option value="木僵">木僵</option>
-            <option value="嗜睡">嗜睡</option>
-            <option value="昏迷">昏迷</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">個案心情 (MOOD)</label>
-          <select class="form-select" id="srMood">
-            <option value="穩定">穩定</option>
-            <option value="不穩定">不穩定</option>
-          </select>
-        </div>
-      </div>
+        // 設定 input 預設值為今日
+        $("#queryDate").val(formatDate(today));
 
-      <div class="mb-4">
-        <label class="form-label">特殊狀況說明及處理 (SPCONS)</label>
-        <textarea class="form-control" id="srSpcons" rows="2"></textarea>
-      </div>
+        // 計算並設定 min (前7天) 與 max (後7天)
+        const minDate = new Date(today);
+        minDate.setDate(today.getDate() - 7);
+        const maxDate = new Date(today);
+        maxDate.setDate(today.getDate() + 7);
 
-      <div class="d-flex gap-2" id="actionBtns"></div>
-    </div>
-  </div>
+        $("#queryDate").attr("min", formatDate(minDate));
+        $("#queryDate").attr("max", formatDate(maxDate));
+        // ---------------------------------
 
-  <script>
-    let userMap = {};
-    let currentRef = null;
+        $("#loading").show();
 
-    $(document).ready(function () {
-      // 1. 設定日期預設值：修正時區偏移導致少一天的寫法
-      const now = new Date();
-      const todayStr = now.getFullYear() + '-' +
-        String(now.getMonth() + 1).padStart(2, '0') + '-' +
-        String(now.getDate()).padStart(2, '0');
-      $('#queryDate').val(todayStr);
+        google.script.run
+          .withSuccessHandler(function (data) {
+            $("#loading").hide();
 
-      // 2. 初始化下拉選單
-      google.script.run.withSuccessHandler(function (data) {
-        const $uSelect = $('#queryUserN');
-        $.each(data.users, function (i, u) {
-          $uSelect.append($('<option>', { value: u.name, text: u.name }));
-          userMap[u.name] = u.email;
+            if (data.userEmail) {
+              $("#currentUserEmail").val(data.userEmail);
+            } else {
+              $("#currentUserEmail").val("未取得登入資訊");
+            }
+
+            fillSelect("#queryCustN", data.custNames, "");
+            fillSelect("#querySrId", data.srIds, "");
+
+            // --- 需求 2：處理 User_N 欄位 ---
+            const userInput = $("#queryUserN");
+            if (data.currentUserName) {
+              // 找到資料：設定姓名並鎖定，標記為舊用戶
+              userInput.val(data.currentUserName).prop("disabled", true);
+              isNewUser = false;
+            } else {
+              // 沒找到資料：啟用輸入，標記為新用戶
+              userInput
+                .val("")
+                .prop("disabled", false)
+                .attr("placeholder", "請輸入姓名...");
+              isNewUser = true;
+            }
+          })
+          .withFailureHandler(function (err) {
+            $("#loading").hide();
+            Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
+          })
+          .getSRServer01InitData();
+      });
+
+      function fillSelect(id, list, selec) {
+        let el = $(id);
+        el.empty().append(
+          '<option value="" disabled selected>請選擇...</option>'
+        );
+        list.forEach((item) => {
+          let isSelected = item === selec ? "selected" : "";
+          el.append(`<option value="${item}" ${isSelected}>${item}</option>`);
         });
-        syncEmail();
+      }
 
-        $.each(data.customers, function (i, c) {
-          $('#queryCustN').append($('<option>', { value: c, text: c }));
+      // 1. 執行 Google 的更換登入帳號畫面
+      function changeEmail() {
+        Swal.fire({
+          title: "更換帳號",
+          text: "系統將引導您至 Google 帳號選擇頁面，切換帳號後請手動重新整理或點擊連結返回。",
+          icon: "info",
+          showCancelButton: true,
+          confirmButtonText: "前往切換",
+          cancelButtonText: "取消",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // 獲取目前 Web App 的網址
+            //const currentUrl = getScriptUrl();
+            const currentUrl = window.location.href;
+            // 強制導向 Google 帳號切換器，並在切換後嘗試導回原網址
+            const authUrl =
+              "https://accounts.google.com/AccountChooser?continue=" +
+              encodeURIComponent(currentUrl);
+
+            // 使用 top.location 嘗試跳出 iframe 限制
+            window.top.location.href = authUrl;
+          }
         });
+      }
 
-        $.each(data.ltcCodes, function (i, id) {
-          $('#querySrId').append($('<option>', { value: id, text: id }));
-        });
+      function initAdd() {
+        if (!validateQuery()) return;
 
-        if (data.triggerSync) google.script.run.processUserSync();
-        console.log("Initial data loaded:", data); // 新增：輸出初始資料以利偵錯
-        $('#loading').fadeOut();
-      }).getAdminInitialData();
+        $("#inputSrRec").val("");
+        $("#inputLoc").val("清醒");
+        $("#inputMood").val("穩定");
+        $("#inputSpcons").val("無");
 
-      // 3. 事件監聽
-      $('#queryUserN').on('change', syncEmail);
-      $('#btnSearch').on('click', runSearch);
-    });
+        $("#labQuery").text(
+          $("#queryDate").val() +
+            "::" +
+          $("#queryUserN").val() +
+            "::" +
+          $("#queryCustN").val() +
+            "::" +
+          $("#queryPType").val() +
+            "::" +
+          $("#querySrId").val()
+        );
 
-    function syncEmail() {
-      const name = $('#queryUserN').val();
-      $('#currentUserEmail').val(userMap[name] || "");
-    }
+        $("#detailSection").show();
+        $("#searchSection").hide();
+        $("#btnUpdate").hide();
+        $("#btnAdd").show();
+      }
 
-    function runSearch() {
-      const params = {
-        date: $('#queryDate').val(), // 傳送 yyyy-MM-dd 字串
-        userN: $('#queryUserN').val(),
-        custN: $('#queryCustN').val(),
-        payType: $('#queryPayType').val(),
-        srId: $('#querySrId').val()
-      };
-      
-      console.log("runSearch params:", params); // 新增：輸出參數以利偵錯
-      
-      if (!params.date) return Swal.fire("錯誤", "請選擇日期", "error");
-
-      $('#loading').show();
-      $('#SearchArea').addClass('hidden');  // 新增此行
-      google.script.run.withSuccessHandler(function (res) {
-        $('#loading').hide();
-        $('#editArea').removeClass('hidden');
-
-        if (res.found) {
-          currentRef = { source: res.source, ssId: res.ssId, sheetName: res.sheetName, rowIndex: res.rowIndex };
-          $('#srRec').val(res.data[6] || "");
-          $('#srLoc').val(res.data[7] || "清醒");
-          $('#srMood').val(res.data[8] || "穩定");
-          $('#srSpcons').val(res.data[9] || "");
-          $('#sourceTag').text("來源: " + res.source);
-
-          $('#actionBtns').html(`
-          <button class="btn btn-primary flex-fill" onclick="handleSubmit('update')">儲存變更</button>
-          <button class="btn btn-outline-danger flex-fill" onclick="handleSubmit('delete')">刪除紀錄</button>
-        `);
-        } else {
-          currentRef = null;
-          $('#editArea').find('textarea, select').val("");
-          $('#sourceTag').text("查無此筆紀錄");
-          $('#actionBtns').html(`
-          <button class="btn btn-primary flex-fill" onclick="handleSubmit('update')">儲存變更</button>
-          <button class="btn btn-outline-danger flex-fill" onclick="handleSubmit('delete')">刪除紀錄</button>
-          <button class="btn btn-secondary flex-fill" onclick="backToSearch()">返回搜尋</button>
-        `);
+      function validateQuery() {
+        if (
+          !$("#queryDate").val() ||
+          !$("#queryCustN").val() ||
+          !$("#querySrId").val() ||
+          !$("#queryUserN").val() ||
+          !$("#queryPType").val()
+        ) {
+          Swal.fire("提示", "請填齊：日期、個案、居服員與編碼", "warning");
+          return false;
         }
-      }).queryServiceRecord(params);
-    }
+        return true;
+      }
 
-    window.handleSubmit = function (mode) {
-      const form = {
-        date: $('#queryDate').val(),
-        email: $('#currentUserEmail').val(),
-        userN: $('#queryUserN').val(),
-        custN: $('#queryCustN').val(),
-        payType: $('#queryPayType').val(),
-        srId: $('#querySrId').val(),
-        srRec: $('#srRec').val(),
-        loc: $('#srLoc').val(),
-        mood: $('#srMood').val(),
-        spcons: $('#srSpcons').val()
-      };
+      // --- 需求 2 核心：處理按鈕動作，並在新用戶時詢問電話 ---
+      async function handleAction(type) {
+        if (!validateQuery()) return;
 
-      $('#loading').show();
-      google.script.run.withSuccessHandler(function (msg) {
-        $('#loading').hide();
-        Swal.fire("成功", msg, "success");
-        runSearch();
-      }).manageSRData(mode, form, currentRef);
-    };
+        // 準備傳送給後端的物件
+        const formObj = {
+          email: $("#currentUserEmail").val(),
+          date: $("#queryDate").val(),
+          userName: $("#queryUserN").val(),
+          custName: $("#queryCustN").val(),
+          payType: $("#queryPType").val(),
+          srId: $("#querySrId").val(),
+          srRec: $("#inputSrRec").val(),
+          loc: $("#inputLoc").val(),
+          mood: $("#inputMood").val(),
+          spcons: $("#inputSpcons").val(),
+          userTel: "", // 預設為空
+        };
 
-    window.backToSearch = function () {
-      $('#SearchArea').removeClass('hidden');
-      $('#editArea').addClass('hidden');
-    };
-  </script>
+        // 如果是「查詢」之後的「新增」或「更新」動作，且被標記為新用戶
+        // 查詢本身不需要電話，只有寫入資料時需要
+        if ((type === "add" || type === "update") && isNewUser) {
+          // 使用 SweetAlert 詢問電話
+          const { value: tel } = await Swal.fire({
+            title: "初次使用資料登錄",
+            text: "系統檢測到您是新居服員，請輸入您的聯絡電話以建檔",
+            input: "text",
+            inputLabel: "聯絡電話 (User_Tel)",
+            inputPlaceholder: "例：0912345678",
+            showCancelButton: true,
+            inputValidator: (value) => {
+              if (!value) {
+                return "電話號碼不能為空！";
+              }
+            },
+          });
 
-</body>
-<?!= includeFooter(); ?>
+          if (tel) {
+            formObj.userTel = "'" + tel;
+            // 用戶輸入完電話後，將狀態改為非新用戶 (避免同一次操作重複詢問)
+            // 註：若後端寫入失敗，下次重新整理頁面會重置，邏輯正確
+            // isNewUser = false; // 這裡先不改，確保這次請求有送出
+          } else {
+            // 如果用戶按取消，則終止動作
+            return;
+          }
+        }
 
+        $("#loading").show();
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            $("#loading").hide();
+
+            // 如果成功寫入新用戶資料，下次就不需要再問了
+            if (
+              (type === "add" || type === "update") &&
+              res.success &&
+              isNewUser
+            ) {
+              isNewUser = false;
+              $("#queryUserN").prop("disabled", true); // 鎖定姓名欄位
+            }
+
+            if (type === "query") {
+              if (res.found) {
+                $("#labQuery").text(
+                  res.data.date +
+                    "::" +  
+                  res.data.userName +
+                    "::" +
+                  res.data.custName +
+                    "::" +
+                  res.data.payType +
+                    "::" +
+                  res.data.srId
+                );
+
+                $("#inputSrRec").val(res.data.srRec);
+                $("#inputLoc").val(res.data.loc);
+                $("#inputMood").val(res.data.mood);
+                $("#inputSpcons").val(res.data.spcons);
+                $("#detailSection").show();
+                $("#searchSection").hide();
+                $("#btnAdd").hide();
+                $("#btnUpdate").show();
+              } else {
+                Swal.fire({
+                  title: "查無此紀錄，是否要新增一筆紀錄並開始編輯？",
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonColor: "#d33",
+                  confirmButtonText: "是，新增紀錄",
+                  cancelButtonText: "否",
+                }).then((result) => {
+                  if (result.isConfirmed) {
+                    initAdd();
+                  }
+                });
+              }
+            } else {
+              Swal.fire({
+                icon: res.success ? "success" : "error",
+                title: res.success ? "成功" : "失敗",
+                text: res.message,
+              }).then(() => {
+                if (res.success) backToSearch();
+              });
+            }
+          })
+          .processSRData(formObj, type);
+      }
+
+      function backToSearch() {
+        $("#detailSection").hide();
+        $("#searchSection").show();        
+      }
+    </script>
+  </body>
+
+  <?!= includeFooter(); ?>
 </html>

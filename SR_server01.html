@@ -70,7 +70,7 @@
     </div>
 
     <div class="container">
-      <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理</h2>
+      <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理(用戶端)</h2>
 
       <div id="searchSection">
         <div class="mb-3">
@@ -379,7 +379,7 @@
           });
 
           if (tel) {
-            formObj.userTel = tel;
+            formObj.userTel = "'" + tel;
             // 用戶輸入完電話後，將狀態改為非新用戶 (避免同一次操作重複詢問)
             // 註：若後端寫入失敗，下次重新整理頁面會重置，邏輯正確
             // isNewUser = false; // 這裡先不改，確保這次請求有送出
@@ -456,8 +456,7 @@
 
       function backToSearch() {
         $("#detailSection").hide();
-        $("#searchSection").show();
-        loadDropdown();
+        $("#searchSection").show();        
       }
     </script>
   </body>
