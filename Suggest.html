@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <title>舒漾意見反應表</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+        }
+
+        .container {
+            max-width: 800px;
+            margin-top: 20px;
+            margin-bottom: 50px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+            background-color: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 5px;
+            display: block;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loadingSpin" class="loading-overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="text-center text-danger mb-4">舒漾意見反應表</h2>
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 text-primary"><i class="fas fa-comment-dots"></i> 提交您的建議</h5>
+            </div>
+            <div class="card-body">
+                <form id="suggestForm">
+                    <div class="row ">
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label text-muted small">填寫日期</label>
+                            <input id="queryDate" class="form-control" type="date" readonly placeholder="載入中..."/>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label class="form-label text-muted small">填寫人姓名 (Su_N)</label>
+                            <input id="querySuName" class="form-control" type="text" readonly placeholder="載入中..."/>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label text-muted small">電子郵件 (Su_Email)</label>
+                            <input id="querySuEmail" class="form-control" type="email" readonly placeholder="載入中..."/>
+                        </div>
+                    </div>
+
+
+                    <hr class="my-4">
+                    <h6 class="mb-3 fw-bold">發現的問題或建議</h6>
+
+                    <div class="mb-4">
+                        <textarea class="form-control" id="inputSuRec" rows="10"
+                            placeholder="請詳細描述您遇到的問題或改進建議..."></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-primary btn-lg" id="btnSubmit">
+                            <i class="fas fa-paper-plane"></i> 提交建議
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            // 1. 設定今日日期
+            const today = new Date().toISOString().split('T')[0];
+            $('#queryDate').val(today);
+
+            // 2. 載入使用者名稱與電子郵件
+            fetchUserName();
+
+            // 3. 提交按鈕事件
+            $('#btnSubmit').click(function () {
+                submitSuggestion();
+            });
+        });
+
+        function fetchUserName() {
+            google.script.run.withSuccessHandler(function (name) {
+                $('#querySuName').val(name.userName || "未知使用者");
+                $('#querySuEmail').val(name.userEmail || "未知電子郵件");
+            }).getUserNameByEmail();
+        }
+
+        function submitSuggestion() {
+            const suRec = $('#inputSuRec').val().trim();
+
+            if (!suRec) {
+                Swal.fire('提示', '請輸入建議內容', 'warning');
+                return;
+            }
+
+            const formData = {
+                date: $('#queryDate').val(),
+                suEmail: $('#querySuEmail').val(),
+                suName: $('#querySuName').val(),
+                suRec: suRec
+            };
+
+            console.log(formData);
+
+            $('#loadingSpin').css('display', 'flex');
+
+            google.script.run.withSuccessHandler(function (res) {
+                $('#loadingSpin').hide();
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '提交成功',
+                        text: '感謝您的回饋！',
+                        confirmButtonText: '確定'
+                    }).then(() => {
+                        $('#inputSuRec').val(''); // 清空輸入框
+                    });
+                } else {
+                    Swal.fire('錯誤', res.message, 'error');
+                }
+            }).addSuggestion(formData);
+        }
+    </script>
+</body>
+
+</html>

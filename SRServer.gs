@@ -28,7 +28,7 @@ function getSRServerInitData() {
  * 同步使用者資料並檢查重復
  * 邏輯：以 Email 為基準，若 SYCompany 已存在該 Email，則跳過不匯入。
  */
-function processUserSync() {
+function processUserSync01() {
   try {
     // 1. 取得來源表 SYTemp > User
     var ssTemp = getTargetsheet("SYTemp", "SYTemp");
@@ -97,7 +97,7 @@ function processUserSync() {
       tempUserSheet.deleteRows(2, tempValues.length - 1);
     }
   } catch (e) {
-    console.log("processUserSync 執行出錯: " + e.toString());
+    console.log("processUserSync01 執行出錯: " + e.toString());
   }
 }
 

@@ -33,6 +33,10 @@ function syncMasterTablePermissions() {
     }
   }
 
+  console.log("開始同步權限至 " + targetFileIds.length + " 個試算表");  
+  console.log("管理員名單: " + managerEmails.join(", "));
+  console.log("目標試算表 ID 列表: " + targetFileIds.join(", ")); 
+
   targetFileIds.forEach(function (fileId) {
     try {
       managerEmails.forEach(function (email) {
