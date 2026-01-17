@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <title>開啟試算表 - 個案管理系統</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: "Microsoft JhengHei", Arial, sans-serif;
+    }
+
+    .container {
+      max-width: 800px;
+      margin-top: 20px;
+      margin-bottom: 50px;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="loadingSpin" class="loading-overlay">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+
+  <nav class="navbar navbar-dark bg-primary sticky-top">
+    <div class="container-fluid">
+      <button class="btn btn-light text-primary" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#offcanvasNavbar">
+        <i class="fas fa-bars"></i>
+      </button>
+      <span class="navbar-brand mb-0 h1 mx-auto">快速開啟試算表</span>
+    </div>
+  </nav>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">系統導航</h5>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+      <?!= includeNav(); ?>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fas fa-external-link-alt"></i> 選擇試算表</h5>
+        
+        <div class="mb-4">
+          <label for="querySheet" class="form-label">請選擇要開啟的檔案：</label>
+          <select class="form-select form-select-lg" id="querySheet">
+            <option value="" disabled selected>載入中...</option>
+          </select>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button class="btn btn-primary btn-lg" id="btnQuery">
+            <i class="fas fa-folder-open"></i> 開啟試算表
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container mt-2 text-end">
+      <small class="text-muted">
+        <i class="fas fa-user-circle"></i> 當前管理員：<?= userEmail ?>
+      </small>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    $(document).ready(function () {
+      loadSheetOptions();
+
+      // 綁定按鈕點擊事件
+      $('#btnQuery').click(function () {
+        openSheet();
+      });
+    });
+
+    /**
+     * 從後端抓取試算表選單資料
+     */
+    function loadSheetOptions() {
+      $('#loadingSpin').css('display', 'flex');
+      
+      google.script.run.withSuccessHandler(function (options) {
+        const select = $('#querySheet');
+        select.empty();
+        
+        if (!options || options.length === 0) {
+          select.append('<option value="" disabled>無可用檔案</option>');
+        } else {
+          select.append('<option value="" disabled selected>--- 請選擇檔案 ---</option>');
+          options.forEach(function (item) {
+            // item 預期格式: { name: "顯示名稱", url: "試算表網址" }
+            select.append(`<option value="${item.url}">${item.name}</option>`);
+          });
+        }
+        $('#loadingSpin').hide();
+      }).getOpenSheetOptions(); // 對應後端函式
+    }
+
+    /**
+     * 開啟選中的試算表
+     */
+    function openSheet() {
+      const targetUrl = $('#querySheet').val();
+      
+      if (!targetUrl) {
+        Swal.fire('提示', '請先選擇一個試算表', 'warning');
+        return;
+      }
+
+      // 使用 window.open 開啟新分頁
+      window.open(targetUrl, '_blank');
+    }
+  </script>
+</body>
+<?!= includeFooter(); ?>
+</html>
