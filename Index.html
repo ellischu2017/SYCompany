@@ -44,11 +44,28 @@
       /* Bootstrap Primary Color */
       color: white;
     }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
   </style>
 </head>
 
 <body>
-
+  <div id="loadingSpin" class="loading-overlay">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
   <nav class="navbar navbar-custom sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar"
@@ -112,7 +129,8 @@
         </a>
       </div>
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=SR_server01" class="btn btn-danger text-white w-100 menu-btn rounded-3" target="_blank">
+        <a href="<?!= getScriptUrl() ?>?page=SR_server01" class="btn btn-danger text-white w-100 menu-btn rounded-3"
+          target="_blank">
           <i class="fas fa-file-medical me-2"></i> 舒漾電子服務紀錄(用戶端)
         </a>
       </div>
@@ -133,7 +151,9 @@
   <script>
     // 頁面加載完成後的初始化邏輯
     $(document).ready(function () {
+      $('#loading').css('display', 'flex');
       console.log("舒漾長照系統 - Index 頁面載入完成");
+      $('#loading').hide();
     });
 
     /**
