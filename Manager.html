@@ -127,6 +127,7 @@
 
   <script>
     $(document).ready(function () {
+      $('#loading').css('display', 'flex');
       loadDropdown();
 
       $('#btnQuery').click(function () {
@@ -200,6 +201,7 @@
           }
         });
       });
+      $('#loading').hide();
     });
 
     function loadDropdown() {

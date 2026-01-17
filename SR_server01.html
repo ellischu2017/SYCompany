@@ -211,6 +211,7 @@
 
     <script>
       $(document).ready(function () {
+        $('#loading').css('display', 'flex');
         // --- 需求 1：日期前後只能 7 天 ---
         const today = new Date();
         const formatDate = (date) => date.toISOString().split("T")[0];
@@ -263,6 +264,7 @@
             Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
           })
           .getSRServer01InitData();
+          $('#loading').hide();
       });
 
       function fillSelect(id, list, selec) {

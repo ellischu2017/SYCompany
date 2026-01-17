@@ -60,7 +60,7 @@
 </head>
 
 <body>
-  <div id="loading" class="loading">
+  <div id="loadingSpin" class="loading">
     <div class="spinner-border text-danger"></div>
   </div>
 
@@ -115,7 +115,7 @@
         </div>
         <div class="col-md-4 mb-3">
           <label class="form-label">服務編碼 (Pay_Type)</label>
-          <select class="form-select" id="queryPType">
+          <select class="form-select" id="queryPayType">
             <option value="補助" selected>補助</option>
             <option value="自費">自費</option>
           </select>
@@ -127,7 +127,7 @@
       </div>
 
       <div class="d-grid gap-2 mt-3">
-        <button class="btn btn-danger btn-lg" onclick="handleAction('query')">
+        <button class="btn btn-danger btn-lg" id="btnSearch" onclick="handleAction('query')">
           查詢紀錄
         </button>
       </div>
@@ -137,12 +137,8 @@
       <h5 class="section-title">紀錄內容</h5>
       <div class="row mb-3">
         <div class="col-12">
-          <!-- <label class="form-label d-block text-muted small">個案姓名</label> -->
           <span id="labQuery" class="label-value fs-6" style="color:#cdb5f8;"></span>
         </div>
-        <!-- <div class="col-6">
-        <label class="form-label d-block text-muted small">服務編碼</label> 
-        </div> -->
       </div>
 
       <div class="mb-3">
@@ -179,10 +175,10 @@
         <button class="btn btn-success btn-lg" id="btnAdd" onclick="handleAction('add')">
           確認存檔
         </button>
-        <!--
-          <button class="btn btn-danger flex-grow-1" id="btnDelete" onclick="handleAction('delete')">刪除</button> 
-          -->
-        <button class="btn btn-secondary btn-lg" onclick="backToSearch()">
+        <button class="btn btn-danger btn-lg" id="btnDelete" onclick="handleAction('delete')">
+          刪除
+        </button>
+        <button class="btn btn-secondary btn-lg" id="btnBack" onclick="backToSearch()">
           返回查詢
         </button>
       </div>
@@ -212,21 +208,6 @@
         $('#queryUserEmail').val(userMap[name] || "");
       });
 
-      // 2. 查詢按鈕
-      $('#btnQuery').on('click', function () {
-        handleSearch();
-      });
-
-      // 3. 存檔按鈕
-      $('#btnSave').on('click', function () {
-        handleAction($('#btnSave').data('action'));
-      });
-
-      // 4. 返回按鈕
-      $('#btnBack').on('click', function () {
-        $('#detailSection').fadeOut();
-        $('#searchSection').fadeIn();
-      });
     });
 
     /**
@@ -256,61 +237,54 @@
     }
 
     /**
-     * 執行查詢
-     */
-    function handleSearch() {
-      const formObj = getFormObj();
-      if (!formObj.date || !formObj.userName) {
-        Swal.fire("提醒", "請填寫日期與服務人員", "warning");
-        return;
-      }
-
-      $('#loadingSpin').css('display', 'flex');
-      google.script.run
-        .withSuccessHandler(function (result) {
-          $('#loadingSpin').hide();
-          if (result.found) {
-            fillDetail(result.data);
-            $('#btnSave').data('action', 'update').text('更新紀錄');
-            $('#searchSection').hide();
-            $('#detailSection').fadeIn();
-          } else {
-            Swal.fire({
-              title: "查無此紀錄",
-              text: "是否要新增一筆紀錄並開始編輯？",
-              icon: "question",
-              showCancelButton: true,
-              confirmButtonText: "是，新增紀錄",
-              cancelButtonText: "否"
-            }).then((res) => {
-              if (res.isConfirmed) {
-                clearDetail();
-                $('#btnSave').data('action', 'add').text('確認存檔');
-                $('#searchSection').hide();
-                $('#detailSection').fadeIn();
-              }
-            });
-          }
-        })
-        .processSRData(formObj, "query");
-    }
-
-    /**
-     * 執行 新增/更新
-     */
+  * 執行 新增/更新
+  */
     function handleAction(actionType) {
       const formObj = { ...getFormObj(), ...getDetailObj() };
-
       $('#loadingSpin').css('display', 'flex');
+
       google.script.run
         .withSuccessHandler(function (res) {
           $('#loadingSpin').hide();
-          if (res.success) {
-            Swal.fire("成功", res.message, "success").then(() => {
-              $('#btnBack').click();
+          if (actionType === "query") {
+            if (res.success) {
+              fillQueryLabel(formObj);
+              fillDetail(res.data);
+              $('#btnUpdate').show();
+              $('#btnAdd').hide();
+              $('#detailSection').fadeIn();
+              $('#searchSection').fadeOut();
+            } else {
+              Swal.fire({
+                title: "查無此紀錄",
+                text: "是否要新增一筆紀錄並開始編輯？",
+                icon: "question",
+                showCancelButton: true,
+                confirmButtonText: "是，新增紀錄",
+                cancelButtonText: "否"
+              }).then((res) => {
+                if (res.isConfirmed) {
+                  fillQueryLabel(formObj);
+                  clearDetail();
+                  $('#btnAdd').show();
+                  $('#btnDelete').hide();
+                  $('#btnUpdate').hide();
+                  $('#searchSection').fadeOut();
+                  $('#detailSection').fadeIn();
+                }
+              });
+            }
+          }
+          else {
+            Swal.fire({
+              title: res.success ? "操作成功" : "操作失敗",
+              text: res.message || "",
+              icon: res.success ? "success" : "error"
+            }).then(() => {
+              if (res.success) {
+                backToSearch();
+              }
             });
-          } else {
-            Swal.fire("失敗", res.message, "error");
           }
         })
         .processSRData(formObj, actionType);
@@ -324,7 +298,7 @@
         date: $('#queryDate').val(),
         custName: $('#queryCustN').val(),
         userName: $('#queryUserN').val(),
-        email: $('#currentUserEmail').val(),
+        email: $('#queryUserEmail').val(),
         payType: $('#queryPayType').val(),
         srId: $('#querySrId').val()
       };
@@ -349,7 +323,7 @@
       $('#inputSrRec').val(data.srRec || "");
       $('#inputLoc').val(data.loc || "清醒");
       $('#inputMood').val(data.mood || "穩定");
-      $('#inputSpcons').val(data.spcons || "");
+      $('#inputSpcons').val(data.spcons || "無");
     }
 
     /**
@@ -359,7 +333,23 @@
       $('#inputSrRec').val("");
       $('#inputLoc').val("清醒");
       $('#inputMood').val("穩定");
-      $('#inputSpcons').val("");
+      $('#inputSpcons').val("無");
+    }
+
+    /**
+     * 工具：填充查詢標籤
+     */
+    function fillQueryLabel(formObj) {
+      const labelText = `${formObj.date} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
+      $('#labQuery').text(labelText);
+    }
+
+    /**
+     * 返回查詢頁面
+     */
+    function backToSearch() {
+      $('#detailSection').fadeOut();
+      $('#searchSection').fadeIn();
     }
   </script>
 </body>

@@ -52,7 +52,7 @@
 
 <body>
 
-  <div id="loading" class="loading-overlay">
+  <div id="loadingSpin" class="loading-overlay">
     <div class="spinner-border text-primary" role="status">
       <span class="visually-hidden">Loading...</span>
     </div>
@@ -182,6 +182,7 @@
 
   <script>
     $(document).ready(function () {
+      $('#loadingSpin').css('display', 'flex');
       // 頁面載入時，先抓取下拉選單資料
       loadDropdown();
 
@@ -197,10 +198,10 @@
           Swal.fire('提示', '請先選擇一位個案', 'warning');
           return;
         }
-        $('#loading').show();
+        $('#loadingSpin').show();
 
         google.script.run.withSuccessHandler(function (response) {
-          $('#loading').hide();
+          $('#loadingSpin').hide();
           if (response.found) {
             populateForm(response.rowResult);
             switchToDetailMode('update');
@@ -256,12 +257,12 @@
           return;
         }
 
-        $('#loading').show();
+        $('#loadingSpin').show();
 
         if (mode === 'add') {
           // 新增模式
           google.script.run.withSuccessHandler(function (res) {
-            $('#loading').hide();
+            $('#loadingSpin').hide();
             if (res.success) {
               Swal.fire({
                 title: '成功',
@@ -279,7 +280,7 @@
         } else {
           // 更新模式
           google.script.run.withSuccessHandler(function (res) {
-            $('#loading').hide();
+            $('#loadingSpin').hide();
             if (res.success) {
               Swal.fire({
                 title: '更新成功',
@@ -313,9 +314,9 @@
           cancelButtonText: '取消'
         }).then((result) => {
           if (result.isConfirmed) {
-            $('#loading').show();
+            $('#loadingSpin').show();
             google.script.run.withSuccessHandler(function (res) {
-              $('#loading').hide();
+              $('#loadingSpin').hide();
               if (res.success) {
                 Swal.fire('已刪除', res.message, 'success').then(
                   () => { backToSearch(); });
@@ -330,6 +331,7 @@
         $('#detailSection').hide();   // 隱藏詳細資料表單
         $('#searchSection').show();   // 顯示查詢與新增區塊
       });
+      $('#loadingSpin').hide();
     });
 
     //

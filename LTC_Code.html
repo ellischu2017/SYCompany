@@ -132,6 +132,7 @@
 
   <script>
     $(document).ready(function () {
+      $('#loading').css('display', 'flex');
       loadDropdown();
 
       // 查詢
@@ -213,6 +214,7 @@
           }
         });
       });
+      $('#loading').hide();
     });
 
     function loadDropdown() {

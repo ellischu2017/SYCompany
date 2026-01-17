@@ -4,8 +4,6 @@
  */
 
 function getSRServerInitData() {
-
-
   var userMapping = {};
   var localUserSheet = MainSpreadsheet.getSheetByName("User");
   if (localUserSheet) {
@@ -36,8 +34,8 @@ function processUserSync() {
     var ssTemp = getTargetsheet("SYTemp", "SYTemp");
     var tempUserSheet = ssTemp.getSheetByName("User");
     if (!tempUserSheet) {
-        console.log("SYTemp 中不存在 User 工作表，無法同步。");
-        return;
+      console.log("SYTemp 中不存在 User 工作表，無法同步。");
+      return;
     }
 
     var tempValues = tempUserSheet.getDataRange().getValues();
@@ -118,10 +116,11 @@ function processSRData(formObj, actionType) {
     // --- 1. 計算日期與判斷目標 ---
     var inputDate = new Date(formObj.date);
     var today = new Date();
-    today.setHours(0, 0, 0, 0); 
-    
-    var diffDays = (today.getTime() - inputDate.getTime()) / (1000 * 60 * 60 * 24);
-    
+    today.setHours(0, 0, 0, 0);
+
+    var diffDays =
+      (today.getTime() - inputDate.getTime()) / (1000 * 60 * 60 * 24);
+
     var targetSS, sheetName;
 
     if (diffDays <= 7) {
@@ -132,20 +131,30 @@ function processSRData(formObj, actionType) {
       // 條件 2: 多於 7 天
       var yearStr = inputDate.getFullYear().toString();
       var monthStr = Utilities.formatDate(inputDate, "GMT+8", "yyyyMM"); // 例如 202501
-      
+
       targetSS = getTargetsheet("RecUrl", "SY" + yearStr);
       sheetName = monthStr;
     }
-    
-    console.log("Processing SR Data in " + targetSS.getName() + " > " + sheetName); 
+
     if (!targetSS) throw new Error("找不到對應年份的試算表或 SYTemp。");
 
     var targetSheet = targetSS.getSheetByName(sheetName);
-   
+
     // 如果是新增(add)且月份工作表不存在，則自動建立並加入標題
     if (!targetSheet && actionType === "add") {
       targetSheet = targetSS.insertSheet(sheetName);
-      var headers = ["Date", "E-mail", "CUST_N", "USER_N", "Pay_Type", "SR_ID", "SR_REC", "LOC", "MOOD", "SPCONS"];
+      var headers = [
+        "Date",
+        "E-mail",
+        "CUST_N",
+        "USER_N",
+        "Pay_Type",
+        "SR_ID",
+        "SR_REC",
+        "LOC",
+        "MOOD",
+        "SPCONS",
+      ];
       targetSheet.appendRow(headers);
     }
 
@@ -164,21 +173,25 @@ function processSRData(formObj, actionType) {
       formObj.srRec,
       formObj.loc,
       formObj.mood,
-      formObj.spcons
+      formObj.spcons,
     ];
 
     if (actionType === "add") {
       targetSheet.appendRow(rowData);
-      return { success: true, message: "資料已成功存入 " + targetSS.getName() + " > " + sheetName };
+      return {
+        success: true,
+        message: "資料已成功存入 " + targetSS.getName() + " > " + sheetName,
+      };
     }
 
     // --- 3. 執行 查詢 (query) / 更新 (update) / 刪除 (delete) ---
     var data = targetSheet.getDataRange().getValues();
-    
+
     for (var i = 1; i < data.length; i++) {
-      var sheetDate = (data[i][0] instanceof Date) 
-                      ? Utilities.formatDate(data[i][0], "GMT+8", "yyyy-MM-dd") 
-                      : data[i][0].toString();
+      var sheetDate =
+        data[i][0] instanceof Date
+          ? Utilities.formatDate(data[i][0], "GMT+8", "yyyy-MM-dd")
+          : data[i][0].toString();
 
       // 比對五個關鍵欄位：Date, Cust_N, User_N, Pay_Type, SR_ID
       if (
@@ -188,10 +201,10 @@ function processSRData(formObj, actionType) {
         data[i][4].toString().trim() === formObj.payType.trim() &&
         data[i][5].toString().trim() === formObj.srId.trim()
       ) {
-        
         if (actionType === "query") {
           return {
             found: true,
+            success: true,
             data: {
               date: sheetDate,
               email: data[i][1],
@@ -202,21 +215,26 @@ function processSRData(formObj, actionType) {
               srRec: data[i][6],
               loc: data[i][7],
               mood: data[i][8],
-              spcons: data[i][9]
-            }
+              spcons: data[i][9],
+            },
           };
         } else if (actionType === "update") {
           targetSheet.getRange(i + 1, 1, 1, 10).setValues([rowData]);
-          return { success: true, message: "資料已於 " + sheetName + " 更新完成。" };
+          return {
+            success: true,
+            message: "資料已於 " + sheetName + " 更新完成。",
+          };
         } else if (actionType === "delete") {
           targetSheet.deleteRow(i + 1);
-          return { success: true, message: "資料已從 " + sheetName + " 刪除。" };
+          return {
+            success: true,
+            message: "資料已從 " + sheetName + " 刪除。",
+          };
         }
       }
     }
 
     return { found: false, message: "在此區間找不到符合條件的紀錄。" };
-
   } catch (e) {
     console.error("processSRData 發生錯誤: " + e.toString());
     return { success: false, message: "錯誤: " + e.toString() };

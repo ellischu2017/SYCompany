@@ -122,6 +122,7 @@
 
   <script>
     $(document).ready(function () {
+      $('#loading').css('display', 'flex');
       loadDropdown();
 
       // 查詢按鈕
@@ -191,6 +192,7 @@
           }
         });
       });
+      $('#loading').hide();
     });
 
     function loadDropdown() {
