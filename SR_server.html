@@ -236,10 +236,31 @@
         .getSRServerInitData();
     }
 
+
+    /**
+     * 驗證查詢欄位
+     */    function validateQuery() {
+      const date = $('#queryDate').val();
+      const email = $('#queryUserEmail').val();
+      const custName = $('#queryCustN').val();
+      const userName = $('#queryUserN').val();
+      const payType = $('#queryPayType').val();   
+      const srId = $('#querySrId').val();
+      if (!date || !custName || !userName || !email || !payType || !srId) {
+        Swal.fire({
+          title: "欄位不完整",
+          text: "請確保所有查詢欄位皆已填寫",
+          icon: "warning"
+        });
+        return false;
+      }
+      return true;
+    }   
     /**
   * 執行 新增/更新
   */
     function handleAction(actionType) {
+      if (!validateQuery()) return;
       const formObj = { ...getFormObj(), ...getDetailObj() };
       $('#loadingSpin').css('display', 'flex');
 

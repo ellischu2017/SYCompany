@@ -60,7 +60,7 @@
 </head>
 
 <body>
-  <div id="loading" class="loading">
+  <div id="loadingSpin" class="loading">
     <div class="spinner-border text-danger"></div>
   </div>
 
@@ -179,10 +179,16 @@
 
   <script>
     $(document).ready(function () {
-      $('#loading').css('display', 'flex');
+      $('#loadingSpin').css('display', 'flex');
+      $("#loadingSpin").show();
       // --- 需求 1：日期前後只能 7 天 ---
       const today = new Date();
-      const formatDate = (date) => date.toISOString().split("T")[0];
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
 
       // 設定 input 預設值為今日
       $("#queryDate").val(formatDate(today));
@@ -197,11 +203,10 @@
       $("#queryDate").attr("max", formatDate(maxDate));
       // ---------------------------------
 
-      $("#loading").show();
 
       google.script.run
         .withSuccessHandler(function (data) {
-          $("#loading").hide();
+          $("#loadingSpin").hide();
 
           if (data.userEmail) {
             $("#currentUserEmail").val(data.userEmail);
@@ -228,11 +233,11 @@
           }
         })
         .withFailureHandler(function (err) {
-          $("#loading").hide();
+          $("#loadingSpin").hide();
           Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
         })
         .getSRServer01InitData();
-      $('#loading').hide();
+      $('#loadingSpin').hide();
     });
 
     function fillSelect(id, list, selec) {
@@ -271,32 +276,8 @@
       });
     }
 
-    function initAdd() {
-      if (!validateQuery()) return;
 
-      $("#inputSrRec").val("");
-      $("#inputLoc").val("清醒");
-      $("#inputMood").val("穩定");
-      $("#inputSpcons").val("無");
-
-      $("#labQuery").text(
-        $("#queryDate").val() +
-        "::" +
-        $("#queryUserN").val() +
-        "::" +
-        $("#queryCustN").val() +
-        "::" +
-        $("#queryPType").val() +
-        "::" +
-        $("#querySrId").val()
-      );
-
-      $("#detailSection").show();
-      $("#searchSection").hide();
-      $("#btnUpdate").hide();
-      $("#btnAdd").show();
-    }
-
+    // 驗證查詢欄位是否填齊
     function validateQuery() {
       if (
         !$("#queryDate").val() ||
@@ -317,8 +298,8 @@
 
       // 準備傳送給後端的物件
       const formObj = {
-        email: $("#currentUserEmail").val(),
         date: $("#queryDate").val(),
+        email: $("#currentUserEmail").val(),
         userName: $("#queryUserN").val(),
         custName: $("#queryCustN").val(),
         payType: $("#queryPType").val(),
@@ -329,6 +310,8 @@
         spcons: $("#inputSpcons").val(),
         userTel: "", // 預設為空
       };
+
+      // console.log("準備執行動作：", type, formObj);
 
       // 如果是「查詢」之後的「新增」或「更新」動作，且被標記為新用戶
       // 查詢本身不需要電話，只有寫入資料時需要
@@ -359,11 +342,11 @@
         }
       }
 
-      $("#loading").show();
+      $("#loadingSpin").show();
 
       google.script.run
         .withSuccessHandler(function (res) {
-          $("#loading").hide();
+          $("#loadingSpin").hide();
 
           // 如果成功寫入新用戶資料，下次就不需要再問了
           if (
@@ -377,22 +360,9 @@
 
           if (type === "query") {
             if (res.found) {
-              $("#labQuery").text(
-                res.data.date +
-                "::" +
-                res.data.userName +
-                "::" +
-                res.data.custName +
-                "::" +
-                res.data.payType +
-                "::" +
-                res.data.srId
-              );
+              fillQueryLabel(formObj);
+              fillDetail(res.data);
 
-              $("#inputSrRec").val(res.data.srRec);
-              $("#inputLoc").val(res.data.loc);
-              $("#inputMood").val(res.data.mood);
-              $("#inputSpcons").val(res.data.spcons);
               $("#detailSection").show();
               $("#searchSection").hide();
               $("#btnAdd").hide();
@@ -407,7 +377,20 @@
                 cancelButtonText: "否",
               }).then((result) => {
                 if (result.isConfirmed) {
-                  initAdd();
+                  fillQueryLabel(formObj);
+
+                  $("#inputSrRec").val("");
+                  $("#inputLoc").val("清醒");
+                  $("#inputMood").val("穩定");
+                  $("#inputSpcons").val("無");
+
+                  $("#detailSection").show();
+                  $("#searchSection").hide();
+                  $("#btnUpdate").hide();
+                  $("#btnAdd").show();
+                } else {
+                  // 使用者取消新增，什麼都不做
+                  Swal.fire("已取消", "您可以修改查詢條件後再試一次。", "info");
                 }
               });
             }
@@ -427,6 +410,24 @@
     function backToSearch() {
       $("#detailSection").hide();
       $("#searchSection").show();
+    }
+
+    /**
+    * 工具：填充查詢標籤
+    */
+    function fillQueryLabel(formObj) {
+      const labelText = `${formObj.date} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
+      $('#labQuery').text(labelText);
+    }
+
+    /**
+ * 工具：填充詳細資料
+ */
+    function fillDetail(data) {
+      $('#inputSrRec').val(data.srRec || "");
+      $('#inputLoc').val(data.loc || "清醒");
+      $('#inputMood').val(data.mood || "穩定");
+      $('#inputSpcons').val(data.spcons || "無");
     }
   </script>
 </body>

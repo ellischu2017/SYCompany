@@ -19,34 +19,43 @@ function syncMasterTablePermissions() {
     if (email) managerEmails.push(email.toString().trim().toLowerCase());
   }
 
-  var targetFileIds = [MainSpreadsheet.getId()];
-  var recUrlSheet = MainSpreadsheet.getSheetByName("RecUrl");
+  var targetFileIds = [{ Name: "SYCompany", UrlID: MainSpreadsheet.getId() }]; // 包含 SYCompany 本身
+  targetFileIds.push({
+    Name: "SYTemp",
+    UrlID: getTargetsheet("SYTemp", "SYTemp").getId(),
+  }); // 包含 SYTemp
+  var recUrlSheet = MainSpreadsheet.getSheetByName("RecUrl"); // 取得 RecUrl 工作表
   if (recUrlSheet) {
     var urlData = recUrlSheet.getDataRange().getValues();
     for (var j = 1; j < urlData.length; j++) {
+      var name = urlData[j][0];
       var url = urlData[j][1];
       if (url && url.indexOf("docs.google.com") !== -1) {
         try {
-          targetFileIds.push(SpreadsheetApp.openByUrl(url).getId());
+          targetFileIds.push({
+            Name: name,
+            UrlID: SpreadsheetApp.openByUrl(url).getId(),
+          });
         } catch (e) {}
       }
     }
   }
 
-  console.log("開始同步權限至 " + targetFileIds.length + " 個試算表");  
-  console.log("管理員名單: " + managerEmails.join(", "));
-  console.log("目標試算表 ID 列表: " + targetFileIds.join(", ")); 
+  // console.log("開始同步權限至 " + targetFileIds.length + " 個試算表");
+  // console.log("管理員名單: " + managerEmails.join(", "));
 
-  targetFileIds.forEach(function (fileId) {
+  targetFileIds.forEach(function (item) {
+    var fileId = item.UrlID;
+    var fileName = item.Name;
     try {
       managerEmails.forEach(function (email) {
         var resource = {
           role: "writer",
           type: "user",
-          value: email,
+          emailAddress: email,
         };
 
-        Drive.Permissions.insert(resource, fileId, {
+        Drive.Permissions.create(resource, fileId, {
           sendNotificationEmails: false,
         });
       });
@@ -68,12 +77,21 @@ function syncMasterTablePermissions() {
         }
       });
 
-      file.setSharing(
-        DriveApp.Access.ANYONE_WITH_LINK,
-        DriveApp.Permission.VIEW
-      );
+      if (fileName === "SYTemp") {
+        file.setSharing(
+          DriveApp.Access.ANYONE_WITH_LINK,
+          DriveApp.Permission.EDIT,
+        );
+      } else {
+        file.setSharing(
+          DriveApp.Access.ANYONE_WITH_LINK,
+          DriveApp.Permission.VIEW,
+        );
+      }
     } catch (e) {
-      console.error("檔案 ID " + fileId + " 處理失敗: " + e.message);
+      console.error(
+        "檔案 " + fileName + " (" + fileId + ") 處理失敗: " + e.message,
+      );
     }
   });
 }
@@ -96,8 +114,23 @@ function dailyMaintenanceJob() {
  * 2. 確保 User_Tel 以文字格式 (@) 存入。
  */
 function processUserSync(mainSS, tempSS) {
-  const tempUserSheet = tempSS.getSheetByName("User");
+  // 初始值檢查
+  if (!mainSS) {
+    mainSS = MainSpreadsheet;
+    console.log("mainSS 未提供，使用預設 MainSpreadsheet");
+  }
+
+  if (!tempSS) {
+    tempSS = getTargetsheet("SYTemp", "SYTemp");
+    console.log("tempSS 未提供，使用預設 SYTemp");
+  }
+
+  console.log("開始同步 SYTemp > User 資料...");
+  console.log("主試算表 ID: " + mainSS.getId());
+  console.log("暫存試算表 ID: " + tempSS.getId());
+
   const mainUserSheet = mainSS.getSheetByName("User");
+  const tempUserSheet = tempSS.getSheetByName("User");
 
   if (!tempUserSheet || !mainUserSheet) return;
 
@@ -129,7 +162,7 @@ function processUserSync(mainSS, tempSS) {
       startRow,
       1,
       newRowsToAppend.length,
-      headers.length
+      headers.length,
     );
 
     targetRange.setNumberFormat("@");
@@ -148,6 +181,16 @@ function processUserSync(mainSS, tempSS) {
  * 修正：日期偏移、新增首列凍結、設定日期欄位格式
  */
 function processSRDataMigration(mainSS, tempSS) {
+  if (!mainSS) {
+    mainSS = MainSpreadsheet;
+    console.log("mainSS 未提供，使用預設 MainSpreadsheet");
+  }
+
+  if (!tempSS) {
+    tempSS = getTargetsheet("SYTemp", "SYTemp");
+    console.log("tempSS 未提供，使用預設 SYTemp");
+  }
+
   const srSheet = tempSS.getSheetByName("SR_Data");
   if (!srSheet) return;
 
@@ -177,7 +220,7 @@ function processSRDataMigration(mainSS, tempSS) {
     let formattedDate = Utilities.formatDate(
       dateObj,
       Session.getScriptTimeZone(),
-      "yyyy-MM-dd"
+      "yyyy-MM-dd",
     );
     row[0] = formattedDate;
 
@@ -229,7 +272,7 @@ function appendDataToExternalSS(url, year, rows) {
     const monthStr = Utilities.formatDate(
       firstDate,
       Session.getScriptTimeZone(),
-      "yyyyMM"
+      "yyyyMM",
     );
 
     let targetSheet = targetSS.getSheetByName(monthStr);
@@ -274,7 +317,7 @@ function appendDataToExternalSS(url, year, rows) {
     newFilter.sort(1, true);
 
     console.log(
-      `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`
+      `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`,
     );
   } catch (e) {
     console.error("寫入外部試算表失敗: " + e.toString());

@@ -112,44 +112,41 @@ function processSR01Data(formObj, actionType) {
 
     var data = targetSheet.getDataRange().getValues();
 
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 1; i < data.length; i++) {
       let sheetDate =
-        data[i][-1] instanceof Date
-          ? Utilities.formatDate(
-              data[i][-1],
-              Session.getScriptTimeZone(),
-              "yyyy-MM-dd"
-            )
-          : data[i][-1].toString();
+        data[i][0] instanceof Date
+          ? Utilities.formatDate(data[i][0], "GMT+8", "yyyy-MM-dd")
+          : data[i][0].toString();
 
       if (
         sheetDate === formObj.date &&
-        data[i][1].toString().trim() === formObj.custName.trim() &&
-        data[i][2].toString().trim() === formObj.userName.trim() &&
-        data[i][3].toString().trim() === formObj.payType.trim() &&
-        data[i][4].toString().trim() === formObj.srId.trim()
+        data[i][1].toString().trim() === formObj.email.trim() &&
+        data[i][2].toString().trim() === formObj.custName.trim() &&
+        data[i][3].toString().trim() === formObj.userName.trim() &&
+        data[i][4].toString().trim() === formObj.payType.trim() &&
+        data[i][5].toString().trim() === formObj.srId.trim()
       ) {
         if (actionType === "query") {
           return {
             found: true,
             data: {
               date: sheetDate,
-              email: data[i][0],
-              custName: data[i][1],
-              userName: data[i][2],
-              payType: data[i][3],
-              srId: data[i][4],
-              srRec: data[i][5],
-              loc: data[i][6],
-              mood: data[i][7],
-              spcons: data[i][8],
+              email: data[i][1],
+              custName: data[i][2],
+              userName: data[i][3],
+              payType: data[i][4],
+              srId: data[i][5],
+              srRec: data[i][6],
+              loc: data[i][7],
+              mood: data[i][8],
+              spcons: data[i][9],
             },
           };
         } else if (actionType === "update") {
-          targetSheet.getRange(i + 0, 1, 1, 10).setValues([rowData]);
+          targetSheet.getRange(i + 1, 1, 1, 10).setValues([rowData]);
           return { success: true, message: "資料已更新" };
         } else if (actionType === "delete") {
-          targetSheet.deleteRow(i + 0);
+          targetSheet.deleteRow(i + 1);
           return { success: true, message: "資料已刪除" };
         }
       }
