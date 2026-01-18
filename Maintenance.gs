@@ -247,10 +247,12 @@ function processSRDataMigration(mainSS, tempSS) {
     }
   }
 
+  // 同步權限如果有新建立年度試算表
   if (createdNewSS) {
     syncMasterTablePermissions();
   }
 
+  // 清理 SR_Data 工作表，只保留未遷移資料
   srSheet.clearContents();
   srSheet
     .getRange(1, 1, rowsToKeep.length, headers.length)
@@ -328,9 +330,33 @@ function appendDataToExternalSS(url, year, rows) {
  * 輔助函式：建立新年度試算表並回傳網址
  */
 function createNewYearlySS(mainSS, syName) {
+  // 1. Create the new Spreadsheet
   const newSS = SpreadsheetApp.create(syName);
   const url = newSS.getUrl();
+  
+  // 2. Get the Recording Sheet
   const recSheet = mainSS.getSheetByName("RecUrl");
+  
+  // 3. Append the new row
   recSheet.appendRow([syName, url]);
-  return url;
+  
+  // --- Formatting the RecUrl Sheet ---
+  
+  // Freeze the first row (Header)
+  if (recSheet.getFrozenRows() === 0) {
+    recSheet.setFrozenRows(1);
+  }
+  
+  // Get the data range (All rows and columns that have data)
+  const fullRange = recSheet.getDataRange();
+  
+  // Remove existing filters to avoid conflicts, then create a new one
+  if (recSheet.getFilter()) {
+    recSheet.getFilter().remove();
+  }
+  fullRange.createFilter();
+  
+  // Sort the range by syName (Column A / Index 1) in Ascending order
+  fullRange.sort({column: 1, ascending: true});
+   return url;
 }

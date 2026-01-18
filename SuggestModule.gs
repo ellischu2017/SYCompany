@@ -35,25 +35,50 @@ function getUserNameByEmail() {
  */
 function addSuggestion(formData) {
   try {
-    // 1. 取得 SYTemp 試算表 (請替換為您實際的 SYTemp ID 或透過搜尋取得)
-    // 假設您在 RecUrl 或某處存有 SYTemp 的 URL/ID
-    const ss = getTargetsheet("SYTemp", "SYTemp");
-    const tempSheet = ss.getSheetByName("Suggest"); // 直接存於主檔或連動到 SYTemp
-    
-    if (!tempSheet) {
-      return { success: false, message: "找不到 Suggest 工作表" };
+    // 驗證 formData
+    if (!formData || !formData.date) {
+      return { success: false, message: "表單資料為空或不完整" };
     }
 
-    // 2. 寫入資料
-    tempSheet.appendRow([
-      formData.date,
-      formData.suEmail,
-      formData.suName,
-      formData.suRec
-    ]);    
+    let ss;
+    try {
+      ss = getTargetsheet("SYTemp", "SYTemp");
+    } catch (error) {
+      return { success: false, message: "無法取得 SYTemp 試算表: " + error.message };
+    }
+    
+    if (!ss) {
+      return { success: false, message: "找不到 SYTemp 試算表" };
+    }
 
-    return { success: true, message: "資料已寫入" };
+    // 檢查 Suggest 工作表是否存在，不存在則建立
+    let tempSheet = ss.getSheetByName("Suggest");
+    if (!tempSheet) {
+      tempSheet = ss.insertSheet("Suggest");
+      // 設定第一列為標題
+      tempSheet.appendRow(["Date","Su_Email","Su_N","Su_Rec","Deal"]);
+    }
+
+    // 準備資料
+    const rowData = [
+      formData.date || "",
+      formData.suEmail || "",
+      formData.suName || "",
+      formData.suRec || ""
+    ];
+
+    Logger.log("寫入資料: " + JSON.stringify(rowData));
+    
+    // 新增資料列
+    tempSheet.appendRow(rowData);
+
+    // 按日期由新到舊排序 (Z to A)
+    const dataRange = tempSheet.getDataRange();
+    tempSheet.sort(1, false); // 第 1 欄 (日期)，false = 降序 (Z to A)
+
+    return { success: true, message: "資料已寫入", data: rowData };
   } catch (e) {
-    return { success: false, message: e.toString() };
+    Logger.log("addSuggestion 錯誤: " + e.toString());
+    return { success: false, message: "錯誤: " + e.toString() };
   }
 }

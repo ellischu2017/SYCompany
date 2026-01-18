@@ -64,15 +64,15 @@
                     <div class="row ">
                         <div class="col-md-3 mb-2">
                             <label class="form-label text-muted small">填寫日期</label>
-                            <input id="queryDate" class="form-control" type="date" readonly placeholder="載入中..."/>
+                            <input id="queryDate" class="form-control" type="date" readonly placeholder="載入中..." />
                         </div>
                         <div class="col-md-3 mb-2">
                             <label class="form-label text-muted small">填寫人姓名 (Su_N)</label>
-                            <input id="querySuName" class="form-control" type="text" readonly placeholder="載入中..."/>
+                            <input id="querySuName" class="form-control" type="text" readonly placeholder="載入中..." />
                         </div>
                         <div class="col-md-6 mb-2">
                             <label class="form-label text-muted small">電子郵件 (Su_Email)</label>
-                            <input id="querySuEmail" class="form-control" type="email" readonly placeholder="載入中..."/>
+                            <input id="querySuEmail" class="form-control" type="email" readonly placeholder="載入中..." />
                         </div>
                     </div>
 
@@ -135,7 +135,7 @@
                 suRec: suRec
             };
 
-            console.log(formData);
+            console.log("formData:", formData);
 
             $('#loadingSpin').css('display', 'flex');
 
@@ -146,7 +146,8 @@
                         icon: 'success',
                         title: '提交成功',
                         text: '感謝您的回饋！',
-                        confirmButtonText: '確定'
+                        confirmButtonText: '確定',
+                        timer: 3000
                     }).then(() => {
                         $('#inputSuRec').val(''); // 清空輸入框
                     });

@@ -19,7 +19,7 @@ function doGet(e) {
 
   var page = e.parameter.page || "Index";
   var isManager = checkManagerPrivilege(userEmail);
-  var pageToLoad = isManager ? page : "SR_server01";
+  var pageToLoad = isManager || page === "Suggest" ? page : "SR_server01";
 
   var template = HtmlService.createTemplateFromFile(pageToLoad);
   template.userEmail = userEmail;
