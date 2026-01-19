@@ -241,7 +241,8 @@ function processSRDataMigration(mainSS, tempSS) {
       targetUrl = createNewYearlySS(mainSS, syName);
       createdNewSS = true;
     }
-
+    console.log("搬移資料至 " + year + " 年試算表，網址: " + targetUrl);
+    console.log("搬移筆數: " + migrationMap[year].length);
     if (targetUrl) {
       appendDataToExternalSS(targetUrl, year, migrationMap[year]);
     }
