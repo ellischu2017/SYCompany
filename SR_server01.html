@@ -132,6 +132,25 @@
       <div class="mb-3">
         <label class="form-label">服務紀錄內容 (SR_REC)</label>
         <textarea class="form-control" id="inputSrRec" rows="4" placeholder="請詳細輸入服務內容..."></textarea>
+        <div class="mt-2 d-flex justify-content-end">
+          <div class="btn-group shadow-sm" role="group">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="handleClipboard('cut', '#inputSrRec')">
+              <i class="fa-solid fa-scissors"></i> 剪下
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="handleClipboard('copy', '#inputSrRec')">
+              <i class="fa-regular fa-copy"></i> 複製
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="handleClipboard('paste', '#inputSrRec')">
+              <i class="fa-solid fa-paste"></i> 貼上
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="handleClipboard('clear', '#inputSrRec')">
+              <i class="fa-solid fa-eraser"></i> 清除
+          </div>
+        </div>
       </div>
       <div class="row">
         <div class="col-md-6 mb-3">
@@ -428,6 +447,64 @@
       $('#inputLoc').val(data.loc || "清醒");
       $('#inputMood').val(data.mood || "穩定");
       $('#inputSpcons').val(data.spcons || "無");
+    }
+
+    /**
+    * 處理指定欄位的剪貼簿動作
+    * @param {string} action - 'cut', 'copy', 'paste'
+    * @param {string} targetId - 指定的元素 ID (例如 '#inputSrRec')
+    */
+    async function handleClipboard(action, targetId) {
+      const $el = $(targetId);
+      const text = $el.val();
+
+      try {
+        if (action === 'cut') {
+          if (!text) return showToast('info', '沒有內容可以剪下');
+          await navigator.clipboard.writeText(text);
+          $el.val(""); // 清空指定欄位
+          showToast('success', '已剪下');
+
+        } else if (action === 'copy') {
+          if (!text) return showToast('info', '內容為空，無法複製');
+          await navigator.clipboard.writeText(text);
+          showToast('success', '已複製');
+
+        } else if (action === 'paste') {
+          const clipboardText = await navigator.clipboard.readText();
+          if (!clipboardText) return showToast('info', '剪貼簿中沒有內容');
+
+          // 將內容附加到指定欄位末尾
+          const currentVal = $el.val();
+          $el.val(currentVal + clipboardText);
+          showToast('success', '已貼上');
+        }else if (action === 'clear') {
+          $el.val("");
+          showToast('success', '已清除');
+        }
+      } catch (err) {
+        console.error('剪貼簿操作失敗:', err);
+        Swal.fire({
+          icon: 'error',
+          title: '操作失敗',
+          text: '請確保使用 HTTPS 並授權瀏覽器存取剪貼簿。',
+          confirmButtonColor: '#dc3545'
+        });
+      }
+    }
+
+    /**
+     * 顯示快速提示訊息
+     */
+    function showToast(icon, title) {
+      Swal.fire({
+        icon: icon,
+        title: title,
+        timer: 1000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
     }
   </script>
 </body>

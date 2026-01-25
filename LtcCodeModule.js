@@ -50,13 +50,20 @@ function addLtcCodeData(formObj) {
     return { success: false, message: "該服務編碼已存在！" };
   }
 
-  const newRow = [
-    formObj.srId,
-    formObj.srName,
-    formObj.srDetail,
-  ];
+  const newRow = [formObj.srId, formObj.srName, formObj.srDetail];
 
   sheet.appendRow(newRow);
+  // 2. 執行排序 (ORDER BY Cust_N A->Z)
+  // getRange(row, column, numRows, numColumns)
+  // 從第 2 列開始排（避開標題列），針對所有已使用的範圍進行排序
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+
+  if (lastRow > 1) {
+    sheet
+      .getRange(2, 1, lastRow - 1, lastColumn)
+      .sort({ column: 1, ascending: true });
+  }
   return { success: true, message: "編碼新增成功！" };
 }
 

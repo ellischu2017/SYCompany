@@ -108,11 +108,20 @@
             <input type="hidden" id="inputCustName">
           </div>
 
-          <div class="mb-3">
-            <label for="inputCustBirth" class="form-label">個案生日 (Cust_BD)</label>
-            <div class="input-group">
-              <input type="date" class="form-control" id="inputCustBirth" required>
-              <span class="input-group-text" id="displayAge">年齡：-- 歲</span>
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label for="inputCustSex" class="form-label">性別 (Cust_Sex)</label>
+              <select class="form-select" id="inputCustSex">
+                <option value="男" selected>男</option>
+                <option value="女">女</option>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <label for="inputCustBirth" class="form-label">個案生日 (Cust_BD)</label>
+              <div class="input-group">
+                <input type="date" class="form-control" id="inputCustBirth" required>
+                <span class="input-group-text" id="displayAge">年齡：-- 歲</span>
+              </div>
             </div>
           </div>
 
@@ -149,6 +158,11 @@
           <div class="mb-3">
             <label for="inputEcTel" class="form-label">緊急聯絡人電話 (Cust_EC_Tel)</label>
             <input type="text" class="form-control" id="inputEcTel" placeholder="0000000000">
+          </div>
+
+          <div class="mb-3">
+            <label for="inputLtcCode" class="form-label">服務項目 (Cust_LTC_Code)</label>
+            <textarea class="form-control" id="inputLtcCode" rows="5" placeholder="請輸入服務項目以 ',' 分開"></textarea>
           </div>
 
           <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
@@ -240,6 +254,7 @@
         const mode = $('#formMode').val();
         const formData = {
           custName: $('#inputCustName').val(),
+          custSex: $('#inputCustSex').val(),
           custBirth: $('#inputCustBirth').val(),
           custAddr: $('#inputCustAddr').val(),
           supName: $('#inputSupName').val(),
@@ -247,7 +262,8 @@
           supTel: $('#inputSupTel').val(),
           officeTel: $('#inputOfficeTel').val(),
           ecName: $('#inputEcName').val(),
-          ecTel: $('#inputEcTel').val()
+          ecTel: $('#inputEcTel').val(),
+          ltcCode: $('#inputLtcCode').val()
         };
 
         if (!formData.custBirth) {
@@ -369,6 +385,7 @@
     function populateForm(data) {
       $('#displayCustName').text(data.Cust_N); // 以標籤顯示 
       $('#inputCustName').val(data.Cust_N);
+      $('#inputCustSex').val(data.Cust_Sex);
       $('#inputCustBirth').val(data.Cust_BD);
       // 填入資料後立即計算年齡
       updateAgeDisplay(data.Cust_BD);
@@ -379,6 +396,7 @@
       $('#inputOfficeTel').val(data.Office_Tel);
       $('#inputEcName').val(data.Cust_EC);
       $('#inputEcTel').val(data.Cust_EC_Tel);
+      $('#inputLtcCode').val(data.Cust_LTC_Code);
     }
 
     // 清空表單

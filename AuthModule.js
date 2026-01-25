@@ -9,30 +9,37 @@
  */
 function doGet(e) {
   var userEmail = Session.getActiveUser().getEmail();
-  if (!userEmail || userEmail === "") {
-    var template = HtmlService.createTemplateFromFile("Auth");
-    template.scriptUrl = "https://accounts.google.com/AccountChooser?continue=" + getScriptUrl() + "?page=Index";
-    return template
-      .evaluate()
+  var authUser = e.parameter.authuser;
+
+  // 1. 如果已經抓到 Email，就直接進入身分分流，不再卡在 AuthPortal
+  if (userEmail && userEmail !== "") {
+    var isManager = checkManagerPrivilege(userEmail);
+    var page = e.parameter.page || "Index";
+
+    // 身分分流
+    var pageToLoad = isManager || page == "Suggest" ? page : "SR_server01";
+
+    var template = HtmlService.createTemplateFromFile(pageToLoad);
+    template.userEmail = userEmail;
+    template.webAppUrl = getScriptUrl();
+    template.authUser = authUser || "0";
+
+    return template.evaluate()
+      .setTitle(isManager ? "舒漾長照管理系統" : "舒漾電子服務紀錄管理")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
-  var page = e.parameter.page || "Index";
-  var isManager = checkManagerPrivilege(userEmail);
-  console.log("使用者 " + userEmail + " 請求頁面: " + page + ", 管理員權限: " + isManager);
-  var pageToLoad = isManager || page === "Suggest" ? page : "SR_server01";
-
-  var template = HtmlService.createTemplateFromFile(pageToLoad);
-  template.userEmail = userEmail;
-  template.webAppUrl = getScriptUrl();
-
-  return template
-    .evaluate()
-    .setTitle(isManager ? "舒漾長照管理系統" : "舒漾電子服務紀錄管理")
+  // 2. 只有在完全抓不到 Email 的情況下才顯示 AuthPortal
+  var template = HtmlService.createTemplateFromFile("AuthPortal");
+  // 使用強制帳號選擇器
+  template.authUrl = "https://accounts.google.com/AccountChooser?continue=" + encodeURIComponent(getScriptUrl());
+  
+  return template.evaluate()
+    .setTitle("帳號驗證 - 舒漾長照")
     .addMetaTag("viewport", "width=device-width, initial-scale=1")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
-
 /**
  * 檢查 Email 是否存在於 Manager 工作表的 Mana_Email 欄位
  */

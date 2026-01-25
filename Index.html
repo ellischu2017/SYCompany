@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html>
-
-<head>
-  <base target="_top">
-  <title>舒漾長照服務紀錄單管理系統</title>
-
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <head>
+    <base target="_top">
+    <title>舒漾長照服務紀錄單管理系統</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <style>
     /* 自定義樣式以優化手機體驗 */
@@ -134,6 +135,13 @@
           <i class="fas fa-file-medical me-2"></i> 舒漾電子服務紀錄(用戶端)
         </a>
       </div>
+      <hr>
+      <div class="col-6">
+        <a href="<?!= getScriptUrl() ?>?page=TranferResponse"
+          class="btn btn-secondary text-white w-100 menu-btn rounded-3">
+          <i class="fas fa-truck-moving me-2"></i> 資料轉換系統
+        </a>
+      </div>
     </div>
     <div class="container mt-2 text-end">
       <small class="text-muted">
@@ -145,16 +153,34 @@
 
 
 
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
     // 頁面加載完成後的初始化邏輯
     $(document).ready(function () {
+      checkAuthContext();
       $('#loading').css('display', 'flex');
       console.log("舒漾長照系統 - Index 頁面載入完成");
       $('#loading').hide();
+      // 檢查如果沒有 userEmail (代表繞過後端載入，雖然機率低)
+      if (!"<?= userEmail ?>") {
+        window.top.location.href = "<?= webAppUrl ?>";
+      }
     });
+
+
+    /**
+     * 檢查 URL 參數，確保與 Google Session 同步
+     */
+    function checkAuthContext() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const currentAuthUser = urlParams.get('authuser');
+
+      // 如果網址沒有 authuser 參數，可以視需求決定是否補上，
+      // 避免在多帳號環境下跳轉回預設的 0 號帳號
+      if (currentAuthUser === null) {
+        console.log("提示：當前網址未指定 authuser，建議由官方入口進入以確保權限正確。");
+      }
+    }
 
     /**
     * 呼叫後端同步權限功能

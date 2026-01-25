@@ -170,6 +170,17 @@ function processUserSync(mainSS, tempSS) {
     console.log("已新增 " + newRowsToAppend.length + " 筆新居服員資料。");
   }
 
+  // --- 新增：排序邏輯 ---
+  const finalLastRow = mainUserSheet.getLastRow();
+  const lastColumn = mainUserSheet.getLastColumn();
+  if (finalLastRow > 1) {
+    // 針對全表 (排除標題列) 依照第一欄 (Column 1) 進行 ASC 排序
+    mainUserSheet
+      .getRange(2, 1, finalLastRow - 1, lastColumn)
+      .sort({ column: 1, ascending: true });
+    console.log("SYCompany > User 已完成 Column 1 排序 (ASC)。");
+  }
+
   if (tempUserSheet.getLastRow() > 1) {
     tempUserSheet.deleteRows(2, tempUserSheet.getLastRow() - 1);
     console.log("SYTemp > User 已清理完畢。");
@@ -200,7 +211,7 @@ function processSRDataMigration(mainSS, tempSS) {
   const headers = data[0];
   const today = new Date();
   const cutoffDate = new Date();
-  cutoffDate.setDate(today.getDate() - 7);
+  cutoffDate.setDate(today.getDate() - 8); // 7 天前
 
   const migrationMap = {};
   const rowsToKeep = [headers];
@@ -334,30 +345,30 @@ function createNewYearlySS(mainSS, syName) {
   // 1. Create the new Spreadsheet
   const newSS = SpreadsheetApp.create(syName);
   const url = newSS.getUrl();
-  
+
   // 2. Get the Recording Sheet
   const recSheet = mainSS.getSheetByName("RecUrl");
-  
+
   // 3. Append the new row
   recSheet.appendRow([syName, url]);
-  
+
   // --- Formatting the RecUrl Sheet ---
-  
+
   // Freeze the first row (Header)
   if (recSheet.getFrozenRows() === 0) {
     recSheet.setFrozenRows(1);
   }
-  
+
   // Get the data range (All rows and columns that have data)
   const fullRange = recSheet.getDataRange();
-  
+
   // Remove existing filters to avoid conflicts, then create a new one
   if (recSheet.getFilter()) {
     recSheet.getFilter().remove();
   }
   fullRange.createFilter();
-  
+
   // Sort the range by syName (Column A / Index 1) in Ascending order
-  fullRange.sort({column: 1, ascending: true});
-   return url;
+  fullRange.sort({ column: 1, ascending: true });
+  return url;
 }

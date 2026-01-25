@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <title>舒漾資料轉換系統</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <style>
+    /* 保持與 Index.html 一致的樣式 */
+    body {
+      background-color: #f8f9fa;
+      font-family: "Microsoft JhengHei", Arial, sans-serif;
+    }
+
+    .main-container {
+      max-width: 800px;
+      /* 稍微加寬以適應表單 */
+      margin: 20px auto;
+      padding: 15px;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-label {
+      font-weight: bold;
+      color: #333;
+    }
+
+    #divResult {
+      margin-top: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 10px;
+      background-color: #f8f9fa;
+      display: none;
+      /* 初始隱藏 */
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="navbar navbar-dark bg-secondary sticky-top">
+    <div class="container-fluid">
+      <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#offcanvasNavbar">
+        <i class="fas fa-bars"></i>
+      </button>
+      <span class="navbar-brand mb-0 h1 mx-auto">舒漾資料轉換系統</span>
+    </div>
+  </nav>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar" aria-labelledby="offcanvasNavbarLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="offcanvasNavbarLabel">系統導航</h5>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <?!= includeNav(); ?>
+    </div>
+
+  </div>
+
+  <div class="container main-container">
+    <form id="transferForm">
+      <div class="mb-3">
+        <label for="selCustName" class="form-label" id="lblCustName">選擇案主 (Customer Name)</label>
+        <select class="form-select" id="selCustName" required>
+          <option value="" selected disabled>資料讀取中...</option>
+        </select>
+      </div>
+
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="chkUpdate" checked>
+        <label class="form-check-label" for="chkUpdate">
+          僅更新 (Update Only) - <small class="text-muted">勾選：只轉換上次更新後的資料；未勾選：轉換該日期前的歷史資料</small>
+        </label>
+      </div>
+
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-secondary btn-lg" id="btnTransfer">
+          <i class="fas fa-sync-alt me-2"></i>開始轉換 (Start Transfer)
+        </button>
+      </div>
+    </form>
+
+    <div id="divResult"></div>
+    <div class="container mt-2 text-end">
+      <small class="text-muted">
+        <i class="fas fa-user-circle"></i> 當前管理員：
+        <?= userEmail ?>
+      </small>
+    </div>
+
+  </div>
+
+
+
+  <script>
+    $(document).ready(function () {
+      // 頁面載入時，獲取案主名單
+      loadCustomerNames();
+
+      // 綁定按鈕點擊事件
+      $('#btnTransfer').on('click', runTransfer);
+    });
+
+    // 獲取案主名單
+    function loadCustomerNames() {
+      google.script.run
+        .withSuccessHandler(function (names) {
+          var select = $('#selCustName');
+          select.empty();
+          select.append('<option value="" selected disabled>請選擇案主...</option>');
+
+          // --- 新增部分 ---
+          select.append('<option value="all" style="font-weight:bold; color:blue;">全部更新 (Update All)</option>');
+          // ----------------
+
+          if (names && names.length > 0) {
+            names.forEach(function (name) {
+              if (name != "Raw Responses") select.append($('<option></option>').val(name).text(name));
+            });
+          } else {
+            select.append('<option value="" disabled>無可用的案主資料</option>');
+          }
+        })
+        .withFailureHandler(function (err) {
+          Swal.fire('讀取錯誤', '無法載入案主名單: ' + err.message, 'error');
+        })
+        .getRawResponseSheetNames();
+    }
+
+    // 執行轉換邏輯
+    function runTransfer() {
+      const custName = $('#selCustName').val();
+      const isUpdateOnly = $('#chkUpdate').is(':checked');
+
+      if (!custName) {
+        Swal.fire('提示', '請先選擇一位案主', 'warning');
+        return;
+      }
+
+      // 根據是否為 "all" 設定顯示文字
+      let titleHtml = '';
+      if (custName === 'all') {
+        titleHtml = `正在處理：<b>全部案主</b><br>這可能需要一點時間，請勿關閉視窗...`;
+      } else {
+        titleHtml = `正在處理案主：<b>${custName}</b>`;
+      }
+
+      // 顯示 Loading
+      Swal.fire({
+        title: '資料轉換中',
+        html: `正在處理案主：<b>${custName}</b><br>模式：${isUpdateOnly ? '僅更新新資料' : '處理歷史資料'}`,
+        allowOutsideClick: true,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 呼叫後端
+      google.script.run
+        .withSuccessHandler(function (result) {
+          Swal.close();
+
+          // 顯示結果摘要
+          if (result.success) {
+            Swal.fire({
+              icon: 'success',
+              title: '轉換完成',
+              text: `成功寫入 ${result.count} 筆紀錄。`,
+            });
+
+            // 在下方顯示詳細 Log
+            const $resultDiv = $('#divResult');
+            $resultDiv.html(`<strong>處理結果 (${new Date().toLocaleTimeString()}):</strong><br>` + result.log.replace(/\n/g, '<br>'));
+            $resultDiv.show();
+          } else {
+            Swal.fire('轉換失敗', result.message, 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          Swal.close();
+          Swal.fire('系統錯誤', '執行超時或發生錯誤：' + err.message, 'error');
+        })
+        .processTransferData(custName, isUpdateOnly);
+    }
+    /**
+      * 呼叫後端同步權限功能
+      */
+    function syncPermissions() {
+      // 檢查 Swal 是否存在，避免再次報錯
+      if (typeof Swal === 'undefined') {
+        alert("系統錯誤：尚未載入 SweetAlert2 函式庫");
+        return;
+      }
+
+      // 1. 關閉 Offcanvas 導覽列
+      var offcanvasElement = document.querySelector('.offcanvas');
+      if (offcanvasElement) {
+        var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (offcanvas) offcanvas.hide();
+      }
+
+      // 2. 啟動 SweetAlert2 動態效果
+      Swal.fire({
+        title: '同步權限中',
+        text: '正在更新所有試算表權限，並清理名單，請稍候...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 3. 呼叫 GAS 後端
+      google.script.run
+        .withSuccessHandler(function () {
+          Swal.fire({
+            icon: 'success',
+            title: '同步完成',
+            text: '權限已成功更新',
+            timer: 2000
+          });
+        })
+        .withFailureHandler(function (err) {
+          Swal.fire({
+            icon: 'error',
+            title: '同步失敗',
+            text: err.message
+          });
+        })
+        .syncMasterTablePermissions();
+    }
+
+    function runManualMaintenance() {
+      // 1. 關閉導航列
+      var offcanvasElement = document.querySelector('.offcanvas');
+      var bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+      if (bsOffcanvas) bsOffcanvas.hide();
+
+      // 2. 顯示讀取中
+      Swal.fire({
+        title: '資料處理中',
+        text: '正在遷移過期紀錄並同步 User 名單，若有新年度檔案將自動設定權限...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      // 3. 呼叫後端函式
+      google.script.run
+        .withSuccessHandler(function () {
+          Swal.fire('完成', '資料維護與 User 同步已執行完畢。', 'success');
+        })
+        .withFailureHandler(function (err) {
+          Swal.fire('執行失敗', err.message, 'error');
+        })
+        .dailyMaintenanceJob(); // 執行剛才寫的後端主函式
+    }    
+  </script>
+</body>
+<?!= includeFooter() ?>
+
+</html>
