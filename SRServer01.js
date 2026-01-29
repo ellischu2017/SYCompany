@@ -65,7 +65,7 @@ function processSR01Data(formObj, actionType) {
           break;
         }
       }
-
+      // 檢查是否已存在相同 Email 的使用者
       if (!uExists) {
         userSheet.appendRow([
           formObj.userName,
@@ -75,6 +75,7 @@ function processSR01Data(formObj, actionType) {
       }
     }
 
+    // 處理 SR_Data 表單
     var targetSheet = targetSs.getSheetByName("SR_Data");
     if (!targetSheet) {
       targetSheet = targetSs.insertSheet("SR_Data");
@@ -259,5 +260,42 @@ function getCustomSrIdList(custName) {
   }
 }
 
+/**
+ * 效能優化版：取得特殊狀況說明
+ */
+function getSPCONS(formObj) {
+  try {
+    var targetSs = getTargetsheet("SYTemp", "SYTemp");
+    var spconsSheet = targetSs.getSheetByName("SR_Data");
+    if (!spconsSheet) return "無";
+
+    var data = spconsSheet.getDataRange().getValues();
+    const targetDateStr = formObj.date; // 前端傳來的 yyyy-MM-dd
+
+    // 從最後一行往回找 (反向遍歷)，通常最新紀錄在下方
+    for (let i = data.length - 1; i >= 1; i--) {
+      let row = data[i];
+
+      // 快速比對：先比對較簡單的字串欄位，減少日期轉換的運算成本
+      if (
+        row[3].toString().trim() === formObj.userName.trim() &&
+        row[2].toString().trim() === formObj.custName.trim() &&
+        row[1].toString().trim() === formObj.SRTimes.trim()
+      ) {
+        let sheetDate =
+          row[0] instanceof Date
+            ? Utilities.formatDate(row[0], "GMT+8", "yyyy-MM-dd")
+            : row[0].toString();
+
+        if (sheetDate === targetDateStr) {          
+          return {data:{ loc: data[i][7], mood: data[i][8], spcons: data[i][9] }};          
+        }
+      }
+    }
+  } catch (e) {
+    console.log("取得特殊狀況失敗: " + e.toString());
+  }
+  return {data:{ loc: "清醒", mood: "穩定", spcons: "無" } };
+}
 // 修改原有的 getSRServer01InitData，讓它在初始化時就觸發名單載入
 // 在 HTML 的 successHandler 中，如果 currentUserName 有值，就呼叫 fetchClientLists(data.currentUserName)

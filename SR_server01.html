@@ -435,6 +435,9 @@
         userTel: "", // 預設為空
       };
 
+      let exSPCONS = await getSPCons(formObj);
+      console.log("特殊狀況說明及處理:", exSPCONS);
+
       // console.log("準備執行動作：", type, formObj);
 
       // 如果是「查詢」之後的「新增」或「更新」動作，且被標記為新用戶
@@ -467,6 +470,7 @@
       }
 
       $("#loadingSpin").show();
+
 
       google.script.run
         .withSuccessHandler(function (res) {
@@ -504,9 +508,9 @@
                   fillQueryLabel(formObj);
 
                   $("#inputSrRec").val("");
-                  $("#inputLoc").val("清醒");
-                  $("#inputMood").val("穩定");
-                  $("#inputSpcons").val("無");
+                  $("#inputLoc").val(exSPCONS.loc || "清醒");
+                  $("#inputMood").val(exSPCONS.mood || "穩定");
+                  $("#inputSpcons").val(exSPCONS.spcons || "無");
 
                   $("#detailSection").show();
                   $("#searchSection").hide();
@@ -613,6 +617,29 @@
         position: 'top-end'
       });
     }
+
+/**
+ * 將 google.script.run 包裝成 Promise 以支援 await
+ */
+function getSPCons(formObj) {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        console.log("後端回傳的原始資料:", res);
+        // 直接回傳 res.data，不要再包一層 data:{}
+        if (res && res.data) {
+          resolve(res.data); 
+        } else {
+          resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
+        }
+      })
+      .withFailureHandler(function (err) {
+        console.error("取得特殊狀況說明失敗:", err);
+        resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
+      })
+      .getSPCONS(formObj);
+  });
+}
   </script>
 </body>
 
