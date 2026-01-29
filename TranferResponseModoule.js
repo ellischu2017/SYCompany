@@ -51,7 +51,7 @@ function processTransferData(custName, isUpdateOnly) {
 
     // 為了效能，這裡先開啟目標 Spreadsheet (避免在迴圈內重複開啟)
     // 假設 Utilities.getTargetsheet 可用，若無請自行替換為 SpreadsheetApp.openByUrl(...)
-    const ssCurrent = getTargetsheet("SYTemp", "SYTemp"); 
+    const ssCurrent = getTargetsheet("SYTemp", "SYTemp");
     const sheetSRData = ssCurrent.getSheetByName("SR_Data");
     const sheetTransResp = ssCurrent.getSheetByName("Transfer_Response");
 
@@ -66,29 +66,35 @@ function processTransferData(custName, isUpdateOnly) {
     // 建立索引 Key: 日期(0)_案主(2)_居服員(3)_SR_ID(5)
     for (let r = 1; r < existingData.length; r++) {
       const exDate = formatDate(existingData[r][0]);
+      const exSRTimes = existingData[r][1];
       const exCust = existingData[r][2];
       const exUser = existingData[r][3];
       const exId = existingData[r][5];
-      existingKeys.add(`${exDate}_${exCust}_${exUser}_${exId}`);
+      existingKeys.add(`${exDate}_${exSRTimes}_${exCust}_${exUser}_${exId}`);
     }
 
     // --- 迴圈處理案主 ---
     for (const customer of customersToProcess) {
-       // 呼叫單一處理邏輯
-       const result = processSingleCustomerInternal(customer, isUpdateOnly, sheetSRData, sheetTransResp, existingKeys);
-       
-       // 累加結果
-       globalResult.count += result.count;
-       globalResult.log += result.log;
-       
-       // 若單一處理發生嚴重錯誤(非資料面)，可選擇是否中斷，這裡選擇記錄錯誤但繼續執行
-       if (!result.success) {
-          globalResult.log += `[Error] ${customer} 處理失敗: ${result.message}\n`;
-       }
+      // 呼叫單一處理邏輯
+      const result = processSingleCustomerInternal(
+        customer,
+        isUpdateOnly,
+        sheetSRData,
+        sheetTransResp,
+        existingKeys,
+      );
+
+      // 累加結果
+      globalResult.count += result.count;
+      globalResult.log += result.log;
+
+      // 若單一處理發生嚴重錯誤(非資料面)，可選擇是否中斷，這裡選擇記錄錯誤但繼續執行
+      if (!result.success) {
+        globalResult.log += `[Error] ${customer} 處理失敗: ${result.message}\n`;
+      }
     }
 
     globalResult.log += `[Done] 所有作業完成。總新增筆數: ${globalResult.count}`;
-
   } catch (err) {
     globalResult.success = false;
     globalResult.message = err.message;
@@ -102,18 +108,24 @@ function processTransferData(custName, isUpdateOnly) {
  * 內部核心邏輯：處理單一案主
  * (將原本 processTransferData 的邏輯搬移至此，並接受共用的 Sheet 物件與 Key Set 以提升效能)
  */
-function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, sheetTransResp, existingKeys) {
+function processSingleCustomerInternal(
+  custName,
+  isUpdateOnly,
+  sheetSRData,
+  sheetTransResp,
+  existingKeys,
+) {
   const result = { success: false, count: 0, log: "", message: "" };
 
   try {
     const ssRaw = SpreadsheetApp.openByUrl(SS_URL_RAW_RESPONSES);
     const sheetSource = ssRaw.getSheetByName(custName);
-    
+
     // 如果來源表單不存在 (例如系統隱藏表單)，跳過並回傳成功
     if (!sheetSource) {
-       result.log = `[Skip] 找不到來源工作表: ${custName} (略過)\n`;
-       result.success = true; 
-       return result;
+      result.log = `[Skip] 找不到來源工作表: ${custName} (略過)\n`;
+      result.success = true;
+      return result;
     }
 
     // 2. 取得 TDate
@@ -123,9 +135,9 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
     // 3. 讀取來源資料
     const sourceData = sheetSource.getDataRange().getValues();
     if (sourceData.length < 2) {
-        result.log += `[Info] 無資料可處理。\n`;
-        result.success = true;
-        return result;
+      result.log += `[Info] 無資料可處理。\n`;
+      result.success = true;
+      return result;
     }
 
     const headers = sourceData[0];
@@ -135,13 +147,15 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
     const idxMood = headers.indexOf("身心狀況");
     const idxSpCons = headers.indexOf("有特殊狀況，請說明及處理");
     const idxHasTemp = headers.indexOf("是否有其他臨時服務項目");
-    const idxTempItem = headers.indexOf("臨時服務項目(請填寫服務代碼+項目名稱)");
+    const idxTempItem = headers.indexOf(
+      "臨時服務項目(請填寫服務代碼+項目名稱)",
+    );
     const idxTempDesc = headers.indexOf("說明");
 
     if (idxDate === -1) {
-        result.log += `[Warn] 缺少 '日期' 欄位，跳過此案主。\n`;
-        result.success = true;
-        return result;
+      result.log += `[Warn] 缺少 '日期' 欄位，跳過此案主。\n`;
+      result.success = true;
+      return result;
     }
 
     // 4. 過濾與轉換資料
@@ -162,11 +176,12 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
         }
 
         let rawSpCons = idxSpCons > -1 ? row[idxSpCons] : "";
-        const finalSpCons = rawSpCons && String(rawSpCons).trim() !== "" ? rawSpCons : "無";
+        const finalSpCons =
+          rawSpCons && String(rawSpCons).trim() !== "" ? rawSpCons : "無";
 
         const baseData = {
           date: formatDate(rowDate),
-          email: "",
+          SRTimes: "1",
           custName: custName,
           userName: idxUser > -1 ? row[idxUser] : "",
           payType: "補助",
@@ -182,16 +197,23 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
           if (
             header.match(/^[A-Za-z][0-9a-zA-Z]+/) &&
             cellValue &&
-            String(cellValue).trim() !== "" && 
+            String(cellValue).trim() !== "" &&
             String(cellValue).trim() !== "無"
           ) {
             const srIdMatch = header.match(/^([A-Za-z][0-9a-zA-Z\-]+)/);
             const srId = srIdMatch ? srIdMatch[0] : header;
 
             rowsToAdd.push([
-              baseData.date, baseData.email, baseData.custName,
-              baseData.userName, baseData.payType, srId,
-              cellValue, baseData.loc, baseData.mood, baseData.spCons
+              baseData.date,
+              baseData.SRTimes,
+              baseData.custName,
+              baseData.userName,
+              baseData.payType,
+              srId,
+              cellValue,
+              baseData.loc,
+              baseData.mood,
+              baseData.spCons,
             ]);
           }
         }
@@ -207,9 +229,16 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
 
           if (tempRec !== "") {
             rowsToAdd.push([
-              baseData.date, baseData.email, baseData.custName,
-              baseData.userName, baseData.payType, tempId,
-              tempRec, baseData.loc, baseData.mood, baseData.spCons
+              baseData.date,
+              baseData.SRTimes,
+              baseData.custName,
+              baseData.userName,
+              baseData.payType,
+              tempId,
+              tempRec,
+              baseData.loc,
+              baseData.mood,
+              baseData.spCons,
             ]);
           }
         }
@@ -218,8 +247,8 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
 
     // 7. 寫入資料 (使用傳入的 existingKeys 檢查重複)
     if (rowsToAdd.length > 0) {
-      const uniqueRows = rowsToAdd.filter(row => {
-        const key = `${row[0]}_${row[2]}_${row[3]}_${row[5]}`;
+      const uniqueRows = rowsToAdd.filter((row) => {
+        const key = `${row[0]}_${row[1]}_${row[2]}_${row[3]}_${row[5]}`;
         if (existingKeys.has(key)) return false;
         existingKeys.add(key);
         return true;
@@ -227,8 +256,10 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
 
       if (uniqueRows.length > 0) {
         const lastRow = sheetSRData.getLastRow();
-        sheetSRData.getRange(lastRow + 1, 1, uniqueRows.length, uniqueRows[0].length).setValues(uniqueRows);
-        
+        sheetSRData
+          .getRange(lastRow + 1, 1, uniqueRows.length, uniqueRows[0].length)
+          .setValues(uniqueRows);
+
         result.count = uniqueRows.length;
         result.log += `> 新增 ${uniqueRows.length} 筆資料。\n`;
 
@@ -239,13 +270,12 @@ function processSingleCustomerInternal(custName, isUpdateOnly, sheetSRData, shee
         result.log += `> 資料皆已存在，無新增。\n`;
       }
     } else {
-        // 沒有符合日期的資料，但也許需要更新 TDate? 
-        // 邏輯上如果是 UpdateOnly 且沒資料，就不更新 TDate
-        result.log += `> 無需更新資料。\n`;
+      // 沒有符合日期的資料，但也許需要更新 TDate?
+      // 邏輯上如果是 UpdateOnly 且沒資料，就不更新 TDate
+      result.log += `> 無需更新資料。\n`;
     }
 
     result.success = true;
-
   } catch (err) {
     result.success = false;
     result.message = err.message;
@@ -305,4 +335,3 @@ function formatDate(date) {
     "yyyy-MM-dd",
   );
 }
-

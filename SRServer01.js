@@ -80,7 +80,7 @@ function processSR01Data(formObj, actionType) {
       targetSheet = targetSs.insertSheet("SR_Data");
       targetSheet.appendRow([
         "Date",
-        "E-mail",
+        "SRTimes",
         "CUST_N",
         "USER_N",
         "Pay_Type",
@@ -94,7 +94,7 @@ function processSR01Data(formObj, actionType) {
 
     const rowData = [
       formObj.date,
-      formObj.email,
+      formObj.SRTimes || "1",
       formObj.custName,
       formObj.userName,
       formObj.payType || "補助",
@@ -120,7 +120,7 @@ function processSR01Data(formObj, actionType) {
 
       if (
         sheetDate === formObj.date &&
-        data[i][1].toString().trim() === formObj.email.trim() &&
+        data[i][1].toString().trim() === formObj.SRTimes.trim() &&
         data[i][2].toString().trim() === formObj.custName.trim() &&
         data[i][3].toString().trim() === formObj.userName.trim() &&
         data[i][4].toString().trim() === formObj.payType.trim() &&
@@ -131,7 +131,7 @@ function processSR01Data(formObj, actionType) {
             found: true,
             data: {
               date: sheetDate,
-              email: data[i][1],
+              SRTimes: data[i][1],
               custName: data[i][2],
               userName: data[i][3],
               payType: data[i][4],
@@ -161,3 +161,103 @@ function processSR01Data(formObj, actionType) {
     return { success: false, message: "錯誤：" + e.toString() };
   }
 }
+
+/**
+ * 根據居服員姓名取得「常用個案」與「其他個案」
+ */
+function getCustomClientLists(userName) {
+  try {
+    // 1. 從 SYTemp > SR_Data 找出該人員服務過的個案 (常用名單)
+    var targetSs = getTargetsheet("SYTemp", "SYTemp");
+    var srDataSheet = targetSs.getSheetByName("SR_Data");
+    var favClients = [];
+
+    if (srDataSheet) {
+      var data = srDataSheet.getDataRange().getValues();
+      var nameSet = new Set();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][3] === userName) {
+          // USER_N 在第 4 欄
+          nameSet.add(data[i][2]); // CUST_N 在第 3 欄
+        }
+      }
+      favClients = Array.from(nameSet).sort();
+    }
+
+    // 2. 從 SYCompany > Cust 取得所有個案
+    var localCustSheet = MainSpreadsheet.getSheetByName("Cust");
+    var allClients = [];
+    if (localCustSheet) {
+      var custData = localCustSheet.getDataRange().getValues();
+      for (var j = 1; j < custData.length; j++) {
+        if (custData[j][0]) allClients.push(custData[j][0].toString()); // 假設 Cust_N 在第 1 欄
+      }
+    }
+
+    // 3. 過濾出「不在常用名單」中的其他個案
+    var otherClients = allClients
+      .filter(function (name) {
+        return !favClients.includes(name);
+      })
+      .sort();
+
+    return {
+      favClients: favClients,
+      otherClients: otherClients,
+    };
+  } catch (e) {
+    console.log("取得客製化名單失敗: " + e.toString());
+    return { favClients: [], otherClients: [] };
+  }
+}
+
+/**
+ * 根據個案姓名取得客製化的服務編碼清單 (優先顯示常用編碼)
+ */
+function getCustomSrIdList(custName) {
+  try {
+    // 1. 從 SYTemp > SR_Data 找出該個案曾使用過的編碼 (常用編碼)
+    var targetSs = getTargetsheet("SYTemp", "SYTemp"); // 使用 Utilities.js 中的工具
+    var srDataSheet = targetSs.getSheetByName("SR_Data");
+    var favSrIds = [];
+
+    if (srDataSheet) {
+      var srData = srDataSheet.getDataRange().getValues();
+      var idSet = new Set();
+      for (var i = 1; i < srData.length; i++) {
+        // CUST_N 在第 3 欄 (index 2)，SR_ID 在第 6 欄 (index 5)
+        if (srData[i][2] === custName && srData[i][5]) {
+          idSet.add(srData[i][5].toString());
+        }
+      }
+      favSrIds = Array.from(idSet).sort();
+    }
+
+    // 2. 從 SYCompany (本機試算表) > LTC_Code 取得所有編碼
+    var ltcSheet = MainSpreadsheet.getSheetByName("LTC_Code");
+    var allSrIds = [];
+    if (ltcSheet) {
+      var ltcData = ltcSheet.getDataRange().getValues();
+      for (var j = 1; j < ltcData.length; j++) {
+        if (ltcData[j][0]) allSrIds.push(ltcData[j][0].toString()); // 假設 SR_ID 在 A 欄
+      }
+    }
+
+    // 3. 過濾出尚未出現在常用名單中的其餘編碼
+    var otherSrIds = allSrIds
+      .filter(function (id) {
+        return !favSrIds.includes(id);
+      })
+      .sort();
+
+    // 4. 合併兩者：常用在前，其餘在後
+    return favSrIds.concat(otherSrIds);
+  } catch (e) {
+    console.log("取得客製化編碼清單失敗: " + e.toString());
+    // 發生錯誤時回傳預設的完整編碼清單
+    return typeof getLtcCodeList === "function" ? getLtcCodeList() : [];
+  }
+}
+
+// 修改原有的 getSRServer01InitData，讓它在初始化時就觸發名單載入
+// 在 HTML 的 successHandler 中，如果 currentUserName 有值，就呼叫 fetchClientLists(data.currentUserName)

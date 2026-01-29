@@ -81,17 +81,38 @@
 
       <h5 class="section-title">查詢條件</h5>
       <div class="row">
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 mb-3">
           <label class="form-label">日期 (Date)</label>
           <input type="date" class="form-control" id="queryDate" />
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">入場別 (SRTimes)</label>
+          <select class="form-select" id="querySRTimes">
+            <option value="1" selected>第一次</option>
+            <option value="2">第二次</option>
+            <option value="3">第三次</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
           <label class="form-label">居服員姓名 (User_N)</label>
           <input type="text" class="form-control" id="queryUserN" disabled placeholder="系統載入中..." />
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 mb-3">
           <label class="form-label">個案姓名 (Cust_N)</label>
-          <select class="form-select" id="queryCustN"></select>
+          <select class="form-select" id="queryCustN">
+            <option value="" disabled selected>請先載入人員...</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" id="otherCustRow">
+        <div class="col-md-12 mb-3">
+          <label class="form-label">其他個案名單 (若常用名單無此個案，請由在此選擇)</label>
+          <select class="form-select" id="queryCustNOther" disabled>
+            <option value="" selected>-- 請先從上方選擇「其他」 --</option>
+          </select>
         </div>
       </div>
 
@@ -147,8 +168,8 @@
               <i class="fa-solid fa-paste"></i> 貼上
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary"
-              onclick="handleClipboard('clear', '#inputSrRec')">
-              <i class="fa-solid fa-eraser"></i> 清除
+              onclick="handleClipboard('addAI', '#inputSrRec')">
+              <i class="fa-solid fa-eraser"></i> AI
           </div>
         </div>
       </div>
@@ -233,8 +254,8 @@
             $("#currentUserEmail").val("未取得登入資訊");
           }
 
-          fillSelect("#queryCustN", data.custNames, "");
-          fillSelect("#querySrId", data.srIds, "");
+          //fillSelect("#queryCustN", data.custNames, "");
+          //fillSelect("#querySrId", data.srIds, "");
 
           // --- 需求 2：處理 User_N 欄位 ---
           const userInput = $("#queryUserN");
@@ -242,6 +263,8 @@
             // 找到資料：設定姓名並鎖定，標記為舊用戶
             userInput.val(data.currentUserName).prop("disabled", true);
             isNewUser = false;
+            fetchClientLists(data.currentUserName);
+            $("#otherCustRow").hide();
           } else {
             // 沒找到資料：啟用輸入，標記為新用戶
             userInput
@@ -256,6 +279,42 @@
           Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
         })
         .getSRServer01InitData();
+
+      // 當常用名單選擇變更時
+      $("#queryCustN").change(function () {
+        if ($(this).val() === "其他") {
+          $("#otherCustRow").show();
+          $("#queryCustNOther").prop("disabled", false).focus();
+        } else {
+          $("#otherCustRow").hide();
+          $("#queryCustNOther").prop("disabled", true).val("");
+        }
+      });
+
+      // 當居服員姓名變動時 (如果是新用戶手動輸入)
+      $("#queryUserN").on('change blur', function () {
+        const userName = $(this).val();
+        if (userName) fetchClientLists(userName);
+      });
+
+      // 當個案姓名欄位發生變動時（包含常用與其他）
+      $("#queryCustN, #queryCustNOther").change(function () {
+        let selectedCust = "";
+
+        // 判斷目前的個案姓名來源
+        if ($("#queryCustN").val() === "其他") {
+          selectedCust = $("#queryCustNOther").val();
+        } else {
+          selectedCust = $("#queryCustN").val();
+        }
+
+        // 只有當確實選中個案時才執行更新
+        if (selectedCust) {
+          updateSrIdList(selectedCust);
+        }
+      });
+
+
       $('#loadingSpin').hide();
     });
 
@@ -300,10 +359,11 @@
     function validateQuery() {
       if (
         !$("#queryDate").val() ||
+        !$("#querySRTimes").val() ||
         !$("#queryCustN").val() ||
-        !$("#querySrId").val() ||
         !$("#queryUserN").val() ||
-        !$("#queryPType").val()
+        !$("#queryPType").val() ||
+        !$("#querySrId").val()
       ) {
         Swal.fire("提示", "請填齊：日期、個案、居服員與編碼", "warning");
         return false;
@@ -311,16 +371,61 @@
       return true;
     }
 
+    // 封裝：向後端請求該居服員的專屬名單
+    function fetchClientLists(userName) {
+      $("#loadingSpin").show();
+      google.script.run
+        .withSuccessHandler(function (res) {
+          $("#loadingSpin").hide();
+
+          // 填入常用名單 (最後加一個"其他")
+          fillSelect("#queryCustN", res.favClients, "");
+          $("#queryCustN").append('<option value="其他">其他(開啟下方清單)</option>');
+
+          // 填入其他名單
+          fillSelect("#queryCustNOther", res.otherClients, "");
+        })
+        .getCustomClientLists(userName);
+    }
+
+    // 封裝：向後端請求客製化的服務編碼清單
+    function updateSrIdList(custName) {
+      $("#loadingSpin").show();
+      google.script.run
+        .withSuccessHandler(function (res) {
+          $("#loadingSpin").hide();
+          // 使用現有的 fillSelect 工具填充清單
+          fillSelect("#querySrId", res, "");
+        })
+        .withFailureHandler(function (err) {
+          $("#loadingSpin").hide();
+          console.error("更新編碼失敗:", err);
+        })
+        .getCustomSrIdList(custName);
+    }
+
     // --- 需求 2 核心：處理按鈕動作，並在新用戶時詢問電話 ---
     async function handleAction(type) {
+      // 決定最終的個案姓名
+      let selectedCust = $("#queryCustN").val();
+      if (selectedCust === "其他") {
+        selectedCust = $("#queryCustNOther").val();
+        if (!selectedCust) {
+          Swal.fire("提示", "請選擇其他個案姓名", "warning");
+          return;
+        }
+      }
+
+
       if (!validateQuery()) return;
 
       // 準備傳送給後端的物件
       const formObj = {
         date: $("#queryDate").val(),
+        SRTimes: $("#querySRTimes").val(),
         email: $("#currentUserEmail").val(),
         userName: $("#queryUserN").val(),
-        custName: $("#queryCustN").val(),
+        custName: selectedCust,
         payType: $("#queryPType").val(),
         srId: $("#querySrId").val(),
         srRec: $("#inputSrRec").val(),
@@ -418,6 +523,7 @@
               icon: res.success ? "success" : "error",
               title: res.success ? "成功" : "失敗",
               text: res.message,
+              timer: 3000,
             }).then(() => {
               if (res.success) backToSearch();
             });
@@ -435,13 +541,13 @@
     * 工具：填充查詢標籤
     */
     function fillQueryLabel(formObj) {
-      const labelText = `${formObj.date} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
+      const labelText = `${formObj.date}| ${formObj.SRTimes} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
       $('#labQuery').text(labelText);
     }
 
     /**
- * 工具：填充詳細資料
- */
+    * 工具：填充詳細資料
+    */
     function fillDetail(data) {
       $('#inputSrRec').val(data.srRec || "");
       $('#inputLoc').val(data.loc || "清醒");
@@ -478,9 +584,10 @@
           const currentVal = $el.val();
           $el.val(currentVal + clipboardText);
           showToast('success', '已貼上');
-        }else if (action === 'clear') {
-          $el.val("");
-          showToast('success', '已清除');
+        } else if (action === 'addAI') {
+          const currentVal = $el.val();
+          $el.val(currentVal + '\n修飾以上句子,符合長照 ' + $('#querySrId').val() + ' 電子服務紀錄單的格式，45個字以內，內容不包含長照編碼。');
+          showToast('success', '已加入AI助手');
         }
       } catch (err) {
         console.error('剪貼簿操作失敗:', err);

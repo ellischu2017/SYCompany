@@ -104,6 +104,7 @@ function dailyMaintenanceJob() {
   const tempSS = getTargetsheet("SYTemp", "SYTemp");
 
   processUserSync(MainSpreadsheet, tempSS);
+  processTransferData("all", true);
   processSRDataMigration(MainSpreadsheet, tempSS);
 }
 
@@ -295,7 +296,7 @@ function appendDataToExternalSS(url, year, rows) {
       targetSheet = targetSS.insertSheet(monthStr);
       const headers = [
         "Date",
-        "E-mail",
+        "SRTimes",
         "CUST_N",
         "USER_N",
         "Pay_Type",
