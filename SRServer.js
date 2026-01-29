@@ -145,7 +145,7 @@ function processSRData(formObj, actionType) {
       targetSheet = targetSS.insertSheet(sheetName);
       var headers = [
         "Date",
-        "E-mail",
+        "SRTimes",
         "CUST_N",
         "USER_N",
         "Pay_Type",
@@ -165,7 +165,7 @@ function processSRData(formObj, actionType) {
     // --- 2. 執行 新增 (add) ---
     var rowData = [
       formObj.date,
-      formObj.email,
+      formObj.SRTimes,
       formObj.custName,
       formObj.userName,
       formObj.payType,
@@ -196,6 +196,7 @@ function processSRData(formObj, actionType) {
       // 比對五個關鍵欄位：Date, Cust_N, User_N, Pay_Type, SR_ID
       if (
         sheetDate === formObj.date &&
+        data[i][1].toString().trim() === formObj.SRTimes.trim() &&
         data[i][2].toString().trim() === formObj.custName.trim() &&
         data[i][3].toString().trim() === formObj.userName.trim() &&
         data[i][4].toString().trim() === formObj.payType.trim() &&
@@ -207,7 +208,7 @@ function processSRData(formObj, actionType) {
             success: true,
             data: {
               date: sheetDate,
-              email: data[i][1],
+              SRTimes: data[i][1],
               custName: data[i][2],
               userName: data[i][3],
               payType: data[i][4],

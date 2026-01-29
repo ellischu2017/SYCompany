@@ -94,15 +94,23 @@
           <input type="date" class="form-control" id="queryDate" />
         </div>
         <div class="col-md-6 mb-3">
-          <label class="form-label">居服員姓名 (User_N)</label>
-          <select type="text" class="form-select" id="queryUserN" placeholder="系統載入中...">
-            <option value="" selected>請選擇居服員</option>
+          <label class="form-label">入場別 (SRTimes)</label>
+          <select class="form-select" id="querySRTimes">
+            <option value="1" selected>第一次</option>
+            <option value="2">第二次</option>
+            <option value="3">第三次</option>
           </select>
         </div>
       </div>
 
       <div class="row">
-        <div class="col-md-12 mb-3">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">居服員姓名 (User_N)</label>
+          <select type="text" class="form-select" id="queryUserN" placeholder="系統載入中...">
+            <option value="" selected>請選擇居服員</option>
+          </select>
+        </div>
+        <div class="col-md-8 mb-3">
           <label class="form-label">居服員 Email </label>
           <input type="email" class="form-control" id="queryUserEmail" readonly placeholder="請選擇居服員..." />
         </div>
@@ -144,7 +152,7 @@
       <div class="mb-3">
         <label class="form-label">服務紀錄內容 (SR_REC)</label>
         <textarea class="form-control" id="inputSrRec" rows="4" placeholder="請詳細輸入服務內容..."></textarea>
-              <div class="mt-2 d-flex justify-content-end">
+        <div class="mt-2 d-flex justify-content-end">
           <div class="btn-group shadow-sm" role="group">
             <button type="button" class="btn btn-sm btn-outline-secondary"
               onclick="handleClipboard('cut', '#inputSrRec')">
@@ -261,12 +269,13 @@
      * 驗證查詢欄位
      */    function validateQuery() {
       const date = $('#queryDate').val();
+      const SRTimes = $('#querySRTimes').val();
       const email = $('#queryUserEmail').val();
       const custName = $('#queryCustN').val();
       const userName = $('#queryUserN').val();
-      const payType = $('#queryPayType').val();   
+      const payType = $('#queryPayType').val();
       const srId = $('#querySrId').val();
-      if (!date || !custName || !userName || !email || !payType || !srId) {
+      if (!date || !custName || !SRTimes || !userName || !email || !payType || !srId) {
         Swal.fire({
           title: "欄位不完整",
           text: "請確保所有查詢欄位皆已填寫",
@@ -275,7 +284,7 @@
         return false;
       }
       return true;
-    }   
+    }
     /**
   * 執行 新增/更新
   */
@@ -337,6 +346,7 @@
     function getFormObj() {
       return {
         date: $('#queryDate').val(),
+        SRTimes: $('#querySRTimes').val(),
         custName: $('#queryCustN').val(),
         userName: $('#queryUserN').val(),
         email: $('#queryUserEmail').val(),
@@ -381,7 +391,7 @@
      * 工具：填充查詢標籤
      */
     function fillQueryLabel(formObj) {
-      const labelText = `${formObj.date} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
+      const labelText = `${formObj.date}|${formObj.SRTimes} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
       $('#labQuery').text(labelText);
     }
 
@@ -464,13 +474,13 @@
           Swal.fire('執行失敗', err.message, 'error');
         })
         .dailyMaintenanceJob(); // 執行剛才寫的後端主函式
-    }     
-    
-        /**
-    * 處理指定欄位的剪貼簿動作
-    * @param {string} action - 'cut', 'copy', 'paste'
-    * @param {string} targetId - 指定的元素 ID (例如 '#inputSrRec')
-    */
+    }
+
+    /**
+* 處理指定欄位的剪貼簿動作
+* @param {string} action - 'cut', 'copy', 'paste'
+* @param {string} targetId - 指定的元素 ID (例如 '#inputSrRec')
+*/
     async function handleClipboard(action, targetId) {
       const $el = $(targetId);
       const text = $el.val();
@@ -495,7 +505,7 @@
           const currentVal = $el.val();
           $el.val(currentVal + clipboardText);
           showToast('success', '已貼上');
-        }else if (action === 'clear') {
+        } else if (action === 'clear') {
           $el.val("");
           showToast('success', '已清除');
         }
@@ -539,7 +549,7 @@
           const currentVal = $el.val();
           $el.val(currentVal + clipboardText);
           showToast('success', '已貼上');
-        }else if (action === 'clear') {
+        } else if (action === 'clear') {
           $el.val("");
           showToast('success', '已清除');
         }
@@ -559,7 +569,7 @@
     * @param {string} action - 'cut', 'copy', 'paste'
     * @param {string} targetId - 指定的元素 ID (例如 '#inputSrRec')
     */
-        async function handleClipboard(action, targetId) {
+    async function handleClipboard(action, targetId) {
       const $el = $(targetId);
       const text = $el.val();
 
@@ -585,7 +595,7 @@
           showToast('success', '已貼上');
         } else if (action === 'addAI') {
           const currentVal = $el.val();
-          $el.val(currentVal + '\n修飾以上句子,符合長照 '+$('#querySrId').val()+' 電子服務紀錄單的格式，45個字以內，內容不包含長照編碼。');
+          $el.val(currentVal + '\n修飾以上句子,符合長照 ' + $('#querySrId').val() + ' 電子服務紀錄單的格式，45個字以內，內容不包含長照編碼。');
           showToast('success', '已加入AI助手');
         }
       } catch (err) {

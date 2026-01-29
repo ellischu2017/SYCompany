@@ -329,7 +329,7 @@ function appendDataToExternalSS(url, year, rows) {
 
     const fullRange = targetSheet.getDataRange();
     const newFilter = fullRange.createFilter();
-    newFilter.sort(1, true);
+    newFilter.sort([{ column: 1, ascending: true },{ column: 3, ascending: true }]);
 
     console.log(
       `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`,
@@ -370,6 +370,6 @@ function createNewYearlySS(mainSS, syName) {
   fullRange.createFilter();
 
   // Sort the range by syName (Column A / Index 1) in Ascending order
-  fullRange.sort({ column: 1, ascending: true });
+  fullRange.sort([{ column: 1, ascending: true },{column: 3, ascending: true }]);
   return url;
 }
