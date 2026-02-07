@@ -34,6 +34,7 @@ function getRawResponseSheetNames() {
  * @param {boolean} isUpdateOnly 是否僅更新 (true: > TDate, false: <= TDate)
  */
 function processTransferData(custName, isUpdateOnly) {
+  console.log(`processTransferData 開始處理: ${custName}, UpdateOnly: ${isUpdateOnly}`);
   // 初始化結果物件
   const globalResult = { success: true, count: 0, log: "", message: "" };
 

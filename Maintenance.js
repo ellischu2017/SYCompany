@@ -4,11 +4,133 @@
  */
 
 /**
+ * 每月維護任務：同步試算表權限
+ */
+function monthlyMaintenanceJob() {
+  syncMasterTablePermissions();
+  console.log("每月維護任務完成：權限已同步。");
+  UpdateCustLTCCode();
+  console.log("每月維護任務完成：LTC Code 已更新。");
+  // 1. 取得今天的日期並計算「上個月」
+  const now = new Date();
+  now.setMonth(now.getUTCMonth() - 1); // 往前推一個月
+
+  // 2. 格式化年份與月份
+  // 使用 Utilities.formatDate 確保格式為 yyyy 與 yyyyMM (補零)
+  const timeZone = Session.getScriptTimeZone();
+  const yyyy = Utilities.formatDate(now, timeZone, "yyyy");
+  const yyyyMM = Utilities.formatDate(now, timeZone, "yyyyMM");
+
+  // 3. 動態組合名稱並獲取工作表
+  const srcSpreadsheetName = "SY" + yyyy;
+  const SYyyyy = getTargetsheetstruct("RecUrl", srcSpreadsheetName).Spreadsheet;
+  const srcSheet = SYyyyy.getSheetByName(yyyyMM);
+  const SYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const tmpSheet = SYTemp.getSheetByName("SR_Data");
+  const tarSheet = MainSpreadsheet.getSheetByName("Cust");
+  // 4. 執行更新
+  if (srcSheet) {
+    UpdateCustLTCCode(srcSheet, tarSheet);
+    UpdateCustLTCCode(tmpSheet, tarSheet);
+    console.log(`成功處理：${srcSpreadsheetName} > ${yyyyMM}`);
+  } else {
+    console.error(`找不到工作表：${yyyyMM}`);
+  }
+}
+
+/**
+ * 更新 SYCompany 試算表中的 LTC_Code
+ * @param {string} srcId 來源試算表 (SY+yyyy) 的 ID
+ * @param {string} tmpId SYTemp 試算表的 ID
+ * @param {string} tarId SYCompany 試算表的 ID
+ */
+function UpdateCustLTCCode(srcSheet, tarSheet) {
+  // 2. 讀取資料並整合到記憶體 (Map 結構)
+  // Map 鍵為 CUST_N, 值為 Set (確保 SR_ID 唯一)
+  let combinedData = new Map();
+
+  function processSheet(sheet) {
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    const headers = data.shift();
+    const cIdx = headers.indexOf("CUST_N");
+    const sIdx = headers.indexOf("SR_ID");
+
+    data.forEach((row) => {
+      const custN = row[cIdx];
+      const srId = String(row[sIdx]).trim();
+      if (custN && srId) {
+        if (!combinedData.has(custN)) {
+          combinedData.set(custN, new Set());
+        }
+        combinedData.get(custN).add(srId);
+      }
+    });
+  }
+
+  processSheet(srcSheet);
+  // processSheet(tmpSheet);
+
+  console.log("資料整合完成，總客戶數: " + combinedData.size);
+  // 3. 讀取目標工作表並進行比對與更新
+  const tarData = tarSheet.getDataRange().getValues();
+  const tarHeaders = tarData.shift();
+  const tarCIdx = tarHeaders.indexOf("Cust_N");
+  const tarLIdx = tarHeaders.indexOf("LTC_Code");
+
+  // 準備更新後的資料列
+  const updatedLTCColumn = tarData.map((row) => {
+    const custN = row[tarCIdx];
+    let existingCodes = row[tarLIdx]
+      ? String(row[tarLIdx])
+          .split(",")
+          .map((s) => s.trim())
+      : [];
+
+    console.log(`客戶 ${custN} 的 LTC_Code 更新: ${existingCodes.join(", ")}`);
+    if (combinedData.has(custN)) {
+      const newIds = combinedData.get(custN);
+
+      // 合併舊有與新取得的 SR_ID
+      newIds.forEach((id) => {
+        if (!existingCodes.includes(id)) {
+          existingCodes.push(id);
+        }
+      });
+      // 排序並轉回字串
+      return [existingCodes.sort().join(",")];
+    }
+    return [row[tarLIdx]]; // 若無匹配則維持原狀
+  });
+
+  // 4. 批次寫回目標工作表的 LTC_Code 欄位
+  if (updatedLTCColumn.length > 0) {
+    tarSheet
+      .getRange(2, tarLIdx + 1, updatedLTCColumn.length, 1)
+      .setValues(updatedLTCColumn);
+  }
+
+  console.log("更新完成！");
+}
+
+/**
  * 同步所有相關試算表的權限
  * 1. 包含 SYCompany 本身與 RecUrl 內的所有試算表。
  * 2. 根據 Manager 工作表名單授權為「編輯者」。
  * 3. 移除名單外所有「特定的」編輯者與檢視者。
  * 4. 將「一般存取權」設為「知道連結的人即可檢視」。
+ * 特別處理：SYTemp 試算表的「一般存取權」設為「知道連結的人即可編輯」，以利資料同步作業。
+ * 建議觸發時間：每日 00:00 - 01:00（可搭配 dailyMaintenanceJob 一起執行）
+ * 注意事項：
+ * - 確保 Manager 工作表的 Email 欄位正確無誤，避免誤刪權限。
+ * - 執行前請備份重要資料，以防不慎操作導致權限異常。
+ * - SYTemp 試算表的特殊權限設定是為了支援每日資料同步，請勿修改該試算表的權限設定。
+ * - 若有新增年度試算表，dailyMaintenanceJob 會自動呼叫此函式同步權限。
+ * - 若有試算表無法訪問或權限異常，請檢查 RecUrl 工作表中的網址是否正確，並確認該試算表的擁有者是否授予了足夠的權限。
+ * - 建議定期檢查 Manager 工作表與 RecUrl 工作表的內容，確保權限同步的正確性與完整性。
+ * - 若有需要排除特定試算表不進行權限同步，請在 RecUrl 工作表中添加一欄「ExcludeFromSync」，並在該欄填入「TRUE」以標記該試算表。
+ * - 權限同步的過程中會有詳細的日誌輸出，建議定期檢查執行日誌以確保同步過程順利，並及時發現與解決可能的問題。
+ * - 此函式使用了 Drive API 來管理權限，請確保已在 Google Cloud Console 中啟用 Drive API 並授予相應的權限。
  */
 function syncMasterTablePermissions() {
   var managerSheet = MainSpreadsheet.getSheetByName("Manager");
@@ -36,7 +158,42 @@ function syncMasterTablePermissions() {
             Name: name,
             UrlID: SpreadsheetApp.openByUrl(url).getId(),
           });
-        } catch (e) {}
+        } catch (e) {
+          console.error(
+            "無法開啟試算表 " +
+              name +
+              "，網址: " +
+              url +
+              "，錯誤: " +
+              e.message,
+          );
+        }
+      }
+    }
+  }
+
+  var recUrlSheet = MainSpreadsheet.getSheetByName("ReportsUrl"); // 取得 ReportsUrl  工作表
+  if (recUrlSheet) {
+    var urlData = recUrlSheet.getDataRange().getValues();
+    for (var j = 1; j < urlData.length; j++) {
+      var name = urlData[j][0];
+      var url = urlData[j][1];
+      if (url && url.indexOf("docs.google.com") !== -1) {
+        try {
+          targetFileIds.push({
+            Name: name,
+            UrlID: SpreadsheetApp.openByUrl(url).getId(),
+          });
+        } catch (e) {
+          console.error(
+            "無法開啟試算表 " +
+              name +
+              "，網址: " +
+              url +
+              "，錯誤: " +
+              e.message,
+          );
+        }
       }
     }
   }
@@ -47,6 +204,7 @@ function syncMasterTablePermissions() {
   targetFileIds.forEach(function (item) {
     var fileId = item.UrlID;
     var fileName = item.Name;
+    console.log("正在處理試算表: " + item.Name + " (ID: " + item.UrlID + ")");
     try {
       managerEmails.forEach(function (email) {
         var resource = {
@@ -101,11 +259,18 @@ function syncMasterTablePermissions() {
  * 建議觸發時間：每日 00:00 - 01:00
  */
 function dailyMaintenanceJob() {
-  const tempSS = getTargetsheet("SYTemp", "SYTemp");
+  const ssSYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const tmpSheet = ssSYTemp.getSheetByName("SR_Data");    
+  const tarSheet = MainSpreadsheet.getSheetByName("Cust");
 
-  processUserSync(MainSpreadsheet, tempSS);
+  processUserSync(MainSpreadsheet, ssSYTemp);
+  processCustSync();
   processTransferData("all", true);
-  processSRDataMigration(MainSpreadsheet, tempSS);
+  processSRDataMigration(MainSpreadsheet, ssSYTemp);
+  
+  removeSRDuplicates(tmpSheet);
+  UpdateCustLTCCode(tmpSheet, tarSheet);
+  // const sSYyear = getTargetsheet("RecUrl","")
 }
 
 /**
@@ -126,9 +291,9 @@ function processUserSync(mainSS, tempSS) {
     console.log("tempSS 未提供，使用預設 SYTemp");
   }
 
-  console.log("開始同步 SYTemp > User 資料...");
-  console.log("主試算表 ID: " + mainSS.getId());
-  console.log("暫存試算表 ID: " + tempSS.getId());
+  console.log("processUserSync 開始同步 SYTemp > User 資料...");
+  // console.log("主試算表 ID: " + mainSS.getId());
+  // console.log("暫存試算表 ID: " + tempSS.getId());
 
   const mainUserSheet = mainSS.getSheetByName("User");
   const tempUserSheet = tempSS.getSheetByName("User");
@@ -193,6 +358,7 @@ function processUserSync(mainSS, tempSS) {
  * 修正：日期偏移、新增首列凍結、設定日期欄位格式
  */
 function processSRDataMigration(mainSS, tempSS) {
+  console.log("processSRDataMigration 開始遷移 SR_Data 資料...");
   if (!mainSS) {
     mainSS = MainSpreadsheet;
     console.log("mainSS 未提供，使用預設 MainSpreadsheet");
@@ -329,7 +495,10 @@ function appendDataToExternalSS(url, year, rows) {
 
     const fullRange = targetSheet.getDataRange();
     const newFilter = fullRange.createFilter();
-    newFilter.sort([{ column: 1, ascending: true },{ column: 3, ascending: true }]);
+    newFilter.sort([
+      { column: 1, ascending: true },
+      { column: 3, ascending: true },
+    ]);
 
     console.log(
       `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`,
@@ -370,6 +539,129 @@ function createNewYearlySS(mainSS, syName) {
   fullRange.createFilter();
 
   // Sort the range by syName (Column A / Index 1) in Ascending order
-  fullRange.sort([{ column: 1, ascending: true },{column: 3, ascending: true }]);
+  fullRange.sort([
+    { column: 1, ascending: true },
+    { column: 3, ascending: true },
+  ]);
   return url;
+}
+
+/**
+ * 處理 Cust 同步：Case_Reports > 個案清單 搬移至 SYCompany > Cust
+ * 對應欄位：
+ * 個案姓名 -> Cust_N
+ * 性別 -> Cust_Sex
+ * 生日 -> Cust_BD
+ * 地址 -> Cust_Add
+ * 服務項目 -> Cust_LTC_Code
+ * 1ib8q-lKJgLEhRVrwncnRqOyKNauMqaV2wtYEpGlmRlk
+ */
+function processCustSync() {
+  console.log(
+    "processCustSync 開始同步 Case_Reports > 個案清單 > Cust 資料...",
+  );
+  const SOURCE_SS_ID = "1ib8q-lKJgLEhRVrwncnRqOyKNauMqaV2wtYEpGlmRlk";
+
+  const sourceSheet =
+    SpreadsheetApp.openById(SOURCE_SS_ID).getSheetByName("個案清單");
+  const targetSheet = MainSpreadsheet.getSheetByName("Cust");
+
+  // 1. 取得來源與目標的所有資料
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const targetData = targetSheet.getDataRange().getValues();
+
+  const sourceHeaders = sourceData[0];
+  const targetHeaders = targetData[0];
+  const sourceRows = sourceData.slice(1);
+  const targetRows = targetData.slice(1);
+
+  // 2. 建立欄位索引字典
+  const getIdx = (headers, name) => headers.indexOf(name);
+  const srcIdx = { name: 0, sex: 1, bd: 2, add: 3, ltc: 5 }; // 根據 CSV 結構固定或動態獲取
+  const tarIdx = {
+    name: getIdx(targetHeaders, "Cust_N"),
+    sex: getIdx(targetHeaders, "Cust_Sex"),
+    bd: getIdx(targetHeaders, "Cust_BD"),
+    add: getIdx(targetHeaders, "Cust_Add"),
+    ltc: getIdx(targetHeaders, "Cust_LTC_Code"),
+  };
+
+  // 3. 將目標表轉換為 Map 物件，方便以「姓名」快速查詢
+  // Key: 姓名, Value: 該列在陣列中的索引與資料內容
+  let targetMap = new Map();
+  targetRows.forEach((row, index) => {
+    const name = row[tarIdx.name];
+    if (name) targetMap.set(name, { index: index, data: row });
+  });
+
+  let updateCount = 0;
+  let insertCount = 0;
+  let finalRows = [...targetRows]; // 複製一份目標資料來修改
+
+  // 4. 遍歷來源資料進行比對
+  sourceRows.forEach((sRow) => {
+    const sName = sRow[srcIdx.name];
+    if (!sName) return; // 跳過空列
+
+    // 格式化來源生日 (處理日期物件轉字串比對)
+    const sBD =
+      sRow[srcIdx.bd] instanceof Date
+        ? Utilities.formatDate(sRow[srcIdx.bd], "GMT+8", "yyyy/M/d")
+        : sRow[srcIdx.bd];
+
+    const newData = {
+      sex: sRow[srcIdx.sex],
+      bd: sBD,
+      add: sRow[srcIdx.add],
+      ltc: sRow[srcIdx.ltc],
+    };
+
+    if (targetMap.has(sName)) {
+      // --- 狀況 A: 姓名已存在，檢查內容是否不同 ---
+      let tEntry = targetMap.get(sName);
+      let tRow = tEntry.data;
+
+      // 比對日期需要特別小心，建議轉字串比對
+      const tBD =
+        tRow[tarIdx.bd] instanceof Date
+          ? Utilities.formatDate(tRow[tarIdx.bd], "GMT+8", "yyyy/M/d")
+          : tRow[tarIdx.bd];
+
+      const isChanged =
+        tRow[tarIdx.sex] !== newData.sex ||
+        tBD !== newData.bd ||
+        tRow[tarIdx.add] !== newData.add ||
+        tRow[tarIdx.ltc] !== newData.ltc;
+
+      if (isChanged) {
+        finalRows[tEntry.index][tarIdx.sex] = newData.sex;
+        finalRows[tEntry.index][tarIdx.bd] = newData.bd;
+        finalRows[tEntry.index][tarIdx.add] = newData.add;
+        finalRows[tEntry.index][tarIdx.ltc] = newData.ltc;
+        updateCount++;
+      }
+    } else {
+      // --- 狀況 B: 姓名不存在，新增一列 ---
+      let newRow = new Array(targetHeaders.length).fill("");
+      newRow[tarIdx.name] = sName;
+      newRow[tarIdx.sex] = newData.sex;
+      newRow[tarIdx.bd] = newData.bd;
+      newRow[tarIdx.add] = newData.add;
+      newRow[tarIdx.ltc] = newData.ltc;
+
+      finalRows.push(newRow);
+      insertCount++;
+    }
+  });
+
+  // 5. 寫回資料
+  if (updateCount > 0 || insertCount > 0) {
+    // 寫回所有資料 (包含更新後與新增的)
+    targetSheet
+      .getRange(2, 1, finalRows.length, targetHeaders.length)
+      .setValues(finalRows);
+    console.log(`同步完成！ 更新：${updateCount} 筆 新增：${insertCount} 筆`);
+  } else {
+    console.log("資料皆為最新，無需更新。");
+  }
 }

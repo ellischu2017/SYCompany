@@ -300,6 +300,7 @@
             if (res.success) {
               fillQueryLabel(formObj);
               fillDetail(res.data);
+              $("#inputSrRec").focus(); // 將焦點設置到服務紀錄欄位
               $('#btnUpdate').show();
               $('#btnAdd').hide();
               $('#detailSection').fadeIn();
@@ -316,6 +317,7 @@
                 if (res.isConfirmed) {
                   fillQueryLabel(formObj);
                   clearDetail();
+                  $("#inputSrRec").val("").focus();
                   $('#btnAdd').show();
                   $('#btnDelete').hide();
                   $('#btnUpdate').hide();
@@ -329,7 +331,8 @@
             Swal.fire({
               title: res.success ? "操作成功" : "操作失敗",
               text: res.message || "",
-              icon: res.success ? "success" : "error"
+              icon: res.success ? "success" : "error",
+              timer: res.success ? 1500 : null
             }).then(() => {
               if (res.success) {
                 backToSearch();
@@ -595,7 +598,7 @@
           showToast('success', '已貼上');
         } else if (action === 'addAI') {
           const currentVal = $el.val();
-          $el.val(currentVal + '\n修飾以上句子,符合長照 ' + $('#querySrId').val() + ' 電子服務紀錄單的格式，45個字以內，內容不包含長照編碼。');
+          $el.val(currentVal + '\n修飾以上句子,符合長照 ' + $('#querySrId').val() + ' 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。');
           showToast('success', '已加入AI助手');
         }
       } catch (err) {
