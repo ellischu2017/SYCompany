@@ -142,7 +142,11 @@ function getTargetsheetstruct(sheetName, targetName) {
       return url;
     }
   }
-  return {url: url , id: getIdFromUrl(url) , Spreadsheet: SpreadsheetApp.openByUrl(url)};
+  return {
+    url: url,
+    id: getIdFromUrl(url),
+    Spreadsheet: SpreadsheetApp.openByUrl(url),
+  };
 }
 
 function removeSR() {
@@ -339,4 +343,85 @@ function processLTCCodes() {
       sCust.getRange(i + 1, tarIdx + 1).setValue(processedArr.join(","));
     }
   }
+}
+
+function UpdateUserName() {
+  const now = new Date();
+  now.setMonth(now.getMonth() - 1);
+  const timeZone = Session.getScriptTimeZone();
+  const yyyy = Utilities.formatDate(now, timeZone, "yyyy");
+  const yyyyMM = Utilities.formatDate(now, timeZone, "yyyyMM");
+
+  const srcSpreadsheet = getTargetsheetstruct("RecUrl", "SY" + yyyy).Spreadsheet;
+  const syyyyMM = srcSpreadsheet.getSheetByName(yyyyMM);
+  const SYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const tempSheet = SYTemp.getSheetByName("SR_Data");
+
+  if (!syyyyMM || !tempSheet) return;
+
+  // 1. 聚合來源資料：Map<User_N, Set<Cust_N>>
+  const userMap = new Map();
+  const processData = (sheet) => {
+    const values = sheet.getDataRange().getValues();
+    const headers = values.shift();
+    const uIdx = getColIndex(headers, "USER_N");
+    const cIdx = getColIndex(headers, "CUST_N");
+    values.forEach(row => {
+      const u = String(row[uIdx] || "").trim();
+      const c = String(row[cIdx] || "").trim();
+      if (u && c) {
+        if (!userMap.has(u)) userMap.set(u, new Set());
+        userMap.get(u).add(c);
+      }
+    });
+  };
+  processData(syyyyMM);
+  processData(tempSheet);
+
+  // 2. 處理目標工作表 (SYCompany > User)
+  const tarSheet = MainSpreadsheet.getSheetByName("User");
+  const tarData = tarSheet.getDataRange().getValues();
+  const tarHeaders = tarData[0];
+  
+  // 動態獲取目標表的欄位索引
+  const tarUserIdx = getColIndex(tarHeaders, "User_N");
+  const tarCustIdx = getColIndex(tarHeaders, "Cust_N");
+
+  if (tarUserIdx === -1 || tarCustIdx === -1) {
+    throw new Error("找不到目標欄位 User_N 或 Cust_N，請檢查標題名稱是否完全一致");
+  }
+
+  // 3. 準備更新後的資料陣列 (保留原始結構，僅修改 Cust_N 欄位)
+  // 我們只處理從第 2 列開始的資料
+  const rowsToUpdate = tarData.slice(1); 
+  const processedUsers = new Set();
+
+  const updatedRows = rowsToUpdate.map(row => {
+    const userName = String(row[tarUserIdx] || "").trim();
+    if (userMap.has(userName)) {
+      // 找到匹配的 User，更新其 Cust_N
+      const custSet = userMap.get(userName);
+      row[tarCustIdx] = Array.from(custSet).sort().join(",");
+      processedUsers.add(userName); // 記錄已更新的 User
+    }
+    return row;
+  });
+
+  // 4. (選填) 處理「目標表原本不存在」的新 User
+  userMap.forEach((custSet, userName) => {
+    if (!processedUsers.has(userName)) {
+      const newRow = new Array(tarHeaders.length).fill("");
+      newRow[tarUserIdx] = userName;
+      newRow[tarCustIdx] = Array.from(custSet).sort().join(",");
+      updatedRows.push(newRow);
+    }
+  });
+
+  // 5. 將所有資料排序並寫回
+  updatedRows.sort((a, b) => String(a[tarUserIdx]).localeCompare(String(b[tarUserIdx])));
+  
+  // 寫回目標區域 (從 A2 開始，涵蓋整張表的寬度)
+  tarSheet.getRange(2, 1, updatedRows.length, tarHeaders.length).setValues(updatedRows);
+
+  console.log("資料更新完成！");
 }

@@ -73,7 +73,7 @@
         <div class="input-group">
           <input type="email" class="form-control" id="currentUserEmail" readonly />
         </div>
-        <a href="https://accounts.google.com/AccountChooser?continue=<?= getScriptUrl() ?>?page=Index" target="_top"
+        <a href="https://accounts.google.com/AccountChooser?continue=<?= getScriptUrl() ?>" target="_top"
           class="btn btn-outline-danger">
           更換 Email 登入
         </a>
@@ -98,12 +98,14 @@
       <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">居服員姓名 (User_N)</label>
-          <input type="text" class="form-control" id="queryUserN" disabled placeholder="系統載入中..." />
+          <select class="form-select" id="queryUserN">
+            <option value="" disabled selected>系統載入中...</option>
+          </select>
         </div>
         <div class="col-md-6 mb-3">
           <label class="form-label">個案姓名 (Cust_N)</label>
           <select class="form-select" id="queryCustN">
-            <option value="" disabled selected>請先載入人員...</option>
+            <option value="" disabled selected>請先選擇居服員...</option>
           </select>
         </div>
       </div>
@@ -127,7 +129,9 @@
 
         <div class="col-md-6 mb-3">
           <label class="form-label">服務編碼 (SR_ID)</label>
-          <select class="form-select" id="querySrId"></select>
+          <select class="form-select" id="querySrId">
+             <option value="" disabled selected>請先選擇個案...</option>
+          </select>
         </div>
       </div>
 
@@ -142,12 +146,8 @@
       <h5 class="section-title">紀錄內容</h5>
       <div class="row mb-3">
         <div class="col-12">
-          <!-- <label class="form-label d-block text-muted small">個案姓名</label> -->
           <span id="labQuery" class="label-value fs-6" style="color:#cdb5f8;"></span>
         </div>
-        <!-- <div class="col-6">
-        <label class="form-label d-block text-muted small">服務編碼</label> 
-        </div> -->
       </div>
 
       <div class="mb-3">
@@ -203,9 +203,6 @@
         <button class="btn btn-success btn-lg" id="btnAdd" onclick="handleAction('add')">
           確認存檔
         </button>
-        <!--
-          <button class="btn btn-danger flex-grow-1" id="btnDelete" onclick="handleAction('delete')">刪除</button> 
-          -->
         <button class="btn btn-secondary btn-lg" onclick="backToSearch()">
           返回查詢
         </button>
@@ -218,10 +215,19 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
+    // --- 全域變數：模擬 Session ---
+    let GLOBAL_DATA = {
+      users: [],      // SYCompany > User + SYTemp > User
+      custs: [],      // SYCompany > Cust
+      ltcCodes: [],   // SYCompany > LTC_Code
+      currentUser: null, 
+      isNewBinding: false 
+    };
+
     $(document).ready(function () {
-      $('#loadingSpin').css('display', 'flex');
-      $("#loadingSpin").show();
-      // --- 需求 1：日期前後只能 7 天 ---
+      $('#loadingSpin').css('display', 'flex').show();
+      
+      // --- 需求 8：日期前後只能 7 天 ---
       const today = new Date();
       const formatDate = (date) => {
         const year = date.getFullYear();
@@ -230,57 +236,28 @@
         return `${year}-${month}-${day}`;
       };
 
-      // 設定 input 預設值為今日
       $("#queryDate").val(formatDate(today));
-
-      // 計算並設定 min (前7天) 與 max (後7天)
-      const minDate = new Date(today);
-      minDate.setDate(today.getDate() - 7);
-      const maxDate = new Date(today);
-      maxDate.setDate(today.getDate() + 7);
-
+      const minDate = new Date(today); minDate.setDate(today.getDate() - 7);
+      const maxDate = new Date(today); maxDate.setDate(today.getDate() + 7);
       $("#queryDate").attr("min", formatDate(minDate));
       $("#queryDate").attr("max", formatDate(maxDate));
       // ---------------------------------
 
-
+      // 初始化：一次抓取所有資料
       google.script.run
-        .withSuccessHandler(function (data) {
-          $("#loadingSpin").hide();
-
-          if (data.userEmail) {
-            $("#currentUserEmail").val(data.userEmail);
-          } else {
-            $("#currentUserEmail").val("未取得登入資訊");
-          }
-
-          //fillSelect("#queryCustN", data.custNames, "");
-          //fillSelect("#querySrId", data.srIds, "");
-
-          // --- 需求 2：處理 User_N 欄位 ---
-          const userInput = $("#queryUserN");
-          if (data.currentUserName) {
-            // 找到資料：設定姓名並鎖定，標記為舊用戶
-            userInput.val(data.currentUserName).prop("disabled", true);
-            isNewUser = false;
-            fetchClientLists(data.currentUserName);
-            $("#otherCustRow").hide();
-          } else {
-            // 沒找到資料：啟用輸入，標記為新用戶
-            userInput
-              .val("")
-              .prop("disabled", false)
-              .attr("placeholder", "請輸入姓名...");
-            isNewUser = true;
-          }
-        })
+        .withSuccessHandler(initSuccess)
         .withFailureHandler(function (err) {
           $("#loadingSpin").hide();
           Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
         })
         .getSRServer01InitData();
 
-      // 當常用名單選擇變更時
+      // --- 綁定事件監聽 ---
+      $("#queryUserN").change(function(){
+        const selectedUserName = $(this).val();
+        updateCustSelect(selectedUserName);
+      });
+
       $("#queryCustN").change(function () {
         if ($(this).val() === "其他") {
           $("#otherCustRow").show();
@@ -288,80 +265,112 @@
         } else {
           $("#otherCustRow").hide();
           $("#queryCustNOther").prop("disabled", true).val("");
+          updateSrIdSelect($(this).val());
         }
       });
 
-      // 當居服員姓名變動時 (如果是新用戶手動輸入)
-      $("#queryUserN").on('change blur', function () {
-        const userName = $(this).val();
-        if (userName) fetchClientLists(userName);
+      $("#queryCustNOther").change(function(){
+         updateSrIdSelect($(this).val());
       });
-
-      // 當個案姓名欄位發生變動時（包含常用與其他）
-      $("#queryCustN, #queryCustNOther").change(function () {
-        let selectedCust = "";
-
-        // 判斷目前的個案姓名來源
-        if ($("#queryCustN").val() === "其他") {
-          selectedCust = $("#queryCustNOther").val();
-        } else {
-          selectedCust = $("#queryCustN").val();
-        }
-
-        // 只有當確實選中個案時才執行更新
-        if (selectedCust) {
-          updateSrIdList(selectedCust);
-        }
-      });
-
-
-      $('#loadingSpin').hide();
     });
 
-    function fillSelect(id, list, selec) {
-      let el = $(id);
-      el.empty().append(
-        '<option value="" disabled selected>請選擇...</option>'
-      );
-      list.forEach((item) => {
-        let isSelected = item === selec ? "selected" : "";
-        el.append(`<option value="${item}" ${isSelected}>${item}</option>`);
+    // --- 初始化成功回調 ---
+    function initSuccess(data) {
+      $("#loadingSpin").hide();
+      
+      GLOBAL_DATA.users = data.users;
+      GLOBAL_DATA.custs = data.custs;
+      GLOBAL_DATA.ltcCodes = data.ltcCodes;
+      
+      $("#currentUserEmail").val(data.email);
+
+      // 需求 4：比對 Email
+      const matchedUser = GLOBAL_DATA.users.find(u => u.email === data.email);
+      const $userSelect = $("#queryUserN");
+      
+      $userSelect.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
+      
+      // 填入所有 User 到下拉選單 (這裡已包含從 Temp 更新過的名單)
+      GLOBAL_DATA.users.forEach(u => {
+        $userSelect.append(`<option value="${u.name}">${u.name}</option>`);
+      });
+
+      if (matchedUser) {
+        GLOBAL_DATA.currentUser = matchedUser;
+        GLOBAL_DATA.isNewBinding = false;
+        $userSelect.val(matchedUser.name).prop("disabled", true);
+        updateCustSelect(matchedUser.name);
+      } else {
+        GLOBAL_DATA.currentUser = null;
+        GLOBAL_DATA.isNewBinding = true;
+        $userSelect.prop("disabled", false);
+      }
+    }
+
+    // --- 需求 5：更新 Cust 選單 ---
+    function updateCustSelect(userName) {
+      const $custSelect = $("#queryCustN");
+      const $otherSelect = $("#queryCustNOther");
+      
+      $custSelect.empty().append('<option value="" disabled selected>請選擇個案...</option>');
+      $otherSelect.empty().append('<option value="" disabled selected>請選擇其他個案...</option>');
+      $("#querySrId").empty().append('<option value="" disabled selected>請先選擇個案...</option>');
+
+      const userObj = GLOBAL_DATA.users.find(u => u.name === userName);
+      let favCusts = [];
+      
+      if (userObj && userObj.favCustStr) {
+        favCusts = userObj.favCustStr.split(',').map(s => s.trim()).filter(s => s !== "");
+      }
+
+      favCusts.forEach(c => {
+        $custSelect.append(`<option value="${c}">${c}</option>`);
+      });
+      $custSelect.append('<option value="其他">其他 (開啟下方清單)</option>');
+
+      const allCustNames = GLOBAL_DATA.custs.map(c => c.name);
+      const otherCusts = allCustNames.filter(name => !favCusts.includes(name)).sort();
+      
+      otherCusts.forEach(c => {
+        $otherSelect.append(`<option value="${c}">${c}</option>`);
       });
     }
 
-    // 1. 執行 Google 的更換登入帳號畫面
-    function changeEmail() {
-      Swal.fire({
-        title: "更換帳號",
-        text: "系統將引導您至 Google 帳號選擇頁面，切換帳號後請手動重新整理或點擊連結返回。",
-        icon: "info",
-        showCancelButton: true,
-        confirmButtonText: "前往切換",
-        cancelButtonText: "取消",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          // 獲取目前 Web App 的網址
-          //const currentUrl = getScriptUrl();
-          const currentUrl = window.location.href;
-          // 強制導向 Google 帳號切換器，並在切換後嘗試導回原網址
-          const authUrl =
-            "https://accounts.google.com/AccountChooser?continue=" +
-            encodeURIComponent(currentUrl);
+    // --- 需求 6：更新 SR_ID 選單 ---
+    function updateSrIdSelect(custName) {
+      if(!custName) return;
+      
+      const $srSelect = $("#querySrId");
+      $srSelect.empty().append('<option value="" disabled selected>請選擇服務編碼...</option>');
 
-          // 使用 top.location 嘗試跳出 iframe 限制
-          window.top.location.href = authUrl;
-        }
+      const custObj = GLOBAL_DATA.custs.find(c => c.name === custName);
+      let favCodes = [];
+      
+      if (custObj && custObj.ltcCodeStr) {
+        favCodes = custObj.ltcCodeStr.split(',').map(s => s.trim()).filter(s => s !== "");
+      }
+
+      favCodes.forEach(code => {
+         $srSelect.append(`<option value="${code}">${code}</option>`);
+      });
+
+      const otherCodes = GLOBAL_DATA.ltcCodes.filter(code => !favCodes.includes(code)).sort();
+      
+      if(otherCodes.length > 0 && favCodes.length > 0) {
+         $srSelect.append('<option disabled>──────────</option>');
+      }
+
+      otherCodes.forEach(code => {
+        $srSelect.append(`<option value="${code}">${code}</option>`);
       });
     }
 
-
-    // 驗證查詢欄位是否填齊
     function validateQuery() {
       if (
         !$("#queryDate").val() ||
         !$("#querySRTimes").val() ||
-        !$("#queryCustN").val() ||
         !$("#queryUserN").val() ||
+        !$("#queryCustN").val() ||
         !$("#queryPType").val() ||
         !$("#querySrId").val()
       ) {
@@ -371,42 +380,7 @@
       return true;
     }
 
-    // 封裝：向後端請求該居服員的專屬名單
-    function fetchClientLists(userName) {
-      $("#loadingSpin").show();
-      google.script.run
-        .withSuccessHandler(function (res) {
-          $("#loadingSpin").hide();
-
-          // 填入常用名單 (最後加一個"其他")
-          fillSelect("#queryCustN", res.favClients, "");
-          $("#queryCustN").append('<option value="其他">其他(開啟下方清單)</option>');
-
-          // 填入其他名單
-          fillSelect("#queryCustNOther", res.otherClients, "");
-        })
-        .getCustomClientLists(userName);
-    }
-
-    // 封裝：向後端請求客製化的服務編碼清單
-    function updateSrIdList(custName) {
-      $("#loadingSpin").show();
-      google.script.run
-        .withSuccessHandler(function (res) {
-          $("#loadingSpin").hide();
-          // 使用現有的 fillSelect 工具填充清單
-          fillSelect("#querySrId", res, "");
-        })
-        .withFailureHandler(function (err) {
-          $("#loadingSpin").hide();
-          console.error("更新編碼失敗:", err);
-        })
-        .getCustomSrIdList(custName);
-    }
-
-    // --- 需求 2 核心：處理按鈕動作，並在新用戶時詢問電話 ---
     async function handleAction(type) {
-      // 決定最終的個案姓名
       let selectedCust = $("#queryCustN").val();
       if (selectedCust === "其他") {
         selectedCust = $("#queryCustNOther").val();
@@ -416,10 +390,8 @@
         }
       }
 
-
       if (!validateQuery()) return;
 
-      // 準備傳送給後端的物件
       const formObj = {
         date: $("#queryDate").val(),
         SRTimes: $("#querySRTimes").val(),
@@ -432,65 +404,54 @@
         loc: $("#inputLoc").val(),
         mood: $("#inputMood").val(),
         spcons: $("#inputSpcons").val(),
-        userTel: "", // 預設為空
+        userTel: "",
+        isNewBinding: false
       };
 
       let exSPCONS = await getSPCons(formObj);
-      console.log("特殊狀況說明及處理:", exSPCONS);
 
-      // console.log("準備執行動作：", type, formObj);
-
-      // 如果是「查詢」之後的「新增」或「更新」動作，且被標記為新用戶
-      // 查詢本身不需要電話，只有寫入資料時需要
-      if ((type === "add" || type === "update") && isNewUser) {
-        // 使用 SweetAlert 詢問電話
+      // --- 需求 7：新使用者電話詢問 ---
+      if ((type === "add" || type === "update") && GLOBAL_DATA.isNewBinding) {
         const { value: tel } = await Swal.fire({
-          title: "初次使用資料登錄",
-          text: "系統檢測到您是新居服員，請輸入您的聯絡電話以建檔",
+          title: "初次綁定資料",
+          text: `系統檢測到此 Email 尚未綁定 "${formObj.userName}"，請輸入您的聯絡電話以完成綁定`,
           input: "text",
           inputLabel: "聯絡電話 (User_Tel)",
           inputPlaceholder: "例：0912345678",
           showCancelButton: true,
           inputValidator: (value) => {
-            if (!value) {
-              return "電話號碼不能為空！";
-            }
+            if (!value) return "電話號碼不能為空！";
           },
         });
 
         if (tel) {
           formObj.userTel = "'" + tel;
-          // 用戶輸入完電話後，將狀態改為非新用戶 (避免同一次操作重複詢問)
-          // 註：若後端寫入失敗，下次重新整理頁面會重置，邏輯正確
-          // isNewUser = false; // 這裡先不改，確保這次請求有送出
+          formObj.isNewBinding = true; // 標記為新綁定，後端將更新至 SYTemp
         } else {
-          // 如果用戶按取消，則終止動作
           return;
         }
       }
 
       $("#loadingSpin").show();
 
-
       google.script.run
         .withSuccessHandler(function (res) {
           $("#loadingSpin").hide();
-
-          // 如果成功寫入新用戶資料，下次就不需要再問了
-          if (
-            (type === "add" || type === "update") &&
-            res.success &&
-            isNewUser
-          ) {
-            isNewUser = false;
-            $("#queryUserN").prop("disabled", true); // 鎖定姓名欄位
+          
+          if(res.success && formObj.isNewBinding) {
+             GLOBAL_DATA.isNewBinding = false;
+             $("#queryUserN").prop("disabled", true);
+             let u = GLOBAL_DATA.users.find(u => u.name === formObj.userName);
+             if(u) {
+                u.email = formObj.email;
+             }
           }
 
           if (type === "query") {
             if (res.found) {
               fillQueryLabel(formObj);
               fillDetail(res.data);
-              $("#inputSrRec").focus(); // 將焦點設置到服務紀錄欄位
+              $("#inputSrRec").focus();
               $("#detailSection").show();
               $("#searchSection").hide();
               $("#btnAdd").hide();
@@ -506,24 +467,19 @@
               }).then((result) => {
                 if (result.isConfirmed) {
                   fillQueryLabel(formObj);
-
                   $("#inputSrRec").val("").focus();
                   $("#inputLoc").val(exSPCONS.loc || "清醒");
                   $("#inputMood").val(exSPCONS.mood || "穩定");
                   $("#inputSpcons").val(exSPCONS.spcons || "無");
-
                   $("#detailSection").show();
                   $("#searchSection").hide();
                   $("#btnUpdate").hide();
                   $("#btnAdd").show();
-                } else {
-                  // 使用者取消新增，什麼都不做
-                  Swal.fire("已取消", "您可以修改查詢條件後再試一次。", "info");
                 }
               });
             }
           } else {
-            Swal.fire({
+             Swal.fire({
               icon: res.success ? "success" : "error",
               title: res.success ? "成功" : "失敗",
               text: res.message,
@@ -541,17 +497,11 @@
       $("#searchSection").show();
     }
 
-    /**
-    * 工具：填充查詢標籤
-    */
     function fillQueryLabel(formObj) {
       const labelText = `${formObj.date}| ${formObj.SRTimes} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
       $('#labQuery').text(labelText);
     }
 
-    /**
-    * 工具：填充詳細資料
-    */
     function fillDetail(data) {
       $('#inputSrRec').val(data.srRec || "");
       $('#inputLoc').val(data.loc || "清醒");
@@ -559,32 +509,22 @@
       $('#inputSpcons').val(data.spcons || "無");
     }
 
-    /**
-    * 處理指定欄位的剪貼簿動作
-    * @param {string} action - 'cut', 'copy', 'paste'
-    * @param {string} targetId - 指定的元素 ID (例如 '#inputSrRec')
-    */
     async function handleClipboard(action, targetId) {
       const $el = $(targetId);
       const text = $el.val();
-
       try {
         if (action === 'cut') {
           if (!text) return showToast('info', '沒有內容可以剪下');
           await navigator.clipboard.writeText(text);
-          $el.val(""); // 清空指定欄位
+          $el.val("");
           showToast('success', '已剪下');
-
         } else if (action === 'copy') {
           if (!text) return showToast('info', '內容為空，無法複製');
           await navigator.clipboard.writeText(text);
           showToast('success', '已複製');
-
         } else if (action === 'paste') {
           const clipboardText = await navigator.clipboard.readText();
           if (!clipboardText) return showToast('info', '剪貼簿中沒有內容');
-
-          // 將內容附加到指定欄位末尾
           const currentVal = $el.val();
           $el.val(currentVal + clipboardText);
           showToast('success', '已貼上');
@@ -595,18 +535,10 @@
         }
       } catch (err) {
         console.error('剪貼簿操作失敗:', err);
-        Swal.fire({
-          icon: 'error',
-          title: '操作失敗',
-          text: '請確保使用 HTTPS 並授權瀏覽器存取剪貼簿。',
-          confirmButtonColor: '#dc3545'
-        });
+        Swal.fire({ icon: 'error', title: '操作失敗', text: '請確保使用 HTTPS 並授權瀏覽器存取剪貼簿。' });
       }
     }
 
-    /**
-     * 顯示快速提示訊息
-     */
     function showToast(icon, title) {
       Swal.fire({
         icon: icon,
@@ -618,31 +550,23 @@
       });
     }
 
-/**
- * 將 google.script.run 包裝成 Promise 以支援 await
- */
-function getSPCons(formObj) {
-  return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler(function (res) {
-        console.log("後端回傳的原始資料:", res);
-        // 直接回傳 res.data，不要再包一層 data:{}
-        if (res && res.data) {
-          resolve(res.data); 
-        } else {
-          resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
-        }
-      })
-      .withFailureHandler(function (err) {
-        console.error("取得特殊狀況說明失敗:", err);
-        resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
-      })
-      .getSPCONS(formObj);
-  });
-}
+    function getSPCons(formObj) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res && res.data) {
+              resolve(res.data); 
+            } else {
+              resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
+            }
+          })
+          .withFailureHandler(function (err) {
+            resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
+          })
+          .getSPCONS(formObj);
+      });
+    }
   </script>
 </body>
-
 <?!= includeFooter(); ?>
-
 </html>

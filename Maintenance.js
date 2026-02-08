@@ -9,8 +9,7 @@
 function monthlyMaintenanceJob() {
   syncMasterTablePermissions();
   console.log("每月維護任務完成：權限已同步。");
-  UpdateCustLTCCode();
-  console.log("每月維護任務完成：LTC Code 已更新。");
+
   // 1. 取得今天的日期並計算「上個月」
   const now = new Date();
   now.setMonth(now.getUTCMonth() - 1); // 往前推一個月
@@ -30,6 +29,7 @@ function monthlyMaintenanceJob() {
   const tarSheet = MainSpreadsheet.getSheetByName("Cust");
   // 4. 執行更新
   if (srcSheet) {
+    removeSRDuplicates(srcSheet);
     UpdateCustLTCCode(srcSheet, tarSheet);
     UpdateCustLTCCode(tmpSheet, tarSheet);
     console.log(`成功處理：${srcSpreadsheetName} > ${yyyyMM}`);
@@ -37,6 +37,26 @@ function monthlyMaintenanceJob() {
     console.error(`找不到工作表：${yyyyMM}`);
   }
 }
+
+/**
+ * 每日維護任務：遷移 7 天前資料與同步 User 名單
+ * 建議觸發時間：每日 00:00 - 01:00
+ */
+function dailyMaintenanceJob() {
+  const ssSYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const tmpSheet = ssSYTemp.getSheetByName("SR_Data");    
+  const tarSheet = MainSpreadsheet.getSheetByName("Cust");
+
+  processUserSync(MainSpreadsheet, ssSYTemp);
+  processCustSync();
+  processTransferData("all", true);
+  processSRDataMigration(MainSpreadsheet, ssSYTemp);
+  
+  removeSRDuplicates(tmpSheet);
+  UpdateCustLTCCode(tmpSheet, tarSheet);
+  // const sSYyear = getTargetsheet("RecUrl","")
+}
+
 
 /**
  * 更新 SYCompany 試算表中的 LTC_Code
@@ -71,26 +91,25 @@ function UpdateCustLTCCode(srcSheet, tarSheet) {
   processSheet(srcSheet);
   // processSheet(tmpSheet);
 
-  console.log("資料整合完成，總客戶數: " + combinedData.size);
   // 3. 讀取目標工作表並進行比對與更新
   const tarData = tarSheet.getDataRange().getValues();
   const tarHeaders = tarData.shift();
   const tarCIdx = tarHeaders.indexOf("Cust_N");
   const tarLIdx = tarHeaders.indexOf("LTC_Code");
-
+  
   // 準備更新後的資料列
   const updatedLTCColumn = tarData.map((row) => {
     const custN = row[tarCIdx];
     let existingCodes = row[tarLIdx]
-      ? String(row[tarLIdx])
-          .split(",")
-          .map((s) => s.trim())
-      : [];
-
-    console.log(`客戶 ${custN} 的 LTC_Code 更新: ${existingCodes.join(", ")}`);
+    ? String(row[tarLIdx])
+    .split(",")
+    .map((s) => s.trim())
+    : [];
+    
+    // console.log(`客戶 ${custN} 的 LTC_Code 更新: ${existingCodes.join(", ")}`);
     if (combinedData.has(custN)) {
       const newIds = combinedData.get(custN);
-
+      
       // 合併舊有與新取得的 SR_ID
       newIds.forEach((id) => {
         if (!existingCodes.includes(id)) {
@@ -102,15 +121,16 @@ function UpdateCustLTCCode(srcSheet, tarSheet) {
     }
     return [row[tarLIdx]]; // 若無匹配則維持原狀
   });
-
+  
   // 4. 批次寫回目標工作表的 LTC_Code 欄位
   if (updatedLTCColumn.length > 0) {
     tarSheet
-      .getRange(2, tarLIdx + 1, updatedLTCColumn.length, 1)
-      .setValues(updatedLTCColumn);
+    .getRange(2, tarLIdx + 1, updatedLTCColumn.length, 1)
+    .setValues(updatedLTCColumn);
   }
-
-  console.log("更新完成！");
+  
+  console.log("資料整合完成，總客戶數: " + combinedData.size);
+  // console.log("更新完成！");
 }
 
 /**
@@ -254,24 +274,6 @@ function syncMasterTablePermissions() {
   });
 }
 
-/**
- * 每日維護任務：遷移 7 天前資料與同步 User 名單
- * 建議觸發時間：每日 00:00 - 01:00
- */
-function dailyMaintenanceJob() {
-  const ssSYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
-  const tmpSheet = ssSYTemp.getSheetByName("SR_Data");    
-  const tarSheet = MainSpreadsheet.getSheetByName("Cust");
-
-  processUserSync(MainSpreadsheet, ssSYTemp);
-  processCustSync();
-  processTransferData("all", true);
-  processSRDataMigration(MainSpreadsheet, ssSYTemp);
-  
-  removeSRDuplicates(tmpSheet);
-  UpdateCustLTCCode(tmpSheet, tarSheet);
-  // const sSYyear = getTargetsheet("RecUrl","")
-}
 
 /**
  * 處理 User 同步：SYTemp > User 搬移至 SYCompany > User
@@ -280,7 +282,7 @@ function dailyMaintenanceJob() {
  * 2. 確保 User_Tel 以文字格式 (@) 存入。
  */
 function processUserSync(mainSS, tempSS) {
-  // 初始值檢查
+  // 1. 初始值檢查與預設值設定
   if (!mainSS) {
     mainSS = MainSpreadsheet;
     console.log("mainSS 未提供，使用預設 MainSpreadsheet");
@@ -291,65 +293,120 @@ function processUserSync(mainSS, tempSS) {
     console.log("tempSS 未提供，使用預設 SYTemp");
   }
 
-  console.log("processUserSync 開始同步 SYTemp > User 資料...");
-  // console.log("主試算表 ID: " + mainSS.getId());
-  // console.log("暫存試算表 ID: " + tempSS.getId());
-
   const mainUserSheet = mainSS.getSheetByName("User");
   const tempUserSheet = tempSS.getSheetByName("User");
 
-  if (!tempUserSheet || !mainUserSheet) return;
+  if (!tempUserSheet || !mainUserSheet) {
+    console.error("找不到 User 工作表，請檢查名稱是否正確。");
+    return;
+  }
 
+  // 2. 讀取資料
   const tempData = tempUserSheet.getDataRange().getValues();
-  if (tempData.length <= 1) return;
+  if (tempData.length <= 1) {
+    console.log("暫存表無資料，跳過同步。");
+    return;
+  }
 
-  const mainData = mainUserSheet.getDataRange().getValues();
-  const existingEmails = mainData
-    .slice(1)
-    .map((row) => row[1].toString().trim().toLowerCase());
+  const mainRange = mainUserSheet.getDataRange();
+  const mainData = mainRange.getValues();
+  const mainHeaders = mainData[0];
+  const tempHeaders = tempData[0];
+
+  // 3. 動態偵測欄位 Index (標題名稱必須精確匹配)
+  const targetFields = ["User_N", "User_Email", "User_Tel"];
+  const mainColMap = {};
+  const tempColMap = {};
+
+  targetFields.forEach(field => {
+    mainColMap[field] = mainHeaders.indexOf(field);
+    tempColMap[field] = tempHeaders.indexOf(field);
+  });
+
+  // 檢查主表是否缺少必要欄位
+  if (mainColMap["User_N"] === -1) {
+    throw new Error("主表找不到標題: User_N，無法進行比對。");
+  }
+
+  // 4. 建立主表索引 Map { User_N_Value : rowIndex }
+  const mainIndexMap = {};
+  for (let i = 1; i < mainData.length; i++) {
+    let userName = mainData[i][mainColMap["User_N"]].toString().trim();
+    if (userName) mainIndexMap[userName] = i; 
+  }
 
   const newRowsToAppend = [];
-  const headers = tempData[0];
+  let updateCount = 0;
 
+  // 5. 開始同步 (比對 User_N)
   for (let i = 1; i < tempData.length; i++) {
-    let row = tempData[i];
-    let tempEmail = row[1].toString().trim().toLowerCase();
+    const tempRow = tempData[i];
+    const tempUserName = tempRow[tempColMap["User_N"]].toString().trim();
 
-    if (existingEmails.indexOf(tempEmail) === -1) {
-      newRowsToAppend.push(row);
+    if (!tempUserName) continue; // 跳過空名
+
+    if (mainIndexMap.hasOwnProperty(tempUserName)) {
+      // --- 狀況 A: User_N 已存在 -> 更新資料 ---
+      const mainRowIdx = mainIndexMap[tempUserName];
+      
+      // 更新這三個指定欄位
+      targetFields.forEach(field => {
+        const mIdx = mainColMap[field];
+        const tIdx = tempColMap[field];
+        // 確保暫存表也有該欄位才更新
+        if (mIdx !== -1 && tIdx !== -1) {
+          mainData[mainRowIdx][mIdx] = tempRow[tIdx];
+        }
+      });
+      updateCount++;
     } else {
-      console.log("Email 已存在，跳過新增: " + tempEmail);
+      // --- 狀況 B: User_N 是新的 -> 準備新增 ---
+      // 按照主表的欄位順序構造一筆新資料
+      let newRow = new Array(mainHeaders.length).fill("");
+      tempHeaders.forEach((headerName, tIdx) => {
+        const mIdx = mainHeaders.indexOf(headerName);
+        if (mIdx !== -1) {
+          newRow[mIdx] = tempRow[tIdx];
+        }
+      });
+      newRowsToAppend.push(newRow);
     }
   }
 
+  // 6. 資料回寫
+  // 更新現有列 (一次性覆蓋主表範圍以提升運作效率)
+  if (updateCount > 0) {
+    mainUserSheet.getRange(1, 1, mainData.length, mainHeaders.length).setValues(mainData);
+    console.log(`已成功更新 ${updateCount} 筆現有使用者資料。`);
+  }
+
+  // 新增全新列
   if (newRowsToAppend.length > 0) {
     const startRow = mainUserSheet.getLastRow() + 1;
     const targetRange = mainUserSheet.getRange(
       startRow,
       1,
       newRowsToAppend.length,
-      headers.length,
+      mainHeaders.length
     );
-
-    targetRange.setNumberFormat("@");
+    targetRange.setNumberFormat("@"); // 強制文字格式避免號碼跑掉
     targetRange.setValues(newRowsToAppend);
-    console.log("已新增 " + newRowsToAppend.length + " 筆新居服員資料。");
+    console.log(`已新增 ${newRowsToAppend.length} 筆新使用者資料。`);
   }
 
-  // --- 新增：排序邏輯 ---
+  // 7. 排序與清理
   const finalLastRow = mainUserSheet.getLastRow();
-  const lastColumn = mainUserSheet.getLastColumn();
   if (finalLastRow > 1) {
-    // 針對全表 (排除標題列) 依照第一欄 (Column 1) 進行 ASC 排序
+    // 依據 User_N 所在欄位進行 ASC 排序
     mainUserSheet
-      .getRange(2, 1, finalLastRow - 1, lastColumn)
-      .sort({ column: 1, ascending: true });
-    console.log("SYCompany > User 已完成 Column 1 排序 (ASC)。");
+      .getRange(2, 1, finalLastRow - 1, mainUserSheet.getLastColumn())
+      .sort({ column: mainColMap["User_N"] + 1, ascending: true });
+    console.log("主表資料已完成排序。");
   }
 
   if (tempUserSheet.getLastRow() > 1) {
     tempUserSheet.deleteRows(2, tempUserSheet.getLastRow() - 1);
-    console.log("SYTemp > User 已清理完畢。");
+    console.log("暫存表清理完畢。");
   }
 }
 

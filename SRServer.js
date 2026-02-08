@@ -3,30 +3,100 @@
  * 提供服務紀錄的查詢、新增、修改、刪除操作
  */
 
+/**
+ * 初始化 SR_server 頁面所需的所有資料
+ * 需求 1, 2, 3: 一次性抓取 SYCompany 中的三个表
+ */
 function getSRServerInitData() {
-  var userMapping = {};
-  var localUserSheet = MainSpreadsheet.getSheetByName("User");
-  if (localUserSheet) {
-    var localData = localUserSheet.getDataRange().getValues();
-    for (var i = 1; i < localData.length; i++) {
-      if (localData[i][0]) userMapping[localData[i][0]] = localData[i][1];
+  // 1. 取得 User 資料 (包含 User_N, User_Email, Cust_N)
+  var userSheet = MainSpreadsheet.getSheetByName("User");
+  var userData = [];
+  if (userSheet) {
+    var rawUsers = userSheet.getDataRange().getValues();
+    var headers = rawUsers[0];
+    
+    // 動態抓取欄位索引，確保名稱對應 (引用 Utilities.js 的 getColIndex 邏輯，或直接重寫以防萬一)
+    var idxName = getColIndexSafe(headers, "User_N");
+    var idxEmail = getColIndexSafe(headers, "User_Email");
+    if (idxEmail === -1) idxEmail = getColIndexSafe(headers, "Email"); // 容錯
+    var idxCust = getColIndexSafe(headers, "Cust_N");
+    
+    if (idxName !== -1) {
+      for (var i = 1; i < rawUsers.length; i++) {
+        var row = rawUsers[i];
+        if (row[idxName]) {
+          userData.push({
+            name: row[idxName].toString(),
+            email: idxEmail !== -1 ? row[idxEmail].toString() : "",
+            custStr: idxCust !== -1 ? row[idxCust].toString() : ""
+          });
+        }
+      }
+    }
+  }
+
+  // 2. 取得 Cust 資料 (包含 Cust_N, Cust_LTC_Code)
+  var custSheet = MainSpreadsheet.getSheetByName("Cust");
+  var custData = [];
+  if (custSheet) {
+    var rawCusts = custSheet.getDataRange().getValues();
+    var cHeaders = rawCusts[0];
+    var idxCName = getColIndexSafe(cHeaders, "Cust_N");
+    var idxCLTC = getColIndexSafe(cHeaders, "LTC_Code");
+    
+    if (idxCName !== -1) {
+      for (var j = 1; j < rawCusts.length; j++) {
+        var row = rawCusts[j];
+        if (row[idxCName]) {
+          custData.push({
+            name: row[idxCName].toString(),
+            ltcStr: idxCLTC !== -1 ? row[idxCLTC].toString() : ""
+          });
+        }
+      }
+    }
+  }
+
+  // 3. 取得 LTC_Code 資料 (SR_ID)
+  var ltcSheet = MainSpreadsheet.getSheetByName("LTC_Code");
+  var ltcIds = [];
+  if (ltcSheet) {
+    var rawLtc = ltcSheet.getDataRange().getValues();
+    var lHeaders = rawLtc[0];
+    var idxSRID = getColIndexSafe(lHeaders, "SR_ID");
+    var targetIdx = idxSRID !== -1 ? idxSRID : 0; // 若找不到標題，預設第一欄
+    
+    for (var k = 1; k < rawLtc.length; k++) {
+       var code = rawLtc[k][targetIdx].toString().trim();
+       if(code && ltcIds.indexOf(code) === -1) {
+         ltcIds.push(code);
+       }
     }
   }
 
   return {
-    userMapping: userMapping,
-    userList: Object.keys(userMapping),
-    custNames: getCustList(), // 需存在於 Utilities.gs
-    srIds: getLtcCodeList(), // 需存在於 Utilities.gs
+    users: userData,
+    custs: custData,
+    ltcCodes: ltcIds
   };
 }
 
 /**
- * 檢查 SYTemp 的 User 工作表並同步回 SYCompany
+ * 輔助函數：安全的取得欄位索引
  */
+function getColIndexSafe(headers, name) {
+  if (!headers) return -1;
+  var idx = headers.indexOf(name);
+  if (idx !== -1) return idx;
+  // 嘗試不區分大小寫
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).toLowerCase() === name.toLowerCase()) return i;
+  }
+  return -1;
+}
+
 /**
- * 同步使用者資料並檢查重復
- * 邏輯：以 Email 為基準，若 SYCompany 已存在該 Email，則跳過不匯入。
+ * 檢查 SYTemp 的 User 工作表並同步回 SYCompany
  */
 function processUserSync01() {
   try {
@@ -42,17 +112,16 @@ function processUserSync01() {
     if (tempValues.length <= 1) {
       console.log("SYTemp 的 User 表無資料可同步。");
       return;
-    } // 若除了標題外無資料，直接結束
+    } 
 
     // 2. 取得目標表 SYCompany > User
     var companyUserSheet = MainSpreadsheet.getSheetByName("User");
     if (!companyUserSheet) {
-      // 若工作表不存在則建立，並寫入標題列
       companyUserSheet = MainSpreadsheet.insertSheet("User");
       companyUserSheet.appendRow(tempValues[0]);
     }
 
-    // 3. 抓取 SYCompany 目前已有的 Email 清單 (假設 Email 在第 2 欄，索引為 1)
+    // 3. 抓取 SYCompany 目前已有的 Email 清單
     var companyData = companyUserSheet.getDataRange().getValues();
     var existingEmails = new Set();
     for (var i = 1; i < companyData.length; i++) {
@@ -69,10 +138,9 @@ function processUserSync01() {
         ? tempValues[j][1].toString().trim().toLowerCase()
         : "";
 
-      // 檢查是否已存在，且避免 SYTemp 內部有重復資料同時被加入
       if (tempEmail !== "" && !existingEmails.has(tempEmail)) {
         rowsToSync.push(tempValues[j]);
-        existingEmails.add(tempEmail); // 暫時加入 Set 防止本次迴圈重復處理
+        existingEmails.add(tempEmail);
       }
     }
 
@@ -91,8 +159,7 @@ function processUserSync01() {
       console.log("無新資料需要同步。");
     }
 
-    // 無論有無新資料，處理完後皆清空 SYTemp (保留標題列)
-    // 這樣可以確保 SYTemp 始終只存放「待處理」的新申請
+    // 清空 SYTemp
     if (tempValues.length > 1) {
       tempUserSheet.deleteRows(2, tempValues.length - 1);
     }
@@ -103,11 +170,6 @@ function processUserSync01() {
 
 /**
  * 處理服務紀錄：根據日期判斷查詢位置
- * 1. 7天內：存取 SYTemp > SR_Data
- * 2. 7天以前：存取 SY + yyyy > SR_Data
- */
-/**
- * 重新定義：根據日期動態分流存取路徑
  * 1. <= 7天：SYTemp > SR_Data
  * 2. > 7天 ：SY+yyyy > yyyyMM (工作表名稱)
  */
@@ -130,7 +192,7 @@ function processSRData(formObj, actionType) {
     } else {
       // 條件 2: 多於 7 天
       var yearStr = inputDate.getFullYear().toString();
-      var monthStr = Utilities.formatDate(inputDate, "GMT+8", "yyyyMM"); // 例如 202501
+      var monthStr = Utilities.formatDate(inputDate, "GMT+8", "yyyyMM"); 
 
       targetSS = getTargetsheet("RecUrl", "SY" + yearStr);
       sheetName = monthStr;
@@ -194,13 +256,14 @@ function processSRData(formObj, actionType) {
           : data[i][0].toString();
 
       // 比對五個關鍵欄位：Date, Cust_N, User_N, Pay_Type, SR_ID
+      // 注意: SR_ID 和 SRTimes 轉字串比對
       if (
         sheetDate === formObj.date &&
-        data[i][1].toString().trim() === formObj.SRTimes.trim() &&
-        data[i][2].toString().trim() === formObj.custName.trim() &&
-        data[i][3].toString().trim() === formObj.userName.trim() &&
-        data[i][4].toString().trim() === formObj.payType.trim() &&
-        data[i][5].toString().trim() === formObj.srId.trim()
+        data[i][1].toString().trim() === formObj.SRTimes.toString().trim() &&
+        data[i][2].toString().trim() === formObj.custName.toString().trim() &&
+        data[i][3].toString().trim() === formObj.userName.toString().trim() &&
+        data[i][4].toString().trim() === formObj.payType.toString().trim() &&
+        data[i][5].toString().trim() === formObj.srId.toString().trim()
       ) {
         if (actionType === "query") {
           return {

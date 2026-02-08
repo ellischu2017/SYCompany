@@ -111,7 +111,7 @@
 
                 <div class="form-group mb-4">
                     <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="chkRegen" style="cursor: pointer;">
+                        <input class="form-check-input" type="checkbox" id="chkRegen" style="cursor: pointer;" >
                         <label class="form-check-label" for="chkRegen" style="cursor: pointer;">
                             強制重新生成報表 (覆寫舊資料)
                         </label>
@@ -157,8 +157,8 @@
         function handleReportGeneration() {
             var yearmonth = $('#qrymonth').val();
             var custn = $('#qrycust').val();
-            var regen = $('#chkRegen').is(':checked');
-
+            var regen = $('#chkRegen').prop('checked');
+            console.log('強制重新生成報表:', regen);
             if (!yearmonth || !custn) {
                 Swal.fire('提示', '請選擇月份與個案', 'warning');
                 return;
