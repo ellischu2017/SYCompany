@@ -75,6 +75,8 @@ function getTargetsheet(sheetName, targetName) {
 
   if (!url) {
     if (sheetName === "ReportsUrl") {
+      var year = targetName.substring(0, 4);
+      var month = targetName.substring(4, 6); 
       // 如果沒有，拷貝 Template
       // 尋找 Template URL
       var tempUrl = "";
@@ -87,7 +89,15 @@ function getTargetsheet(sheetName, targetName) {
       if (!tempUrl) throw new Error("找不到 RPTemplate");
 
       var templateFile = DriveApp.getFileById(getIdFromUrl(tempUrl));
-      var newFile = templateFile.makeCopy(targetName);
+      var folderName = "RP" + year;
+      var folders = DriveApp.getFoldersByName(folderName);
+      var destinationFolder;
+      if (folders.hasNext()) {
+        destinationFolder = folders.next();
+      } else {
+        destinationFolder = DriveApp.createFolder(folderName);
+      }
+      var newFile = templateFile.makeCopy(targetName, destinationFolder);
       url = newFile.getUrl();
 
       // 把名稱及網址存到 ss4
@@ -118,6 +128,8 @@ function getTargetsheetstruct(sheetName, targetName) {
 
   if (!url) {
     if (sheetName === "ReportsUrl") {
+      var year = targetName.substring(0, 4);
+
       // 如果沒有，拷貝 Template
       // 尋找 Template URL
       var tempUrl = "";
@@ -130,7 +142,15 @@ function getTargetsheetstruct(sheetName, targetName) {
       if (!tempUrl) throw new Error("找不到 RPTemplate");
 
       var templateFile = DriveApp.getFileById(getIdFromUrl(tempUrl));
-      var newFile = templateFile.makeCopy(targetName);
+      var folderName = "RP" + year;
+      var folders = DriveApp.getFoldersByName(folderName);
+      var destinationFolder;
+      if (folders.hasNext()) {
+        destinationFolder = folders.next();
+      } else {
+        destinationFolder = DriveApp.createFolder(folderName);
+      }
+      var newFile = templateFile.makeCopy(targetName, destinationFolder);
       url = newFile.getUrl();
 
       // 把名稱及網址存到 ss4
