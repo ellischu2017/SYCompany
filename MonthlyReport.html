@@ -326,10 +326,12 @@
                 icon: "success",
                 title: "處理完成",
                 text: res.message,
-                confirmButtonText: "查看報表",
+                confirmButtonText: res.btntext ,
                 showCloseButton: true,
-              }).then(() => {
-                if (res.url) window.open(res.url, "_blank");
+              }).then((result) => {
+                if (result.isConfirmed && res.url) {
+                  window.open(res.url, "_blank");
+                }
                 $("#progressArea").fadeOut();
               });
             }
@@ -362,8 +364,10 @@
                 text: res.message,
                 confirmButtonText: "查看Pdf",
                 showCloseButton: true,
-              }).then(() => {
-                if (res.url) window.open(res.url, "_blank");
+              }).then((result) => {
+                if (result.isConfirmed && res.url) {
+                  window.open(res.url, "_blank");
+                }
                 $("#progressArea").fadeOut();
               });
             }

@@ -36,6 +36,7 @@ function genreport(yearmonth, custn, regen) {
       return {
         status: "complete",
         message: "該個案此月份無紀錄。",
+        btntext: "返回",        
         currentIndex: 1,
         total: 1,
       };
@@ -57,6 +58,7 @@ function genreport(yearmonth, custn, regen) {
       currentIndex: 1,
       total: 1,
       message: "個案 " + custn + " 報表處理完成！",
+      btntext: "查看報表",
       url: url,
     };
   }
@@ -123,6 +125,7 @@ function genreport(yearmonth, custn, regen) {
   return {
     status: "complete",
     message: "全部個案處理完成！",
+    btntext: "查看報表",
     url: ssReportFile.getUrl(),
   };
 }
@@ -165,10 +168,10 @@ function processSingleReport(
     .getRange("A2")
     .setValue(
       parseInt(year) -
-        1911 +
-        "年" +
-        parseInt(month) +
-        "月　　居家服務照顧內容紀錄單",
+      1911 +
+      "年" +
+      parseInt(month) +
+      "月　　居家服務照顧內容紀錄單",
     );
   sheet
     .getRange("A3:C3")
@@ -487,10 +490,10 @@ function writeReportHeader(sheet, custn, year, month) {
     .getRange("A2")
     .setValue(
       parseInt(year) -
-        1911 +
-        "年" +
-        parseInt(month) +
-        "月　　居家服務照顧內容紀錄單",
+      1911 +
+      "年" +
+      parseInt(month) +
+      "月　　居家服務照顧內容紀錄單",
     );
   // Row 3: 個資
   sheet
