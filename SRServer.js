@@ -105,7 +105,7 @@ function getColIndexSafe(headers, name) {
 function processUserSync01() {
   try {
     // 1. 取得來源表 SYTemp > User
-    var ssTemp = getTargetsheet("SYTemp", "SYTemp");
+    var ssTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     var tempUserSheet = ssTemp.getSheetByName("User");
     if (!tempUserSheet) {
       console.log("SYTemp 中不存在 User 工作表，無法同步。");
@@ -191,14 +191,14 @@ function processSRData(formObj, actionType) {
 
     if (diffDays <= 7) {
       // 條件 1: 少於或等於 7 天
-      targetSS = getTargetsheet("SYTemp", "SYTemp");
+      targetSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
       sheetName = "SR_Data";
     } else {
       // 條件 2: 多於 7 天
       var yearStr = inputDate.getFullYear().toString();
       var monthStr = Utilities.formatDate(inputDate, "GMT+8", "yyyyMM"); 
 
-      targetSS = getTargetsheet("RecUrl", "SY" + yearStr);
+      targetSS = getTargetsheet("RecUrl", "SY" + yearStr).Spreadsheet;
       sheetName = monthStr;
     }
 

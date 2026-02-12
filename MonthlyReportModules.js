@@ -27,7 +27,7 @@ function genreport(yearmonth, custn, regen) {
     // 1. 準備單一案主所需的資料 (跟批次邏輯一樣，先抓取必要的 Map)
     var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
     var custBase = getCustInfoMap();
-    var ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth);
+    var ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
     var templateSheet =
       ssReportFile.getSheetByName("Template") || ssReportFile.getSheets()[0];
 
@@ -82,7 +82,7 @@ function genreport(yearmonth, custn, regen) {
   // var month = yearmonth.substring(4, 6);
   var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
   var custBase = getCustInfoMap();
-  var ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth);
+  var ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
 
   var templateSheet =
     ssReportFile.getSheetByName("Template") || ssReportFile.getSheets()[0];
@@ -244,10 +244,10 @@ function processSingleReport() {
  * 預先讀取所有資料並分類 (Map: Name -> Rows[])
  */
 function getAllDataMapFromSources(yearmonth, year, month) {
-  var ssAnnual = getTargetsheet("RecUrl", "SY" + year).getSheetByName(
+  var ssAnnual = getTargetsheet("RecUrl", "SY" + year).Spreadsheet.getSheetByName(
     yearmonth,
   );
-  var ssTemp = getTargetsheet("SYTemp", "SYTemp").getSheetByName("SR_Data");
+  var ssTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet.getSheetByName("SR_Data");
   var dataMap = {};
   var excludeIDs = ["GA05", "GA09"];
 

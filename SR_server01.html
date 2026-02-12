@@ -485,7 +485,7 @@
               icon: res.success ? "success" : "error",
               title: res.success ? "成功" : "失敗",
               text: res.message,
-              timer: 10000,
+              timer: res.success ? 1500 : null,
             }).then(() => {
               if (res.success) backToSearch();
             });

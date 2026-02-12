@@ -22,9 +22,9 @@ function monthlyMaintenanceJob() {
 
   // 3. 動態組合名稱並獲取工作表
   const srcSpreadsheetName = "SY" + yyyy;
-  const SYyyyy = getTargetsheetstruct("RecUrl", srcSpreadsheetName).Spreadsheet;
+  const SYyyyy = getTargetsheet("RecUrl", srcSpreadsheetName).Spreadsheet;
   const srcSheet = SYyyyy.getSheetByName(yyyyMM);
-  const SYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const SYTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
   const tmpSheet = SYTemp.getSheetByName("SR_Data");
   const tarSheet = MainSpreadsheet.getSheetByName("Cust");
   // 4. 執行更新
@@ -43,7 +43,7 @@ function monthlyMaintenanceJob() {
  * 建議觸發時間：每日 00:00 - 01:00
  */
 function dailyMaintenanceJob() {
-  const ssSYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const ssSYTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
   const tmpSheet = ssSYTemp.getSheetByName("SR_Data");    
   const tarSheet = MainSpreadsheet.getSheetByName("Cust");
 
@@ -162,10 +162,7 @@ function syncMasterTablePermissions() {
   }
 
   var targetFileIds = [{ Name: "SYCompany", UrlID: MainSpreadsheet.getId() }]; // 包含 SYCompany 本身
-  targetFileIds.push({
-    Name: "SYTemp",
-    UrlID: getTargetsheet("SYTemp", "SYTemp").getId(),
-  }); // 包含 SYTemp
+  targetFileIds.push({Name: "SYTemp",UrlID: getTargetsheet("SYTemp", "SYTemp").id }); // 包含 SYTemp
   var recUrlSheet = MainSpreadsheet.getSheetByName("RecUrl"); // 取得 RecUrl 工作表
   if (recUrlSheet) {
     var urlData = recUrlSheet.getDataRange().getValues();
@@ -289,7 +286,7 @@ function processUserSync(mainSS, tempSS) {
   }
 
   if (!tempSS) {
-    tempSS = getTargetsheet("SYTemp", "SYTemp");
+    tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     console.log("tempSS 未提供，使用預設 SYTemp");
   }
 
@@ -422,7 +419,7 @@ function processSRDataMigration(mainSS, tempSS) {
   }
 
   if (!tempSS) {
-    tempSS = getTargetsheet("SYTemp", "SYTemp");
+    tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     console.log("tempSS 未提供，使用預設 SYTemp");
   }
 

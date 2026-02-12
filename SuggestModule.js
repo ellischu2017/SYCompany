@@ -42,7 +42,7 @@ function addSuggestion(formData) {
 
     let ss;
     try {
-      ss = getTargetsheet("SYTemp", "SYTemp");
+      ss = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     } catch (error) {
       return { success: false, message: "無法取得 SYTemp 試算表: " + error.message };
     }

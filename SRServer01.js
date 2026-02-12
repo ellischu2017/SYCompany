@@ -35,7 +35,7 @@ function getSRServer01InitData() {
 
   // 2. 讀取 SYTemp > User (更新名單) 並覆蓋/合併
   try {
-    var tempSS = getTargetsheet("SYTemp", "SYTemp");
+    var tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     var tempUserSheet = tempSS.getSheetByName("User");
     if (tempUserSheet) {
       var tempUsers = tempUserSheet.getDataRange().getValues();
@@ -128,7 +128,7 @@ function getSRServer01InitData() {
  */
 function processSR01Data(formObj, actionType) {
   try {
-    var targetSs = getTargetsheet("SYTemp", "SYTemp");
+    var targetSs = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
 
     // --- 處理需求：若前端標記為新綁定，則更新 SYTemp > User 表 ---
     if ((actionType === "add" || actionType === "update") && formObj.isNewBinding === true) {
@@ -252,7 +252,7 @@ function processSR01Data(formObj, actionType) {
 
 function getSPCONS(formObj) {
   try {
-    var targetSs = getTargetsheet("SYTemp", "SYTemp");
+    var targetSs = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     var spconsSheet = targetSs.getSheetByName("SR_Data");
     if (!spconsSheet) return { data: { loc: "清醒", mood: "穩定", spcons: "無" } };
 

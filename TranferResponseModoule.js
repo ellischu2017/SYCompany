@@ -52,7 +52,7 @@ function processTransferData(custName, isUpdateOnly) {
 
     // 為了效能，這裡先開啟目標 Spreadsheet (避免在迴圈內重複開啟)
     // 假設 Utilities.getTargetsheet 可用，若無請自行替換為 SpreadsheetApp.openByUrl(...)
-    const ssCurrent = getTargetsheet("SYTemp", "SYTemp");
+    const ssCurrent = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     const sheetSRData = ssCurrent.getSheetByName("SR_Data");
     const sheetTransResp = ssCurrent.getSheetByName("Transfer_Response");
 

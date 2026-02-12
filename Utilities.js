@@ -59,6 +59,7 @@ function getScriptUrl() {
 /**
  * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物件
  */
+
 function getTargetsheet(sheetName, targetName) {
   var sheet = MainSpreadsheet.getSheetByName(sheetName);
   if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName + "工作表");
@@ -75,60 +76,8 @@ function getTargetsheet(sheetName, targetName) {
 
   if (!url) {
     if (sheetName === "ReportsUrl") {
-      var year = targetName.substring(0, 4);
-      var month = targetName.substring(4, 6); 
-      // 如果沒有，拷貝 Template
-      // 尋找 Template URL
-      var tempUrl = "";
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][0] === "RPTemplate") {
-          tempUrl = data[i][1];
-          break;
-        }
-      }
-      if (!tempUrl) throw new Error("找不到 RPTemplate");
-
-      var templateFile = DriveApp.getFileById(getIdFromUrl(tempUrl));
-      var folderName = "RP" + year;
-      var folders = DriveApp.getFoldersByName(folderName);
-      var destinationFolder;
-      if (folders.hasNext()) {
-        destinationFolder = folders.next();
-      } else {
-        destinationFolder = DriveApp.createFolder(folderName);
-      }
-      var newFile = templateFile.makeCopy(targetName, destinationFolder);
-      url = newFile.getUrl();
-
-      // 把名稱及網址存到 ss4
-      sheet.appendRow([targetName, url]);
-    } else {
-      console.log(
-        "無法在" + sheetName + "工作表中找到名稱為" + targetName + "的對應網址",
-      );
-      return url;
-    }
-  }
-  return SpreadsheetApp.openByUrl(url);
-}
-
-function getTargetsheetstruct(sheetName, targetName) {
-  var sheet = MainSpreadsheet.getSheetByName(sheetName);
-  if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName + "工作表");
-
-  var data = sheet.getDataRange().getValues();
-  var url = "";
-
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === targetName) {
-      url = data[i][1];
-      break;
-    }
-  }
-
-  if (!url) {
-    if (sheetName === "ReportsUrl") {
-      var year = targetName.substring(0, 4);
+      var year = targetName.substring(2, 6);
+      var month = targetName.substring(6, 8);
 
       // 如果沒有，拷貝 Template
       // 尋找 Template URL
@@ -143,7 +92,7 @@ function getTargetsheetstruct(sheetName, targetName) {
 
       var templateFile = DriveApp.getFileById(getIdFromUrl(tempUrl));
       var folderName = "RP" + year;
-      var folders = DriveApp.getFoldersByName(folderName);
+      var folders = DriveApp.getfoldersByName(folderName);
       var destinationFolder;
       if (folders.hasNext()) {
         destinationFolder = folders.next();
@@ -170,7 +119,7 @@ function getTargetsheetstruct(sheetName, targetName) {
 }
 
 function removeSR() {
-  const ssSYTemp = getTargetsheet("RecUrl", "SY2026");
+  const ssSYTemp = getTargetsheet("RecUrl", "SY2026").Spreadsheet;
   const sSRData = ssSYTemp.getSheetByName("202601");
   removeSRDuplicates(sSRData);
 }
@@ -372,9 +321,9 @@ function UpdateUserName() {
   const yyyy = Utilities.formatDate(now, timeZone, "yyyy");
   const yyyyMM = Utilities.formatDate(now, timeZone, "yyyyMM");
 
-  const srcSpreadsheet = getTargetsheetstruct("RecUrl", "SY" + yyyy).Spreadsheet;
+  const srcSpreadsheet = getTargetsheet("RecUrl", "SY" + yyyy).Spreadsheet;
   const syyyyMM = srcSpreadsheet.getSheetByName(yyyyMM);
-  const SYTemp = getTargetsheetstruct("SYTemp", "SYTemp").Spreadsheet;
+  const SYTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
   const tempSheet = SYTemp.getSheetByName("SR_Data");
 
   if (!syyyyMM || !tempSheet) return;
@@ -402,7 +351,7 @@ function UpdateUserName() {
   const tarSheet = MainSpreadsheet.getSheetByName("User");
   const tarData = tarSheet.getDataRange().getValues();
   const tarHeaders = tarData[0];
-  
+
   // 動態獲取目標表的欄位索引
   const tarUserIdx = getColIndex(tarHeaders, "User_N");
   const tarCustIdx = getColIndex(tarHeaders, "Cust_N");
@@ -413,7 +362,7 @@ function UpdateUserName() {
 
   // 3. 準備更新後的資料陣列 (保留原始結構，僅修改 Cust_N 欄位)
   // 我們只處理從第 2 列開始的資料
-  const rowsToUpdate = tarData.slice(1); 
+  const rowsToUpdate = tarData.slice(1);
   const processedUsers = new Set();
 
   const updatedRows = rowsToUpdate.map(row => {
@@ -439,7 +388,7 @@ function UpdateUserName() {
 
   // 5. 將所有資料排序並寫回
   updatedRows.sort((a, b) => String(a[tarUserIdx]).localeCompare(String(b[tarUserIdx])));
-  
+
   // 寫回目標區域 (從 A2 開始，涵蓋整張表的寬度)
   tarSheet.getRange(2, 1, updatedRows.length, tarHeaders.length).setValues(updatedRows);
 

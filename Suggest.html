@@ -147,7 +147,7 @@
                         title: '提交成功',
                         text: '感謝您的回饋！',
                         confirmButtonText: '確定',
-                        timer: 3000
+                        timer: res.success ? 3000 : null
                     }).then(() => {
                         $('#inputSuRec').val(''); // 清空輸入框
                     });
