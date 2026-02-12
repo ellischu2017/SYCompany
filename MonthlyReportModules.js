@@ -36,7 +36,7 @@ function genreport(yearmonth, custn, regen) {
       return {
         status: "complete",
         message: "該個案此月份無紀錄。",
-        btntext: "返回",        
+        btntext: "返回",
         currentIndex: 1,
         total: 1,
       };
@@ -227,6 +227,19 @@ function processSingleReport(
   return ssFile.getUrl() + "#gid=" + sheet.getSheetId();
 }
 
+function genPdfFile(yearmonth, custn, regen) {
+  var year = yearmonth.substring(0, 4);
+  var month = yearmonth.substring(4, 6);
+  if (custn !== "all") {
+    //
+  }
+
+}
+
+function processSingleReport() {
+
+
+}
 /**
  * 預先讀取所有資料並分類 (Map: Name -> Rows[])
  */

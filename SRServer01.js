@@ -4,7 +4,7 @@
  */
 function getSRServer01InitData() {
   var userEmail = Session.getActiveUser().getEmail();
-  
+
   // 1. 讀取 SYCompany > User (主名單)
   var userSheet = MainSpreadsheet.getSheetByName("User");
   var userMap = new Map(); // 使用 Map 以便用 Name 進行合併
@@ -12,17 +12,17 @@ function getSRServer01InitData() {
   if (userSheet) {
     var rawUsers = userSheet.getDataRange().getValues();
     var headers = rawUsers[0];
-    
+
     var idxName = getColIndex(headers, "User_N");
     var idxEmail = getColIndex(headers, "User_Email");
-    if(idxEmail === -1) idxEmail = getColIndex(headers, "Email");
+    if (idxEmail === -1) idxEmail = getColIndex(headers, "Email");
     var idxCust = getColIndex(headers, "Cust_N");
-    
+
     if (idxName !== -1) {
       for (var i = 1; i < rawUsers.length; i++) {
         var row = rawUsers[i];
         var name = String(row[idxName]).trim();
-        if(name) {
+        if (name) {
           userMap.set(name, {
             name: name,
             email: idxEmail !== -1 ? String(row[idxEmail]).trim() : "",
@@ -42,14 +42,14 @@ function getSRServer01InitData() {
       var tHeaders = tempUsers[0];
       var tNameIdx = getColIndex(tHeaders, "User_N");
       var tEmailIdx = getColIndex(tHeaders, "User_Email");
-      if(tEmailIdx === -1) tEmailIdx = getColIndex(tHeaders, "Email");
+      if (tEmailIdx === -1) tEmailIdx = getColIndex(tHeaders, "Email");
 
       if (tNameIdx !== -1 && tEmailIdx !== -1) {
         for (var j = 1; j < tempUsers.length; j++) {
           var tRow = tempUsers[j];
           var tName = String(tRow[tNameIdx]).trim();
           var tEmail = String(tRow[tEmailIdx]).trim();
-          
+
           if (tName) {
             if (userMap.has(tName)) {
               // 若主名單已有，則更新 Email (以 Temp 為準)
@@ -82,7 +82,7 @@ function getSRServer01InitData() {
     var cHeaders = rawCusts[0];
     var idxCName = getColIndex(cHeaders, "Cust_N");
     var idxCLTC = getColIndex(cHeaders, "LTC_Code");
-    
+
     if (idxCName !== -1 && idxCLTC !== -1) {
       for (var k = 1; k < rawCusts.length; k++) {
         custData.push({
@@ -99,14 +99,18 @@ function getSRServer01InitData() {
   if (ltcSheet) {
     var rawLtc = ltcSheet.getDataRange().getValues();
     var lHeaders = rawLtc[0];
-    var idxSRID = getColIndex(lHeaders, "SR_ID");
-    var targetIdx = idxSRID !== -1 ? idxSRID : 0;
-    
-    for (var m = 1; m < rawLtc.length; m++) {
-       var code = String(rawLtc[m][targetIdx]).trim();
-       if(code && !ltcIds.includes(code)) {
-         ltcIds.push(code);
-       }
+    var idxSRID = getColIndexSafe(lHeaders, "SR_ID");
+    var idxCont = getColIndexSafe(lHeaders, "SR_Cont");
+    var targetIdx = idxSRID !== -1 ? idxSRID : 0; // 若找不到標題，預設第一欄
+    var seen = {};
+
+    for (var k = 1; k < rawLtc.length; k++) {
+      var code = rawLtc[k][targetIdx].toString().trim();
+      var cont = idxCont !== -1 ? rawLtc[k][idxCont].toString().trim() : "";
+      if (code && !seen[code]) {
+        seen[code] = true;
+        ltcIds.push({ id: code, cont: cont });
+      }
     }
   }
 
@@ -138,7 +142,7 @@ function processSR01Data(formObj, actionType) {
       var tHeaders = tData[0];
       var tNameIdx = getColIndex(tHeaders, "User_N");
       var tEmailIdx = getColIndex(tHeaders, "User_Email");
-      if(tEmailIdx === -1) tEmailIdx = getColIndex(tHeaders, "Email");
+      if (tEmailIdx === -1) tEmailIdx = getColIndex(tHeaders, "Email");
       var tTelIdx = getColIndex(tHeaders, "User_Tel");
 
       // 如果找不到對應欄位，嘗試使用預設欄位索引
@@ -154,7 +158,7 @@ function processSR01Data(formObj, actionType) {
           tempUserSheet.getRange(k + 1, tEmailIdx + 1).setValue(formObj.email);
           tempUserSheet.getRange(k + 1, tTelIdx + 1).setValue(formObj.userTel);
           foundInTemp = true;
-          break; 
+          break;
         }
       }
 
@@ -250,7 +254,7 @@ function getSPCONS(formObj) {
   try {
     var targetSs = getTargetsheet("SYTemp", "SYTemp");
     var spconsSheet = targetSs.getSheetByName("SR_Data");
-    if (!spconsSheet) return {data:{ loc: "清醒", mood: "穩定", spcons: "無" } };
+    if (!spconsSheet) return { data: { loc: "清醒", mood: "穩定", spcons: "無" } };
 
     var data = spconsSheet.getDataRange().getValues();
     const targetDateStr = formObj.date;
@@ -267,13 +271,13 @@ function getSPCONS(formObj) {
             ? Utilities.formatDate(row[0], "GMT+8", "yyyy-MM-dd")
             : row[0].toString();
 
-        if (sheetDate === targetDateStr) {          
-          return {data:{ loc: data[i][7], mood: data[i][8], spcons: data[i][9] }};          
+        if (sheetDate === targetDateStr) {
+          return { data: { loc: data[i][7], mood: data[i][8], spcons: data[i][9] } };
         }
       }
     }
   } catch (e) {
     console.log("取得特殊狀況失敗: " + e.toString());
   }
-  return {data:{ loc: "清醒", mood: "穩定", spcons: "無" } };
+  return { data: { loc: "清醒", mood: "穩定", spcons: "無" } };
 }

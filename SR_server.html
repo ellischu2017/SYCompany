@@ -345,16 +345,22 @@
 
       // B. 其餘代碼：Session(LTC_Code) - 優先代碼 (不重複)
       const allCodes = GLOBAL_DATA.ltcCodes;
-      const otherCodes = allCodes.filter(code => !priorityCodes.includes(code)).sort();
+      const favorCodes = allCodes.filter(srcode => priorityCodes.includes(srcode.id)).sort();
+      const otherCodes = allCodes.filter(srcode => !priorityCodes.includes(srcode.id)).sort();
 
       // C. 依序填入
-      priorityCodes.forEach(c => $srSelect.append(new Option(c, c)));
+      favorCodes.forEach(srcode => {
+         $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
+      });
 
       if(priorityCodes.length > 0 && otherCodes.length > 0) {
          $srSelect.append('<option disabled>──────────</option>');
       }
 
-      otherCodes.forEach(c => $srSelect.append(new Option(c, c)));
+      otherCodes.forEach(srcode => {
+         $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
+      });
+
     }
 
 
@@ -369,7 +375,7 @@
       const userName = $('#queryUserN').val();
       const payType = $('#queryPayType').val();
       const srId = $('#querySrId').val();
-      if (!date || !custName || !SRTimes || !userName || !email || !payType || !srId) {
+      if (!date || !custName || !SRTimes || !userName || !payType || !srId) {
         Swal.fire({
           title: "欄位不完整",
           text: "請確保所有查詢欄位皆已填寫",
@@ -507,7 +513,7 @@
     async function handleClipboard(action, targetId) {
       const $el = $(targetId);
       const text = $el.val();
-
+      const srid = GLOBAL_DATA.ltcCodes.find(x => String(x.id) === $('#querySrId').val().trim());
       try {
         if (action === 'cut') {
           if (!text) return showToast('info', '沒有內容可以剪下');
@@ -528,7 +534,7 @@
           showToast('success', '已貼上');
         } else if (action === 'addAI') {
           const currentVal = $el.val();
-          $el.val(currentVal + '\n修飾以上句子,符合長照 ' + $('#querySrId').val() + ' 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。');
+          $el.val(`${currentVal}\n修飾以上句子，符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。`);
           showToast('success', '已加入AI助手');
         }
       } catch (err) {

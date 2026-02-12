@@ -64,12 +64,16 @@ function getSRServerInitData() {
     var rawLtc = ltcSheet.getDataRange().getValues();
     var lHeaders = rawLtc[0];
     var idxSRID = getColIndexSafe(lHeaders, "SR_ID");
+    var idxCont = getColIndexSafe(lHeaders, "SR_Cont");
     var targetIdx = idxSRID !== -1 ? idxSRID : 0; // 若找不到標題，預設第一欄
+    var seen = {};
     
     for (var k = 1; k < rawLtc.length; k++) {
        var code = rawLtc[k][targetIdx].toString().trim();
-       if(code && ltcIds.indexOf(code) === -1) {
-         ltcIds.push(code);
+       var cont = idxCont !== -1 ? rawLtc[k][idxCont].toString().trim() : "";
+       if(code && !seen[code]) {
+         seen[code] = true;
+         ltcIds.push({ id: code, cont: cont });
        }
     }
   }

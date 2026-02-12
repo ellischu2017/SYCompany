@@ -350,18 +350,20 @@
         favCodes = custObj.ltcCodeStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
 
-      favCodes.forEach(code => {
-         $srSelect.append(`<option value="${code}">${code}</option>`);
+      const favCodesSet = GLOBAL_DATA.ltcCodes.filter(srcode => favCodes.includes(srcode.id)).sort();
+      const otherCodes = GLOBAL_DATA.ltcCodes.filter(srcode => !favCodes.includes(srcode.id)).sort();
+
+      favCodesSet.forEach(srcode => {
+         $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
       });
 
-      const otherCodes = GLOBAL_DATA.ltcCodes.filter(code => !favCodes.includes(code)).sort();
       
       if(otherCodes.length > 0 && favCodes.length > 0) {
          $srSelect.append('<option disabled>──────────</option>');
       }
 
-      otherCodes.forEach(code => {
-        $srSelect.append(`<option value="${code}">${code}</option>`);
+      otherCodes.forEach(srcode => {
+        $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
       });
     }
 
@@ -483,7 +485,7 @@
               icon: res.success ? "success" : "error",
               title: res.success ? "成功" : "失敗",
               text: res.message,
-              timer: 3000,
+              timer: 10000,
             }).then(() => {
               if (res.success) backToSearch();
             });
@@ -512,6 +514,7 @@
     async function handleClipboard(action, targetId) {
       const $el = $(targetId);
       const text = $el.val();
+      const srid = GLOBAL_DATA.ltcCodes.find(x => String(x.id) === $('#querySrId').val().trim());
       try {
         if (action === 'cut') {
           if (!text) return showToast('info', '沒有內容可以剪下');
@@ -530,7 +533,7 @@
           showToast('success', '已貼上');
         } else if (action === 'addAI') {
           const currentVal = $el.val();
-          $el.val(currentVal + '\n修飾以上句子,符合長照 ' + $('#querySrId').val() + ' 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。');
+          $el.val(`${currentVal}\n修飾以上句子，符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。`);
           showToast('success', '已加入AI助手');
         }
       } catch (err) {
