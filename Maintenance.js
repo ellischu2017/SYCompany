@@ -44,14 +44,14 @@ function monthlyMaintenanceJob() {
  */
 function dailyMaintenanceJob() {
   const ssSYTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
-  const tmpSheet = ssSYTemp.getSheetByName("SR_Data");    
+  const tmpSheet = ssSYTemp.getSheetByName("SR_Data");
   const tarSheet = MainSpreadsheet.getSheetByName("Cust");
 
   processUserSync(MainSpreadsheet, ssSYTemp);
   processCustSync();
   processTransferData("all", true);
   processSRDataMigration(MainSpreadsheet, ssSYTemp);
-  
+
   removeSRDuplicates(tmpSheet);
   UpdateCustLTCCode(tmpSheet, tarSheet);
   // const sSYyear = getTargetsheet("RecUrl","")
@@ -96,20 +96,20 @@ function UpdateCustLTCCode(srcSheet, tarSheet) {
   const tarHeaders = tarData.shift();
   const tarCIdx = tarHeaders.indexOf("Cust_N");
   const tarLIdx = tarHeaders.indexOf("LTC_Code");
-  
+
   // 準備更新後的資料列
   const updatedLTCColumn = tarData.map((row) => {
     const custN = row[tarCIdx];
     let existingCodes = row[tarLIdx]
-    ? String(row[tarLIdx])
-    .split(",")
-    .map((s) => s.trim())
-    : [];
-    
+      ? String(row[tarLIdx])
+        .split(",")
+        .map((s) => s.trim())
+      : [];
+
     // console.log(`客戶 ${custN} 的 LTC_Code 更新: ${existingCodes.join(", ")}`);
     if (combinedData.has(custN)) {
       const newIds = combinedData.get(custN);
-      
+
       // 合併舊有與新取得的 SR_ID
       newIds.forEach((id) => {
         if (!existingCodes.includes(id)) {
@@ -121,14 +121,14 @@ function UpdateCustLTCCode(srcSheet, tarSheet) {
     }
     return [row[tarLIdx]]; // 若無匹配則維持原狀
   });
-  
+
   // 4. 批次寫回目標工作表的 LTC_Code 欄位
   if (updatedLTCColumn.length > 0) {
     tarSheet
-    .getRange(2, tarLIdx + 1, updatedLTCColumn.length, 1)
-    .setValues(updatedLTCColumn);
+      .getRange(2, tarLIdx + 1, updatedLTCColumn.length, 1)
+      .setValues(updatedLTCColumn);
   }
-  
+
   console.log("資料整合完成，總客戶數: " + combinedData.size);
   // console.log("更新完成！");
 }
@@ -161,62 +161,9 @@ function syncMasterTablePermissions() {
     if (email) managerEmails.push(email.toString().trim().toLowerCase());
   }
 
-  var targetFileIds = [{ Name: "SYCompany", UrlID: MainSpreadsheet.getId() }]; // 包含 SYCompany 本身
-  targetFileIds.push({Name: "SYTemp",UrlID: getTargetsheet("SYTemp", "SYTemp").id }); // 包含 SYTemp
-  var recUrlSheet = MainSpreadsheet.getSheetByName("RecUrl"); // 取得 RecUrl 工作表
-  if (recUrlSheet) {
-    var urlData = recUrlSheet.getDataRange().getValues();
-    for (var j = 1; j < urlData.length; j++) {
-      var name = urlData[j][0];
-      var url = urlData[j][1];
-      if (url && url.indexOf("docs.google.com") !== -1) {
-        try {
-          targetFileIds.push({
-            Name: name,
-            UrlID: SpreadsheetApp.openByUrl(url).getId(),
-          });
-        } catch (e) {
-          console.error(
-            "無法開啟試算表 " +
-              name +
-              "，網址: " +
-              url +
-              "，錯誤: " +
-              e.message,
-          );
-        }
-      }
-    }
-  }
-
-  var recUrlSheet = MainSpreadsheet.getSheetByName("ReportsUrl"); // 取得 ReportsUrl  工作表
-  if (recUrlSheet) {
-    var urlData = recUrlSheet.getDataRange().getValues();
-    for (var j = 1; j < urlData.length; j++) {
-      var name = urlData[j][0];
-      var url = urlData[j][1];
-      if (url && url.indexOf("docs.google.com") !== -1) {
-        try {
-          targetFileIds.push({
-            Name: name,
-            UrlID: SpreadsheetApp.openByUrl(url).getId(),
-          });
-        } catch (e) {
-          console.error(
-            "無法開啟試算表 " +
-              name +
-              "，網址: " +
-              url +
-              "，錯誤: " +
-              e.message,
-          );
-        }
-      }
-    }
-  }
-
-  // console.log("開始同步權限至 " + targetFileIds.length + " 個試算表");
-  // console.log("管理員名單: " + managerEmails.join(", "));
+  var RootFolder = getTargetDir("FloderUrl", "SYCompany");
+  var targetFileIds = [{ Name: "SYCompany", UrlID: RootFolder.id }]; // 包含 SYCompany 本身
+  targetFileIds.push({ Name: "SYTemp", UrlID: getTargetsheet("SYTemp", "SYTemp").id }); // 包含 SYTemp
 
   targetFileIds.forEach(function (item) {
     var fileId = item.UrlID;
@@ -329,7 +276,7 @@ function processUserSync(mainSS, tempSS) {
   const mainIndexMap = {};
   for (let i = 1; i < mainData.length; i++) {
     let userName = mainData[i][mainColMap["User_N"]].toString().trim();
-    if (userName) mainIndexMap[userName] = i; 
+    if (userName) mainIndexMap[userName] = i;
   }
 
   const newRowsToAppend = [];
@@ -345,7 +292,7 @@ function processUserSync(mainSS, tempSS) {
     if (mainIndexMap.hasOwnProperty(tempUserName)) {
       // --- 狀況 A: User_N 已存在 -> 更新資料 ---
       const mainRowIdx = mainIndexMap[tempUserName];
-      
+
       // 更新這三個指定欄位
       targetFields.forEach(field => {
         const mIdx = mainColMap[field];

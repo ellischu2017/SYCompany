@@ -237,7 +237,7 @@
       $('#queryDate').val(today);
 
       console.log("舒漾長照系統 - SR_server 頁面載入完成");
-      
+
       // 2. 初始化頁面資料
       initPage();
 
@@ -260,7 +260,7 @@
      */
     function initPage() {
       $('#loadingSpin').css('display', 'flex');
-      
+
       google.script.run
         .withSuccessHandler(function (data) {
           // 儲存至全域變數 (前端 Session)
@@ -271,18 +271,18 @@
           // 填充居服員下拉選單
           const $userN = $('#queryUserN').empty().append('<option value="" disabled selected>請選擇居服員</option>');
           GLOBAL_DATA.users.forEach(u => {
-             $userN.append(new Option(u.name, u.name));
+            $userN.append(new Option(u.name, u.name));
           });
-          
+
           // 初始化其他下拉選單
           $('#queryCustN').empty().append('<option value="" selected>請先選擇居服員</option>');
           $('#querySrId').empty().append('<option value="" selected>請先選擇個案</option>');
 
           $('#loadingSpin').hide();
         })
-        .withFailureHandler(function(err){
-           $('#loadingSpin').hide();
-           Swal.fire("系統錯誤", "初始化資料失敗: " + err.message, "error");
+        .withFailureHandler(function (err) {
+          $('#loadingSpin').hide();
+          Swal.fire("系統錯誤", "初始化資料失敗: " + err.message, "error");
         })
         .getSRServerInitData();
     }
@@ -291,21 +291,21 @@
      * 處理居服員變更邏輯 (需求 4 & 5)
      */
     function handleUserChange(userName) {
-      if(!userName) return;
+      if (!userName) return;
 
       // 1. 找出該 User 的資料
       const userObj = GLOBAL_DATA.users.find(u => u.name === userName);
-      if(!userObj) return;
+      if (!userObj) return;
 
       // 需求 4: 填入 Email
       $('#queryUserEmail').val(userObj.email || "");
 
       // 需求 5: 處理個案清單 (Cust_N)
       const $custSelect = $('#queryCustN').empty().append('<option value="" disabled selected>請選擇個案</option>');
-      
+
       // A. 優先名單：來自 User > Cust_N
       let priorityCusts = [];
-      if(userObj.custStr) {
+      if (userObj.custStr) {
         priorityCusts = userObj.custStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
 
@@ -315,13 +315,13 @@
 
       // C. 依序填入
       priorityCusts.forEach(c => $custSelect.append(new Option(c, c)));
-      
-      if(priorityCusts.length > 0 && otherCusts.length > 0) {
-         $custSelect.append('<option disabled>──────────</option>');
+
+      if (priorityCusts.length > 0 && otherCusts.length > 0) {
+        $custSelect.append('<option disabled>──────────</option>');
       }
 
       otherCusts.forEach(c => $custSelect.append(new Option(c, c)));
-      
+
       // 重置下一級 SR_ID
       $('#querySrId').empty().append('<option value="" selected>請先選擇個案</option>');
     }
@@ -330,16 +330,16 @@
      * 處理個案變更邏輯 (需求 6)
      */
     function handleCustChange(custName) {
-      if(!custName || custName.includes("──")) return; // 避免選到分隔線
+      if (!custName || custName.includes("──")) return; // 避免選到分隔線
 
       const $srSelect = $('#querySrId').empty().append('<option value="" disabled selected>請選擇服務編碼</option>');
-      
+
       // 1. 找出該 Cust 的資料
       const custObj = GLOBAL_DATA.custs.find(c => c.name === custName);
-      
+
       // A. 優先代碼：來自 Cust > LTC_Code
       let priorityCodes = [];
-      if(custObj && custObj.ltcStr) {
+      if (custObj && custObj.ltcStr) {
         priorityCodes = custObj.ltcStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
 
@@ -350,15 +350,15 @@
 
       // C. 依序填入
       favorCodes.forEach(srcode => {
-         $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
+        $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
       });
 
-      if(priorityCodes.length > 0 && otherCodes.length > 0) {
-         $srSelect.append('<option disabled>──────────</option>');
+      if (priorityCodes.length > 0 && otherCodes.length > 0) {
+        $srSelect.append('<option disabled>──────────</option>');
       }
 
       otherCodes.forEach(srcode => {
-         $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
+        $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
       });
 
     }
@@ -366,7 +366,7 @@
 
     /**
      * 驗證查詢欄位
-     */    
+     */
     function validateQuery() {
       const date = $('#queryDate').val();
       const SRTimes = $('#querySRTimes').val();
@@ -401,7 +401,7 @@
             if (res.success) {
               fillQueryLabel(formObj);
               fillDetail(res.data);
-              $("#inputSrRec").focus(); 
+              $("#inputSrRec").focus();
               $('#btnUpdate').show();
               $('#btnDelete').show(); // 顯示刪除按鈕
               $('#btnAdd').hide();
@@ -419,7 +419,7 @@
                 if (res.isConfirmed) {
                   fillQueryLabel(formObj);
                   clearDetail();
-                  $("#inputSrRec").val("").focus();
+                  setTimeout(function () { $("#inputSrRec").val("").focus(); }, 50);
                   $('#btnAdd').show();
                   $('#btnDelete').hide();
                   $('#btnUpdate').hide();
@@ -509,7 +509,7 @@
     }
 
     // --- 剪貼簿與 UI 工具函數 (保持原樣) ---
-    
+
     async function handleClipboard(action, targetId) {
       const $el = $(targetId);
       const text = $el.val();
@@ -518,7 +518,7 @@
         if (action === 'cut') {
           if (!text) return showToast('info', '沒有內容可以剪下');
           await navigator.clipboard.writeText(text);
-          $el.val(""); 
+          $el.val("");
           showToast('success', '已剪下');
 
         } else if (action === 'copy') {

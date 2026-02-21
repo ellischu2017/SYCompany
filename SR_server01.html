@@ -130,7 +130,7 @@
         <div class="col-md-6 mb-3">
           <label class="form-label">服務編碼 (SR_ID)</label>
           <select class="form-select" id="querySrId">
-             <option value="" disabled selected>請先選擇個案...</option>
+            <option value="" disabled selected>請先選擇個案...</option>
           </select>
         </div>
       </div>
@@ -220,13 +220,13 @@
       users: [],      // SYCompany > User + SYTemp > User
       custs: [],      // SYCompany > Cust
       ltcCodes: [],   // SYCompany > LTC_Code
-      currentUser: null, 
-      isNewBinding: false 
+      currentUser: null,
+      isNewBinding: false
     };
 
     $(document).ready(function () {
       $('#loadingSpin').css('display', 'flex').show();
-      
+
       // --- 需求 8：日期前後只能 7 天 ---
       const today = new Date();
       const formatDate = (date) => {
@@ -253,7 +253,7 @@
         .getSRServer01InitData();
 
       // --- 綁定事件監聽 ---
-      $("#queryUserN").change(function(){
+      $("#queryUserN").change(function () {
         const selectedUserName = $(this).val();
         updateCustSelect(selectedUserName);
       });
@@ -269,27 +269,27 @@
         }
       });
 
-      $("#queryCustNOther").change(function(){
-         updateSrIdSelect($(this).val());
+      $("#queryCustNOther").change(function () {
+        updateSrIdSelect($(this).val());
       });
     });
 
     // --- 初始化成功回調 ---
     function initSuccess(data) {
       $("#loadingSpin").hide();
-      
+
       GLOBAL_DATA.users = data.users;
       GLOBAL_DATA.custs = data.custs;
       GLOBAL_DATA.ltcCodes = data.ltcCodes;
-      
+
       $("#currentUserEmail").val(data.email);
 
       // 需求 4：比對 Email
       const matchedUser = GLOBAL_DATA.users.find(u => u.email === data.email);
       const $userSelect = $("#queryUserN");
-      
+
       $userSelect.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
-      
+
       // 填入所有 User 到下拉選單 (這裡已包含從 Temp 更新過的名單)
       GLOBAL_DATA.users.forEach(u => {
         $userSelect.append(`<option value="${u.name}">${u.name}</option>`);
@@ -311,14 +311,14 @@
     function updateCustSelect(userName) {
       const $custSelect = $("#queryCustN");
       const $otherSelect = $("#queryCustNOther");
-      
+
       $custSelect.empty().append('<option value="" disabled selected>請選擇個案...</option>');
       $otherSelect.empty().append('<option value="" disabled selected>請選擇其他個案...</option>');
       $("#querySrId").empty().append('<option value="" disabled selected>請先選擇個案...</option>');
 
       const userObj = GLOBAL_DATA.users.find(u => u.name === userName);
       let favCusts = [];
-      
+
       if (userObj && userObj.favCustStr) {
         favCusts = userObj.favCustStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
@@ -330,7 +330,7 @@
 
       const allCustNames = GLOBAL_DATA.custs.map(c => c.name);
       const otherCusts = allCustNames.filter(name => !favCusts.includes(name)).sort();
-      
+
       otherCusts.forEach(c => {
         $otherSelect.append(`<option value="${c}">${c}</option>`);
       });
@@ -338,14 +338,14 @@
 
     // --- 需求 6：更新 SR_ID 選單 ---
     function updateSrIdSelect(custName) {
-      if(!custName) return;
-      
+      if (!custName) return;
+
       const $srSelect = $("#querySrId");
       $srSelect.empty().append('<option value="" disabled selected>請選擇服務編碼...</option>');
 
       const custObj = GLOBAL_DATA.custs.find(c => c.name === custName);
       let favCodes = [];
-      
+
       if (custObj && custObj.ltcCodeStr) {
         favCodes = custObj.ltcCodeStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
@@ -354,12 +354,12 @@
       const otherCodes = GLOBAL_DATA.ltcCodes.filter(srcode => !favCodes.includes(srcode.id)).sort();
 
       favCodesSet.forEach(srcode => {
-         $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
+        $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
       });
 
-      
-      if(otherCodes.length > 0 && favCodes.length > 0) {
-         $srSelect.append('<option disabled>──────────</option>');
+
+      if (otherCodes.length > 0 && favCodes.length > 0) {
+        $srSelect.append('<option disabled>──────────</option>');
       }
 
       otherCodes.forEach(srcode => {
@@ -439,14 +439,14 @@
       google.script.run
         .withSuccessHandler(function (res) {
           $("#loadingSpin").hide();
-          
-          if(res.success && formObj.isNewBinding) {
-             GLOBAL_DATA.isNewBinding = false;
-             $("#queryUserN").prop("disabled", true);
-             let u = GLOBAL_DATA.users.find(u => u.name === formObj.userName);
-             if(u) {
-                u.email = formObj.email;
-             }
+
+          if (res.success && formObj.isNewBinding) {
+            GLOBAL_DATA.isNewBinding = false;
+            $("#queryUserN").prop("disabled", true);
+            let u = GLOBAL_DATA.users.find(u => u.name === formObj.userName);
+            if (u) {
+              u.email = formObj.email;
+            }
           }
 
           if (type === "query") {
@@ -469,7 +469,7 @@
               }).then((result) => {
                 if (result.isConfirmed) {
                   fillQueryLabel(formObj);
-                  $("#inputSrRec").val("").focus();
+                  setTimeout(function () { $("#inputSrRec").val("").focus(); }, 50);
                   $("#inputLoc").val(exSPCONS.loc || "清醒");
                   $("#inputMood").val(exSPCONS.mood || "穩定");
                   $("#inputSpcons").val(exSPCONS.spcons || "無");
@@ -481,7 +481,7 @@
               });
             }
           } else {
-             Swal.fire({
+            Swal.fire({
               icon: res.success ? "success" : "error",
               title: res.success ? "成功" : "失敗",
               text: res.message,
@@ -558,7 +558,7 @@
         google.script.run
           .withSuccessHandler(function (res) {
             if (res && res.data) {
-              resolve(res.data); 
+              resolve(res.data);
             } else {
               resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
             }
@@ -572,4 +572,5 @@
   </script>
 </body>
 <?!= includeFooter(); ?>
+
 </html>

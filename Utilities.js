@@ -3,15 +3,32 @@
  * 提供通用的工具函式
  */
 
+// 注意：這個檔案主要放置與試算表操作、URL 解析、資料處理等相關的工具函式，與業務邏輯無關的部分都可以放在這裡，以保持程式碼的模組化和可維護性。
+// 例如：getTarget、getIdFromUrl、removeSRDuplicates、processLTCCodes 等函式都適合放在這裡。
+// 這樣的結構也方便未來如果需要拆分成多個檔案（如 Utilities.js、SpreadsheetUtils.js、DriveUtils.js 等）時，可以更清晰地管理不同類型的工具函式。
+// 注意：這裡的函式應該盡量保持純粹的工具性質，不應該直接操作 UI 或特定業務邏輯，這樣才能在不同的情境下重複使用。
+// 注意：如果有需要與前端 HTML 模板互動的函式（如 includeFooter、includeNav），也可以放在這裡，但要確保它們的職責僅限於生成 HTML 內容，不應該包含過多的業務邏輯。
+
+// 目錄結構：
+// SYCompany : 主目錄
+// ├── LTCRecord : 主要電子表單
+// |   └── SYyyyy : 每年相關的電子記錄試算表
+// ├── RPyyyy : 每年相關的報表試算表
+// |   └── RPyyyyMM : 每月報表相關的試算表
+// ├── SYCompany.gexcel : 這個腳本綁定的試算表，包含 SYTemp、User、Cust 等工作表
+// ├── SYTemp : 存放臨時資料的工作表，包含 SYSuggest 等設定
+//
+
+
 // 全域試算表參考 SYCompany
 const MainSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
 /**
  * 測試用的 include 函數 (若未來需要拆分 CSS/JS 檔案時使用)
  */
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
+// function include(filename) {
+//   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+// }
 
 /**
  * 從試算表動態取得意見反應連結並生成 Footer HTML
@@ -57,10 +74,111 @@ function getScriptUrl() {
 }
 
 /**
- * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物件
+* 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物
+ * @param {*} sheetName SYCompany 中的工作表名稱 
+ * @param {*} targetName 試算表名稱（如 RecUrl 中的 SY202401）
+ * @returns {Object} 包含 url、id、Spreadsheet 物件的物件
+ * @throws {Error} 如果找不到對應的工作表或試算表，會丟出錯誤
  */
+function getTargetDir(sheetName, targetName) {
+  // console.log("嘗試取得目標資料夾，sheetName: " + sheetName + ", targetName: " + targetName);
+  var res = getTarget(sheetName, targetName);
+
+  if (!res && targetName.substring(0, 2) === "RP") {
+    var sheet = MainSpreadsheet.getSheetByName("FolderUrl");
+    var year = targetName.substring(2, 6);
+    var upfolderName = "RP" + year;
+    var upfolder;
+    // var month = targetName.substring(6, 8);
+
+    if (targetName.length === 6) {
+      upfolder = getTargetDir("FolderUrl", "SYCompany").folder;
+    } else {
+      upfolder = getTargetDir("FolderUrl", upfolderName).folder; // RP 的上層資料夾
+    }
+    var folder = upfolder.createFolder(targetName);
+    res = folder.getUrl();
+    sheet.appendRow([targetName, res]);
+  }
+
+  var folderId = getIdFromUrl(res);
+
+  // 2. 檢查解析出來的 ID 是否有效
+  if (!folderId || typeof folderId !== 'string') {
+    throw new Error("無法從 URL 解析出有效的 ID: " + res);
+  }
+
+  try {
+    // 3. 建議直接用 getFolderById，除非你確定 Res 是檔案 ID
+    var folder = DriveApp.getFolderById(folderId);
+
+    return {
+      url: res,
+      id: folderId,
+      folder: folder,
+      folderName: folder.getName() // 順便測試是否真的抓到了
+    };
+  } catch (e) {
+    throw new Error("DriveApp 找不到該 ID 的資料夾，請檢查權限或 ID 是否正確。錯誤訊息: " + e.message);
+  }
+}
 
 function getTargetsheet(sheetName, targetName) {
+  var res = getTarget(sheetName, targetName);
+
+  if (!res && sheetName === "ReportsUrl") {
+    // 如果沒有，拷貝 Template
+    var templateFile = DriveApp.getFileById(getTargetsheet("ReportsUrl", "RPSample").id);
+    var destinationFolder = getTargetDir("FolderUrl", targetName).folder;
+    var newFile = templateFile.makeCopy(targetName, destinationFolder);
+    var sheet = MainSpreadsheet.getSheetByName("ReportsUrl");
+
+    res = newFile.getUrl();
+    // 把名稱及網址存到 SYCompany 的 ReportsUrl 工作表中
+    sheet.appendRow([targetName, res]);
+  }
+
+  if (!res && sheetName === "RecUrl") {
+    // 如果沒有，拷貝 Template
+    var templateFile = DriveApp.getFileById(getTargetsheet("RecUrl", "SYSample").id);
+    var destinationFolder = getTargetDir("FolderUrl", "LTCRecord").folder;
+    var newFile = templateFile.makeCopy(targetName, destinationFolder);
+    var sheet = MainSpreadsheet.getSheetByName("RecUrl");
+
+    res = newFile.getUrl();
+    // 把名稱及網址存到 SYCompany 的 RecUrl 工作表中
+    sheet.appendRow([targetName, res]);
+  }
+
+  if (!res) {
+    console.log(
+      "無法在" + sheetName + "工作表中找到名稱為" + targetName + "的對應網址",
+    );
+    return url;
+  }
+
+  var fileId = getIdFromUrl(res);
+  if (!fileId || typeof fileId !== 'string') {
+    throw new Error("無法從 URL 解析出有效的 ID: " + res);
+  }
+  var file = DriveApp.getFileById(fileId);
+  var spreadsheet = SpreadsheetApp.open(file);
+  return {
+    url: res,
+    id: fileId,
+    Spreadsheet: spreadsheet
+  };
+}
+
+
+/**
+ * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物件
+ * @param {string} sheetName SYCompany 中的工作表名稱
+ * @param {string} targetName 試算表名稱（如 RecUrl 中的 SY202401）
+ * @returns {string} 試算表的 URL
+ * @throws {Error} 如果找不到對應的工作表或試算表，會丟出錯誤
+ */
+function getTarget(sheetName, targetName) {
   var sheet = MainSpreadsheet.getSheetByName(sheetName);
   if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName + "工作表");
 
@@ -73,57 +191,39 @@ function getTargetsheet(sheetName, targetName) {
       break;
     }
   }
+  // console.log("取得試算表網址: " + url);
+  return url;
+}
 
-  if (!url) {
-    if (sheetName === "ReportsUrl") {
-      var year = targetName.substring(2, 6);
-      var month = targetName.substring(6, 8);
+function setTargetUrl(sheetName, targetName, url) {
+  var sheet = MainSpreadsheet.getSheetByName(sheetName);
+  if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName + "工作表");
+  var data = sheet.getDataRange().getValues();// 讀取整個資料範圍，包含標題列
+  var found = false;
 
-      // 如果沒有，拷貝 Template
-      // 尋找 Template URL
-      var tempUrl = "";
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][0] === "RPTemplate") {
-          tempUrl = data[i][1];
-          break;
-        }
-      }
-      if (!tempUrl) throw new Error("找不到 RPTemplate");
-
-      var templateFile = DriveApp.getFileById(getIdFromUrl(tempUrl));
-      var folderName = "RP" + year;
-      var folders = DriveApp.getfoldersByName(folderName);
-      var destinationFolder;
-      if (folders.hasNext()) {
-        destinationFolder = folders.next();
-      } else {
-        destinationFolder = DriveApp.createFolder(folderName);
-      }
-      var newFile = templateFile.makeCopy(targetName, destinationFolder);
-      url = newFile.getUrl();
-
-      // 把名稱及網址存到 ss4
-      sheet.appendRow([targetName, url]);
-    } else {
-      console.log(
-        "無法在" + sheetName + "工作表中找到名稱為" + targetName + "的對應網址",
-      );
-      return url;
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === targetName) {
+      data[i][1] = url;
+      found = true;
+      break;
     }
   }
-  return {
-    url: url,
-    id: getIdFromUrl(url),
-    Spreadsheet: SpreadsheetApp.openByUrl(url),
-  };
-}
+  // 如果沒找到，就新增一列
+  if (!found) {
+    data.push([targetName, url]);
+  }
+  // 寫回整個資料範圍，包含標題列
+  sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+  //以第一欄排序
+  sheet.getRange(2, 1, data.length - 1, data[0].length).sort({ column: 1, ascending: true });
+} 
 
-function removeSR() {
-  const ssSYTemp = getTargetsheet("RecUrl", "SY2026").Spreadsheet;
-  const sSRData = ssSYTemp.getSheetByName("202601");
-  removeSRDuplicates(sSRData);
-}
 
+/**
+ * 清除 SR_Data 工作表中的重複資料，根據 Date、SRTimes、CUST_N、USER_N、SR_ID 這幾個欄位的組合來判斷是否重複
+ * @param {*} sheet 
+ * @returns 
+ */
 function removeSRDuplicates(sheet) {
   // const ss = SpreadsheetApp.getActiveSpreadsheet();
   // const sheet = ss.getSheetByName("SR_Data");
@@ -177,24 +277,33 @@ function isNearTimeout() {
   return new Date().getTime() - startTime > 20 * 1000;
 }
 
-/** 儲存/讀取進度 (PropertiesService 會存在雲端專案屬性中) */
-function saveProgress(data) {
+/** 儲存/讀取進度 (PropertiesService 會存在雲端專案屬性中)
+ * @param {Object} data 進度物件，會被序列化成 JSON 字串存儲
+ */
+function saveProgress(propname,data) {
   PropertiesService.getScriptProperties().setProperty(
-    "REPORT_JOB",
+    propname,
     JSON.stringify(data),
   );
 }
 
-function getProgress() {
-  var p = PropertiesService.getScriptProperties().getProperty("REPORT_JOB");
+/**
+ * 讀取進度
+ * @ returns {Object|null} 進度物件，如果沒有則回傳 null * 
+ */
+function getProgress(propname) {
+  var p = PropertiesService.getScriptProperties().getProperty(propname);
   return p ? JSON.parse(p) : null;
 }
 
-function clearProgress() {
-  PropertiesService.getScriptProperties().deleteProperty("REPORT_JOB");
+/** 移除進度 */
+function clearProgress(propname) {
+  PropertiesService.getScriptProperties().deleteProperty(propname);
 }
+
 /**
  * 將工作表依照名稱反向排序 (選用)
+ * @param {*} ss spreadsheet 物件
  */
 function sortSheetsDesc(ss) {
   var sheets = ss.getSheets();
@@ -209,6 +318,7 @@ function sortSheetsDesc(ss) {
 
 /**
  * 將試算表分頁依名稱升冪排序 (A -> Z, 0 -> 9)
+ * @param {*} ss spreadsheet 物件 
  */
 function sortSheetsAsc(ss) {
   var sheets = ss.getSheets();
@@ -227,6 +337,9 @@ function sortSheetsAsc(ss) {
 
 /**
  * 尋找欄位索引（不分大小寫與底線）
+ * @param {Array} headers 欄位名稱陣列
+ * @param {string} name 欄位名稱
+ * @return {number} 欄位索引，找不到則回傳 -1 
  */
 function getColIndex(headers, name) {
   var idx = headers.indexOf(name);
@@ -253,8 +366,12 @@ function getColIndex(headers, name) {
  * @return {string} 試算表 ID
  */
 function getIdFromUrl(url) {
-  var match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-  return match ? match[1] : null;
+  var id = "";
+  var parts = url.match(/[-\w]{25,}(?!.*[-\w]{25,})/);
+  if (parts) {
+    id = parts[0];
+  }
+  return id;
 }
 
 /**
@@ -313,6 +430,11 @@ function processLTCCodes() {
     }
   }
 }
+
+/**
+ * 
+ * @returns 
+ */
 
 function UpdateUserName() {
   const now = new Date();

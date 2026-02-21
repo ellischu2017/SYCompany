@@ -64,7 +64,7 @@ function genreport(yearmonth, custn, regen) {
   }
 
   // --- 批次處理邏輯 (支援續傳) ---
-  var progress = getProgress();
+  var progress = getProgress("REPORT_JOB");
   var currentIndex = 0;
   var allCusts = [];
 
@@ -90,7 +90,7 @@ function genreport(yearmonth, custn, regen) {
   for (var i = currentIndex; i < allCusts.length; i++) {
     // 檢查是否快要超時
     if (isNearTimeout()) {
-      saveProgress({
+      saveProgress("REPORT_JOB", {
         yearmonth: yearmonth,
         allCusts: allCusts,
         currentIndex: i,
@@ -114,13 +114,13 @@ function genreport(yearmonth, custn, regen) {
         custBase.info[name],
         year,
         month,
-        false,
+        regen,
       );
     }
   }
 
   // 全部完成
-  clearProgress();
+  clearProgress("REPORT_JOB");
   sortSheetsDesc(ssReportFile); // 選用：完成後將工作表依名稱反向排序
   return {
     status: "complete",
@@ -146,7 +146,7 @@ function processSingleReport(
   var sheet = ssFile.getSheetByName(custn);
 
   // 檢查是否跳過
-  if (sheet && sheet.getLastRow() >= 6 && !regen) {
+  if (sheet && sheet.getLastRow() >= 7 && !regen) {
     return ssFile.getUrl() + "#gid=" + sheet.getSheetId();
   }
 
@@ -209,7 +209,7 @@ function processSingleReport(
     });
 
     // 批次寫入所有數據 (關鍵優化！)
-    var writeRange = sheet.getRange(6, 1, finalValues.length, 7);
+    var writeRange = sheet.getRange(7, 1, finalValues.length, 7);
     writeRange
       .setValues(finalValues)
       .setFontSize(10)
@@ -227,19 +227,275 @@ function processSingleReport(
   return ssFile.getUrl() + "#gid=" + sheet.getSheetId();
 }
 
-function genPdfFile(yearmonth, custn, regen) {
+async function genPdfFile(yearmonth, custn, regen) {
   var year = yearmonth.substring(0, 4);
   var month = yearmonth.substring(4, 6);
+  const ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
   if (custn !== "all") {
-    //
+    // 取得該個案的Pdf Url 
+    var pdfUrl = getTarget("PdfUrl", "PDF" + yearmonth + "_" + custn);
+    if (pdfUrl && !regen) {
+      return pdfUrl;
+    } else {
+      // 呼叫 genreport 生成報表，這裡可以直接呼叫 processSingleReport 以避免重複讀取資料，但為了保持邏輯清晰，我們先呼叫 genreport 
+      var res = genreport(yearmonth, custn, regen);
+      if (res.status === "complete" && !res.url) {
+        // 代表該個案無資料，無法生成報表，因此也無法生成 PDF
+        return {
+          status: "complete",
+          message: "該個案此月份無紀錄。",
+          btntext: "返回",
+          currentIndex: 1,
+          total: 1,
+        };
+      } else if (res.status === "complete" && res.url) {
+        //2. 生成 PDF
+        var pdfUrl = await processSinglePdf(yearmonth, custn, regen);
+        return {
+          status: "complete",
+          currentIndex: 1,
+          total: 1,
+          message: "個案 " + custn + " 報表處理完成！",
+          btntext: "查看報表",
+          url: pdfUrl,
+        };
+      }
+    }
+  }
+  
+  // --- 批次處理邏輯 (支援續傳) ---
+  var progress = getProgress("PDF_JOB");
+  var currentIndex = 0;
+  var allCusts = [];
+  
+  // 如果是第一次執行或月份變了，就初始化
+  if (!progress || progress.yearmonth !== yearmonth) {
+    // get all sheets except Template (優化效能，避免在迴圈裡重複呼叫 getSheetByName)
+    var allSheets = ssReportFile.getSheets();
+    var allSheetNames = [];
+    for (var i = 0; i < allSheets.length; i++) {
+      allSheetNames.push(allSheets[i].getName());
+    }
+    allSheetNames.splice(allSheetNames.indexOf("Template"), 1);
+    Logger.log("所有個案工作表名稱: " + allSheetNames.join(", ") + "，總數: " + allSheetNames.length + "個");
+    allCusts = allSheetNames;
+    currentIndex = 0;
+    clearProgress("PDF_JOB");
+  } else {
+    allCusts = progress.allCusts;
+    currentIndex = progress.currentIndex;
+  }
+  
+  // 預讀資料 (優化效能)
+  // var year = yearmonth.substring(0, 4);
+  // var month = yearmonth.substring(4, 6);
+  var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
+  for (var i = currentIndex; i < allCusts.length; i++) {
+    // 檢查是否快要超時
+    if (isNearTimeout()) {
+      saveProgress("PDF_JOB", {
+        yearmonth: yearmonth,
+        allCusts: allCusts,
+        currentIndex: i,
+      });
+      return {
+        status: "continue",
+        message:
+          "已處理 " + i + " / " + allCusts.length + " 個個案，正在續傳...",
+        currentIndex: i,
+        total: allCusts.length,
+      };
+    }
+
+    var name = allCusts[i];
+    if (allDataMap[name]) {
+      var pdfUrl = getTarget("PdfUrl", "PDF" + yearmonth + "_" + name);
+      if (pdfUrl && !regen) {
+        continue;
+      } else {
+        // 呼叫 genreport 生成報表
+        var res = genreport(yearmonth, name, regen);
+        if (res.status === "complete" && !res.url) {
+          // 代表該個案無資料，無法生成報表，因此也無法生成 PDF
+          continue;
+        } else if (res.status === "complete" && res.url) {
+          // 生成 PDF
+          await processSinglePdf(yearmonth, name, regen);
+        }
+      }
+    }
+  }
+  //把所有個案的 PDF 都生成完後，再把 PDF 資料夾裡的檔案合併成一個 PDF (選用，視需求而定)
+  var folder = getTargetDir("FolderUrl", "RP" + yearmonth).folder;
+  var mergedPdfUrl = null;
+  var pdfFiles = folder.getFoldersByName("PDF").hasNext() ? folder.getFoldersByName("PDF").next().getFiles() : null;
+  if (pdfFiles) {
+    var fileList = [];
+    while (pdfFiles.hasNext()) {
+      fileList.push(pdfFiles.next());
+    }
+    // 依檔名排序，確保合併順序正確
+    fileList.sort(function(a, b) { return a.getName().localeCompare(b.getName()); });
+    
+    var pdfIds = fileList.map(function(f) { return f.getId(); });
+
+    // 這裡可以呼叫一個合併 PDF 的函式，將 pdfUrls 中的 PDF 合併成一個檔案，並儲存到 Drive 中，最後回傳合併後 PDF 的網址
+    mergedPdfUrl = await mergePdfs(pdfIds, yearmonth);
+    // return { status: "complete", message: "全部個案處理完成！", btntext: "查看合併報表", url: mergedPdfUrl };
+  }
+  // 全部完成
+  clearProgress("PDF_JOB");
+  return {
+    status: "complete",
+    message: "全部個案處理完成！",
+    btntext: "查看報表",
+    url: mergedPdfUrl,
+  };
+
+}
+
+async function mergePdfs(pdfIds, yearmonth) {
+  // --- 1. 載入 pdf-lib 庫 (只載入一次) ---
+  var setTimeout = function(f, t) { Utilities.sleep(t || 0); return f(); };
+  var clearTimeout = function() {};
+  eval(fetchPdfLib());
+
+  // --- 2. 建立一個新的 PDF 文件作為合併容器 ---
+  const mergedPdfDoc = await PDFLib.PDFDocument.create();
+
+  // --- 3. 遍歷所有 PDF ID 進行合併 ---
+  for (const id of pdfIds) {
+    const pdfBytes = DriveApp.getFileById(id).getBlob().getBytes();
+    const uint8Array = new Uint8Array(pdfBytes);
+
+    // 載入來源 PDF
+    const pdfDoc = await PDFLib.PDFDocument.load(uint8Array);
+
+    // 複製所有頁面
+    const copiedPages = await mergedPdfDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
+
+    // 將複製的頁面加入合併文件
+    copiedPages.forEach((page) => mergedPdfDoc.addPage(page));
   }
 
+  // --- 4. 儲存合併後的 PDF ---
+  const mergedPdfBytes = await mergedPdfDoc.save();
+
+  // 上傳合併後的 PDF 到 Drive
+  var fileName = "PDF" + yearmonth + ".pdf";
+  var blob = Utilities.newBlob(mergedPdfBytes, "application/pdf", fileName);
+  var folder = getTargetDir("FolderUrl", "RP" + yearmonth).folder;
+
+  // 檢查是否已存在同名檔案，若有則刪除舊檔 (選用)
+  var existingFiles = folder.getFilesByName(fileName);
+  while (existingFiles.hasNext()) {
+    existingFiles.next().setTrashed(true);
+  }
+
+  var file = folder.createFile(blob);
+
+  // 儲存 PDF 的網址到 Properties 以供前端使用
+  setTargetUrl("PdfUrl", "PDF" + yearmonth, file.getUrl());
+
+  // 回傳檔案網址供後續使用
+  return file.getUrl();
 }
 
-function processSingleReport() {
+async function processSinglePdf(yearmonth, custn, regen) {
+  const ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
+  const sheet = ssReportFile.getSheetByName(custn);
+  //把工作表 匯出成暫存試算表
+  const ssId = ssReportFile.getId();
+  const sheetId = sheet.getSheetId();
+  const token = ScriptApp.getOAuthToken();
+  //匯出成PDF
+  // --- 1. 定義匯出 URL (含凍結列、頁碼、頁尾設定) ---
+  const url = "https://docs.google.com/spreadsheets/d/" + ssId + "/export?" +
+    "format=pdf&" +
+    "size=A4&" +
+    "portrait=false&" +     // 橫向
+    "fitw=true&" +          // 寬度符合頁面
+    "gridlines=false&" +    // 不顯示格線
+    "fzr=true&" +           // 重要：重複凍結列 (作為每一頁的頁首)
+    "top_margin=0.5&" + //邊界：窄  (預設是 0.75 英吋，A4 紙寬約 8.27 英吋，這裡設定為 0.5 英吋，實際內容寬度約 7.27 英吋)
+    "bottom_margin=0.5&" +
+    "left_margin=0.5&" +
+    "right_margin=0.5&" +
+    "pagenumbers=false&" +  // 不顯示頁碼
+    "printtitle=false&" +   // 不顯示標題列
+    "pagenum=CENTER&" +     // 頁碼置中 (雙面列印最保險的位置)
+    "sheetnames=false&" +    // 不顯示工作表名稱
+    "gid=" + sheetId;
 
 
+  // --- 2. 抓取 PDF 原始內容 ---
+  const response = UrlFetchApp.fetch(url, {
+    headers: { 'Authorization': 'Bearer ' + token },
+    muteHttpExceptions: true
+  });
+
+  if (response.getResponseCode() !== 200) {
+    throw new Error("PDF Export Failed (" + response.getResponseCode() + "): " + response.getContentText());
+  }
+
+  const pdfBytes = response.getContent();
+  // 轉換成 Uint8Array 以供 pdf-lib 使用
+  const uint8Array = new Uint8Array(pdfBytes);
+
+  // --- 3. 載入 pdf-lib 庫 ---
+  var setTimeout = function(f, t) { Utilities.sleep(t || 0); return f(); };
+  var clearTimeout = function() {};
+  eval(fetchPdfLib());
+
+  // --- 4. 解析 PDF 並檢查頁數 ---
+  const pdfDoc = await PDFLib.PDFDocument.load(uint8Array);
+  const pageCount = pdfDoc.getPageCount();
+  Logger.log("原始頁數: " + pageCount);
+
+  // --- 5. 若為奇數頁，則補上一張空白頁 ---
+  if (pageCount % 2 !== 0) {
+    Logger.log("偵測到奇數頁，正在加入空白頁以符合雙面列印需求...");
+
+    // 取得最後一頁的大小，建立相同大小的空白頁
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    const { width, height } = lastPage.getSize();
+
+    pdfDoc.addPage([width, height]);
+
+    // (選填) 你可以在空白頁上加一行字，防止別人以為是漏印
+    // const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    // pdfDoc.getPages()[pageCount].drawText('Blank Page for Duplex Printing', { x: 50, y: 50, size: 10, font: font });
+  } else {
+    Logger.log("頁數已是偶數，無需補頁。");
+  }
+
+  // --- 6. 儲存最終 PDF ---
+  const finalPdfBytes = await pdfDoc.save();
+  const fileName = "PDF" + yearmonth + "_" + custn + ".pdf";
+  const blob = Utilities.newBlob(finalPdfBytes, "application/pdf", fileName);
+
+  // 移動到指定資料夾 (選用)
+  var folder = getTargetDir("FolderUrl", "RP" + yearmonth).folder;
+  // 檢查folder 是否已經有 PDF 子資料夾
+  var pdfFolder = null;
+  var folders = folder.getFoldersByName("PDF");
+  if (folders.hasNext()) {
+    pdfFolder = folders.next();
+  } else {
+    pdfFolder = folder.createFolder("PDF");
+  }
+  const file = DriveApp.createFile(blob);
+  pdfFolder.addFile(file);
+  folder.removeFile(file); // 從根目錄移除，避免混亂
+  // 儲存 PDF 的網址到 Properties 以供前端使用
+  setTargetUrl("PdfUrl", "PDF" + yearmonth + "_" + custn, file.getUrl());
+
+  // 回傳檔案網址供後續使用
+  return file.getUrl();
 }
+
+
 /**
  * 預先讀取所有資料並分類 (Map: Name -> Rows[])
  */
@@ -538,7 +794,10 @@ function formatDate(dateObj) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy/MM/dd");
 }
 
-
-
-
-
+var _pdfLibCache = null;
+function fetchPdfLib() {
+  if (!_pdfLibCache) {
+    _pdfLibCache = UrlFetchApp.fetch("https://unpkg.com/pdf-lib/dist/pdf-lib.min.js").getContentText();
+  }
+  return _pdfLibCache;
+}
