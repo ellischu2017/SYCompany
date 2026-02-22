@@ -231,15 +231,22 @@ async function genPdfFile(yearmonth, custn, regen) {
   var year = yearmonth.substring(0, 4);
   var month = yearmonth.substring(4, 6);
   const ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
+  // get all sheets except Template (優化效能，避免在迴圈裡重複呼叫 getSheetByName)
+  var allSheets = ssReportFile.getSheets();
+  var allSheetNames = [];
+  for (var i = 0; i < allSheets.length; i++) {
+    allSheetNames.push(allSheets[i].getName());
+  }
+  allSheetNames.splice(allSheetNames.indexOf("Template"), 1);
+  //Logger.log("所有個案工作表名稱: " + allSheetNames.join(", ") + "，總數: " + allSheetNames.length + "個");
   if (custn !== "all") {
     // 取得該個案的Pdf Url 
-    var pdfUrl = getTarget("PdfUrl", "PDF" + yearmonth + "_" + custn);
+    var pdfUrl = getTarget("PdfUrl", "PD" + yearmonth + "_" + custn);
     if (pdfUrl && !regen) {
       return pdfUrl;
     } else {
       // 呼叫 genreport 生成報表，這裡可以直接呼叫 processSingleReport 以避免重複讀取資料，但為了保持邏輯清晰，我們先呼叫 genreport 
-      var res = genreport(yearmonth, custn, regen);
-      if (res.status === "complete" && !res.url) {
+      if (!allSheetNames.includes(custn)) {
         // 代表該個案無資料，無法生成報表，因此也無法生成 PDF
         return {
           status: "complete",
@@ -248,7 +255,7 @@ async function genPdfFile(yearmonth, custn, regen) {
           currentIndex: 1,
           total: 1,
         };
-      } else if (res.status === "complete" && res.url) {
+      } else {
         //2. 生成 PDF
         var pdfUrl = await processSinglePdf(yearmonth, custn, regen);
         return {
@@ -262,22 +269,15 @@ async function genPdfFile(yearmonth, custn, regen) {
       }
     }
   }
-  
+
   // --- 批次處理邏輯 (支援續傳) ---
   var progress = getProgress("PDF_JOB");
   var currentIndex = 0;
   var allCusts = [];
-  
+
   // 如果是第一次執行或月份變了，就初始化
   if (!progress || progress.yearmonth !== yearmonth) {
-    // get all sheets except Template (優化效能，避免在迴圈裡重複呼叫 getSheetByName)
-    var allSheets = ssReportFile.getSheets();
-    var allSheetNames = [];
-    for (var i = 0; i < allSheets.length; i++) {
-      allSheetNames.push(allSheets[i].getName());
-    }
-    allSheetNames.splice(allSheetNames.indexOf("Template"), 1);
-    Logger.log("所有個案工作表名稱: " + allSheetNames.join(", ") + "，總數: " + allSheetNames.length + "個");
+
     allCusts = allSheetNames;
     currentIndex = 0;
     clearProgress("PDF_JOB");
@@ -285,7 +285,7 @@ async function genPdfFile(yearmonth, custn, regen) {
     allCusts = progress.allCusts;
     currentIndex = progress.currentIndex;
   }
-  
+
   // 預讀資料 (優化效能)
   // var year = yearmonth.substring(0, 4);
   // var month = yearmonth.substring(4, 6);
@@ -308,22 +308,14 @@ async function genPdfFile(yearmonth, custn, regen) {
     }
 
     var name = allCusts[i];
-    if (allDataMap[name]) {
-      var pdfUrl = getTarget("PdfUrl", "PDF" + yearmonth + "_" + name);
-      if (pdfUrl && !regen) {
-        continue;
-      } else {
-        // 呼叫 genreport 生成報表
-        var res = genreport(yearmonth, name, regen);
-        if (res.status === "complete" && !res.url) {
-          // 代表該個案無資料，無法生成報表，因此也無法生成 PDF
-          continue;
-        } else if (res.status === "complete" && res.url) {
-          // 生成 PDF
-          await processSinglePdf(yearmonth, name, regen);
-        }
-      }
+    var pdfUrl = getTarget("PdfUrl", "PD" + yearmonth + "_" + name);
+    if (pdfUrl && !regen) {
+      continue;
+    } else {
+      // 生成 PDF
+      await processSinglePdf(yearmonth, name, regen);
     }
+
   }
   //把所有個案的 PDF 都生成完後，再把 PDF 資料夾裡的檔案合併成一個 PDF (選用，視需求而定)
   var folder = getTargetDir("FolderUrl", "RP" + yearmonth).folder;
@@ -335,9 +327,9 @@ async function genPdfFile(yearmonth, custn, regen) {
       fileList.push(pdfFiles.next());
     }
     // 依檔名排序，確保合併順序正確
-    fileList.sort(function(a, b) { return a.getName().localeCompare(b.getName()); });
-    
-    var pdfIds = fileList.map(function(f) { return f.getId(); });
+    fileList.sort(function (a, b) { return a.getName().localeCompare(b.getName()); });
+
+    var pdfIds = fileList.map(function (f) { return f.getId(); });
 
     // 這裡可以呼叫一個合併 PDF 的函式，將 pdfUrls 中的 PDF 合併成一個檔案，並儲存到 Drive 中，最後回傳合併後 PDF 的網址
     mergedPdfUrl = await mergePdfs(pdfIds, yearmonth);
@@ -356,8 +348,8 @@ async function genPdfFile(yearmonth, custn, regen) {
 
 async function mergePdfs(pdfIds, yearmonth) {
   // --- 1. 載入 pdf-lib 庫 (只載入一次) ---
-  var setTimeout = function(f, t) { Utilities.sleep(t || 0); return f(); };
-  var clearTimeout = function() {};
+  var setTimeout = function (f, t) { Utilities.sleep(t || 0); return f(); };
+  var clearTimeout = function () { };
   eval(fetchPdfLib());
 
   // --- 2. 建立一個新的 PDF 文件作為合併容器 ---
@@ -382,7 +374,7 @@ async function mergePdfs(pdfIds, yearmonth) {
   const mergedPdfBytes = await mergedPdfDoc.save();
 
   // 上傳合併後的 PDF 到 Drive
-  var fileName = "PDF" + yearmonth + ".pdf";
+  var fileName = "PD" + yearmonth + ".pdf";
   var blob = Utilities.newBlob(mergedPdfBytes, "application/pdf", fileName);
   var folder = getTargetDir("FolderUrl", "RP" + yearmonth).folder;
 
@@ -395,7 +387,7 @@ async function mergePdfs(pdfIds, yearmonth) {
   var file = folder.createFile(blob);
 
   // 儲存 PDF 的網址到 Properties 以供前端使用
-  setTargetUrl("PdfUrl", "PDF" + yearmonth, file.getUrl());
+  setTargetUrl("PdfUrl", "PD" + yearmonth, file.getUrl());
 
   // 回傳檔案網址供後續使用
   return file.getUrl();
@@ -443,8 +435,8 @@ async function processSinglePdf(yearmonth, custn, regen) {
   const uint8Array = new Uint8Array(pdfBytes);
 
   // --- 3. 載入 pdf-lib 庫 ---
-  var setTimeout = function(f, t) { Utilities.sleep(t || 0); return f(); };
-  var clearTimeout = function() {};
+  var setTimeout = function (f, t) { Utilities.sleep(t || 0); return f(); };
+  var clearTimeout = function () { };
   eval(fetchPdfLib());
 
   // --- 4. 解析 PDF 並檢查頁數 ---
@@ -472,7 +464,7 @@ async function processSinglePdf(yearmonth, custn, regen) {
 
   // --- 6. 儲存最終 PDF ---
   const finalPdfBytes = await pdfDoc.save();
-  const fileName = "PDF" + yearmonth + "_" + custn + ".pdf";
+  const fileName = "PD" + yearmonth + "_" + custn + ".pdf";
   const blob = Utilities.newBlob(finalPdfBytes, "application/pdf", fileName);
 
   // 移動到指定資料夾 (選用)
@@ -489,7 +481,7 @@ async function processSinglePdf(yearmonth, custn, regen) {
   pdfFolder.addFile(file);
   folder.removeFile(file); // 從根目錄移除，避免混亂
   // 儲存 PDF 的網址到 Properties 以供前端使用
-  setTargetUrl("PdfUrl", "PDF" + yearmonth + "_" + custn, file.getUrl());
+  setTargetUrl("PdfUrl", "PD" + yearmonth + "_" + custn, file.getUrl());
 
   // 回傳檔案網址供後續使用
   return file.getUrl();

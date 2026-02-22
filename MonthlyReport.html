@@ -117,13 +117,13 @@
         <div class="row g-4">
           <div class="d-grid gap-2 col-6">
             <button id="btnReport" class="btn btn-primary btn-lg shadow-sm">
-              <i class="fas fa-search me-2"></i>查詢 / 產生報表
+              <i class="fas fa-search me-2"></i>1.查詢 / 產生報表
             </button>
           </div>
 
           <div class="d-grid gap-2 col-6">
             <button id="btnGenPdf" class="btn btn-info btn-lg text-dark shadow-sm">
-              <i class="fas fa-file-pdf me-2"></i>查詢 / 產生Pdf
+              <i class="fas fa-file-pdf me-2"></i>2.查詢 / 產生Pdf
             </button>
           </div>
         </div>
@@ -173,8 +173,8 @@
       updateProgressBar(0, 100, "啟動中...");
       $("#btnReport").prop("disabled", true); // 禁用按鈕防止重複點擊
       $("#btnGenPdf").prop("disabled", true); // 禁用按鈕防止重複點擊
-      $("qrycust").prop("disabled", true); // 禁用個案選單防止變更
-      $("qrymonth").prop("disabled", true); // 禁用月份選單防止變更
+      $("#qrycust").prop("disabled", true); // 禁用個案選單防止變更
+      $("#qrymonth").prop("disabled", true); // 禁用月份選單防止變更
       callGenReport(yearmonth, custn, regen);
     }
 
@@ -193,8 +193,8 @@
       updateProgressBar(0, 100, "啟動中...");
       $("#btnReport").prop("disabled", true); // 禁用按鈕防止重複點擊
       $("#btnGenPdf").prop("disabled", true); // 禁用按鈕防止重複點擊
-      $("qrycust").prop("disabled", true); // 禁用個案選單防止變更
-      $("qrymonth").prop("disabled", true); // 禁用月份選單防止變更
+      $("#qrycust").prop("disabled", true); // 禁用個案選單防止變更
+      $("#qrymonth").prop("disabled", true); // 禁用月份選單防止變更
       callGenPdf(yearmonth, custn, regen);
     }
 
@@ -235,7 +235,11 @@
       var $select = $("#qrycust");
 
       if (sessionCust) {
-        populateCustSelect(JSON.parse(sessionCust));
+        $select.empty(); // 清除 "載入中..."
+        $select.append(
+          '<option value="" disabled selected>請選擇個案名稱</option>',
+        );
+        populateCustSelect(JSON.parse(sessionCust)); // 接著填入從 Session 來的資料
       } else {
         // 讀取中狀態
         $select.html("<option disabled selected>資料讀取中...</option>");
@@ -283,8 +287,8 @@
             updateProgressBar(100, 100, "全部處理完成！");
             $("#btnReport").prop("disabled", false); // 啟用按鈕
             $("#btnGenPdf").prop("disabled", false); // 啟用按鈕
-            $("qrycust").prop("disabled", false); // 啟用選單
-            $("qrymonth").prop("disabled", false); // 啟用選單
+            $("#qrycust").prop("disabled", false); // 啟用選單
+            $("#qrymonth").prop("disabled", false); // 啟用選單
 
             Swal.fire({
               icon: "success",
@@ -303,8 +307,8 @@
         .withFailureHandler(function (err) {
           $("#btnReport").prop("disabled", false); // 啟用按鈕
           $("#btnGenPdf").prop("disabled", false); // 啟用按鈕
-          $("qrycust").prop("disabled", false); // 啟用選單
-          $("qrymonth").prop("disabled", false); // 啟用選單
+          $("#qrycust").prop("disabled", false); // 啟用選單
+          $("#qrymonth").prop("disabled", false); // 啟用選單
           Swal.fire("系統錯誤", err.message, "error");
         })
         .genreport(yearmonth, custn, regen);
@@ -325,8 +329,8 @@
             updateProgressBar(100, 100, "全部處理完成！");
             $("#btnGenPdf").prop("disabled", false); // 啟用按鈕
             $("#btnReport").prop("disabled", false); // 啟用按鈕
-            $("qrycust").prop("disabled", false); // 啟用選單
-            $("qrymonth").prop("disabled", false); // 啟用選單
+            $("#qrycust").prop("disabled", false); // 啟用選單
+            $("#qrymonth").prop("disabled", false); // 啟用選單
             Swal.fire({
               icon: "success",
               title: "處理完成",
@@ -344,8 +348,8 @@
         .withFailureHandler(function (err) {
           $("#btnGenPdf").prop("disabled", false); // 啟用按鈕
           $("#btnReport").prop("disabled", false); // 啟用按鈕
-          $("qrycust").prop("disabled", false); // 啟用選單
-          $("qrymonth").prop("disabled", false); // 啟用選單
+          $("#qrycust").prop("disabled", false); // 啟用選單
+          $("#qrymonth").prop("disabled", false); // 啟用選單
           Swal.fire("系統錯誤", err.message, "error");
         })
         .genPdfFile(yearmonth, custn, regen);

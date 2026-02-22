@@ -14,21 +14,19 @@
 // ├── LTCRecord : 主要電子表單
 // |   └── SYyyyy : 每年相關的電子記錄試算表
 // ├── RPyyyy : 每年相關的報表試算表
+// |   ├── Pdf : 每月客戶報表Pdf檔。
+// |   |   └── PDyyyymm_custn：每月客戶報表Pdf檔。
+// |   ├── PDyyyymm : 每月報表總表Pdf檔。
 // |   └── RPyyyyMM : 每月報表相關的試算表
-// ├── SYCompany.gexcel : 這個腳本綁定的試算表，包含 SYTemp、User、Cust 等工作表
+// ├── Template : 存放報表模板的資料夾，包含 RPSample、SYSample 等模板試算表
+// ├── SYCompany.gxlsx : 這個腳本綁定的試算表，包含 SYTemp、User、Cust 等工作表
 // ├── SYTemp : 存放臨時資料的工作表，包含 SYSuggest 等設定
-//
+// 
 
 
 // 全域試算表參考 SYCompany
 const MainSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
-/**
- * 測試用的 include 函數 (若未來需要拆分 CSS/JS 檔案時使用)
- */
-// function include(filename) {
-//   return HtmlService.createHtmlOutputFromFile(filename).getContent();
-// }
 
 /**
  * 從試算表動態取得意見反應連結並生成 Footer HTML
