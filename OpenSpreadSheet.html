@@ -67,20 +67,54 @@
   <div class="container">
     <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h5 class="card-title mb-3"><i class="fas fa-external-link-alt"></i> 選擇試算表</h5>
+        <h5 class="card-title mb-3"><i class="fas fa-server"></i> 系統試算表</h5>
 
-        <div class="mb-4">
-          <label for="querySheet" class="form-label">請選擇要開啟的檔案：</label>
-          <select class="form-select form-select-lg" id="querySheet">
+        <div class="input-group mb-3">
+          <select class="form-select" id="queryMainSheet">
             <option value="" disabled selected>載入中...</option>
+          </select>
+          <button class="btn btn-primary" type="button" onclick="openSelected('queryMainSheet')">
+            <i class="fas fa-external-link-alt"></i> 開啟
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fas fa-folder-open"></i> 年度檔案</h5>
+
+        <div class="mb-3">
+          <label for="queryYear" class="form-label">選擇年份：</label>
+          <select class="form-select" id="queryYear">
+            <!-- 由 JS 動態產生 -->
           </select>
         </div>
 
-        <div class="d-grid gap-2">
-          <button class="btn btn-primary btn-lg" id="btnQuery">
-            <i class="fas fa-folder-open"></i> 開啟試算表
-          </button>
+        <div class="mb-3">
+          <label class="form-label">紀錄表 (RecUrl)：</label>
+          <div class="input-group">
+            <select class="form-select" id="queryRecSheet"></select>
+            <button class="btn btn-outline-primary" type="button" onclick="openSelected('queryRecSheet')">開啟</button>
+          </div>
         </div>
+
+        <div class="mb-3">
+          <label class="form-label">報表 (ReportsUrl)：</label>
+          <div class="input-group">
+            <select class="form-select" id="queryReportsSheet"></select>
+            <button class="btn btn-outline-primary" type="button" onclick="openSelected('queryReportsSheet')">開啟</button>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">PDF 報表 (PdfUrl)：</label>
+          <div class="input-group">
+            <select class="form-select" id="queryPdf"></select>
+            <button class="btn btn-outline-primary" type="button" onclick="openSelected('queryPdf')">開啟</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -96,53 +130,101 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    $(document).ready(function () {
-      loadSheetOptions();
+    // 儲存後端回傳的所有資料
+    let cachedData = {
+      main: [],
+      rec: [],
+      reports: [],
+      pdfs: []
+    };
 
-      // 綁定按鈕點擊事件
-      $('#btnQuery').click(function () {
-        openSheet();
+    $(document).ready(function () {
+      loadAllData();
+
+      // 綁定年份變更事件
+      $('#queryYear').change(function () {
+        updateYearlyOptions($(this).val());
       });
     });
 
     /**
-     * 從後端抓取試算表選單資料
+     * 從後端一次抓取所有資料
      */
-    function loadSheetOptions() {
+    function loadAllData() {
       $('#loadingSpin').css('display', 'flex');
 
-      google.script.run.withSuccessHandler(function (options) {
-        const select = $('#querySheet');
-        select.empty();
-
-        if (!options || options.length === 0) {
-          select.append('<option value="" disabled>無可用檔案</option>');
-        } else {
-          select.append('<option value="" disabled selected>--- 請選擇檔案 ---</option>');
-          options.forEach(function (item) {
-            // item 預期格式: { name: "顯示名稱", url: "試算表網址" }
-            select.append(`<option value="${item.url}">${item.name}</option>`);
-          });
-        }
+      google.script.run.withSuccessHandler(function (data) {
+        cachedData = data;
+        initSystemSheets();
+        initYearSelect();
         $('#loadingSpin').hide();
-      }).getOpenSheetOptions(); // 對應後端函式
+      }).getOpenSheetData();
     }
 
-    /**
-     * 開啟選中的試算表
-     */
-    function openSheet() {
-      const targetUrl = $('#querySheet').val();
-
-      if (!targetUrl) {
-        Swal.fire('提示', '請先選擇一個試算表', 'warning');
-        return;
+    function initSystemSheets() {
+      const select = $('#queryMainSheet');
+      select.empty();
+      if (cachedData.main && cachedData.main.length > 0) {
+        cachedData.main.forEach(item => {
+          select.append(`<option value="${item.url}">${item.name}</option>`);
+        });
+      } else {
+        select.append('<option value="" disabled>無可用檔案</option>');
       }
-
-      // 使用 window.open 開啟新分頁
-      window.open(targetUrl, '_blank');
     }
-          
+
+    function initYearSelect() {
+      const select = $('#queryYear');
+      select.empty();
+      const currentYear = new Date().getFullYear();
+      const startYear = 2025;
+
+      for (let y = startYear; y <= currentYear; y++) {
+        select.append(`<option value="${y}">${y}年</option>`);
+      }
+      // 預設選中目前年份
+      select.val(currentYear);
+      updateYearlyOptions(currentYear);
+    }
+
+    function updateYearlyOptions(year) {
+      // 根據年份篩選並更新下拉選單
+      // RecUrl: 包含 SYyyyy
+      populateSelect('#queryRecSheet', cachedData.rec, 'SY' + year);
+      // ReportsUrl: 包含 RPyyyy (修正為 RP 以符合現有命名規則)
+      populateSelect('#queryReportsSheet', cachedData.reports, 'RP' + year);
+      // PdfUrl: 包含 PDyyyy
+      populateSelect('#queryPdf', cachedData.pdfs, 'PD' + year);
+    }
+
+    function populateSelect(selector, sourceData, searchStr) {
+      const select = $(selector);
+      select.empty();
+      
+      const filtered = sourceData.filter(item => item.name.indexOf(searchStr) !== -1);
+      
+      if (filtered.length === 0) {
+        select.append('<option value="" disabled selected>無相關檔案</option>');
+      } else {
+        select.append('<option value="" disabled selected>--- 請選擇 ---</option>');
+        filtered.forEach(item => {
+          select.append(`<option value="${item.url}">${item.name}</option>`);
+        });
+        // 若只有一個選項則自動選取
+        if (filtered.length === 1) {
+          select.val(filtered[0].url);
+        }
+      }
+    }
+
+    function openSelected(elementId) {
+      const url = $('#' + elementId).val();
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        Swal.fire('提示', '請先選擇一個檔案', 'warning');
+      }
+    }
   </script>
 </body>
 <?!= includeFooter(); ?>

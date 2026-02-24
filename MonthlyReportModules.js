@@ -228,8 +228,8 @@ function processSingleReport(
 }
 
 async function genPdfFile(yearmonth, custn, regen) {
-  var year = yearmonth.substring(0, 4);
-  var month = yearmonth.substring(4, 6);
+  // var year = yearmonth.substring(0, 4);
+  // var month = yearmonth.substring(4, 6);
   const ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
   // get all sheets except Template (優化效能，避免在迴圈裡重複呼叫 getSheetByName)
   var allSheets = ssReportFile.getSheets();
@@ -289,7 +289,7 @@ async function genPdfFile(yearmonth, custn, regen) {
   // 預讀資料 (優化效能)
   // var year = yearmonth.substring(0, 4);
   // var month = yearmonth.substring(4, 6);
-  var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
+  // var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
   for (var i = currentIndex; i < allCusts.length; i++) {
     // 檢查是否快要超時
     if (isNearTimeout()) {
@@ -497,7 +497,7 @@ function getAllDataMapFromSources(yearmonth, year, month) {
   );
   var ssTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet.getSheetByName("SR_Data");
   var dataMap = {};
-  var excludeIDs = ["GA05", "GA09"];
+  var excludeIDs = ["GA05", "GA09", "SY01"];
 
   [ssAnnual, ssTemp].forEach(function (sheet, idx) {
     if (!sheet) return;

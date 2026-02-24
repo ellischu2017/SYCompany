@@ -1,40 +1,63 @@
 /**
- * 取得試算表清單供前端下拉選單使用
+ * 取得所有試算表資料，供前端快取與篩選
+ * 回傳結構包含 main (主程式+暫存), rec (紀錄), reports (報表), pdfs (PDF)
  */
-function getOpenSheetOptions() {
-  const options = [];
-  
-  // 1. 加入 Main Spreadsheet (SYCompany)
+function getOpenSheetData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  options.push({ name: "主程式 (SYCompany)", url: ss.getUrl() });
+  const result = {
+    main: [],
+    rec: [],
+    reports: [],
+    pdfs: []
+  };
+
+  // 1. 加入 Main Spreadsheet (SYCompany)
+  result.main.push({ name: "主程式 (SYCompany)", url: ss.getUrl() });
 
   // 2. 加入 SYTemp
-  // 假設您有名為 'SYTemp' 的工作表，且網址在某個欄位，或直接根據規則定義
-  // 這裡需根據您的實際工作表結構調整
   const tempSheet = ss.getSheetByName("SYTemp");
-  if(tempSheet) {
+  if (tempSheet) {
     const tempData = tempSheet.getDataRange().getValues();
-    // 假設第二列開始，第一欄是 'SYTemp'，第二欄是網址
-    tempData.forEach(row => {
-      if(row[0] === 'SYTemp') {
-        options.push({ name: "暫存檔 (SYTemp)", url: row[1] }); // 這裡 row[1] 應為 SYT_Url
-      }
-    });
-  }
-
-  // 3. 遍歷 SY+yyyy (歷年紀錄)
-  const recSheet = ss.getSheetByName("RecUrl");
-  if(recSheet) {
-    const recData = recSheet.getDataRange().getValues();
-    // 跳過標題列
-    for(let i = 1; i < recData.length; i++) {
-      const name = recData[i][0]; // SY_N
-      const url = recData[i][1];  // SY_Url
-      if(name && name.toString().startsWith("SY")) {
-        options.push({ name: "歷年紀錄 - " + name, url: url });
+    for (let i = 1; i < tempData.length; i++) {
+      if (tempData[i][0] === 'SYTemp') {
+        result.main.push({ name: "暫存檔 (SYTemp)", url: tempData[i][1] });
+        break;
       }
     }
   }
 
-  return options;
+  // 3. 取得 RecUrl
+  const recSheet = ss.getSheetByName("RecUrl");
+  if (recSheet) {
+    const recData = recSheet.getDataRange().getValues();
+    for (let i = 1; i < recData.length; i++) {
+      if (recData[i][0] && recData[i][1] && recData[i][0] !== "SYSample") {
+        result.rec.push({ name: recData[i][0], url: recData[i][1] });
+      }
+    }
+  }
+
+  // 4. 取得 ReportsUrl
+  const reportsheet = ss.getSheetByName("ReportsUrl");
+  if (reportsheet) {
+    const reportData = reportsheet.getDataRange().getValues();
+    for (let i = 1; i < reportData.length; i++) {
+      if (reportData[i][0] && reportData[i][1] && reportData[i][0] !== "RPSample") {
+        result.reports.push({ name: reportData[i][0], url: reportData[i][1] });
+      }
+    }
+  }
+
+  // 5. 取得 PdfUrl
+  const pdfsheet = ss.getSheetByName("PdfUrl");
+  if (pdfsheet) {
+    const pdfData = pdfsheet.getDataRange().getValues();
+    for (let i = 1; i < pdfData.length; i++) {
+      if (pdfData[i][0] && pdfData[i][1]) {
+        result.pdfs.push({ name: pdfData[i][0], url: pdfData[i][1] });
+      }
+    }
+  }
+
+  return result;
 }

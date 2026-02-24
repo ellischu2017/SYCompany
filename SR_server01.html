@@ -6,6 +6,9 @@
   <title>舒漾電子服務紀錄管理(用戶端)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     body {
       background-color: #fff5f5;
@@ -90,7 +93,9 @@
           <select class="form-select" id="querySRTimes">
             <option value="1" selected>第一次</option>
             <option value="2">第二次</option>
-            <option value="3">第三次</option>
+            <option value="3">第三次</option>            
+            <option value="4">第四次</option>
+            <option value="5">第五次</option>
           </select>
         </div>
       </div>
@@ -136,7 +141,7 @@
       </div>
 
       <div class="d-grid gap-2 mt-3">
-        <button class="btn btn-danger btn-lg" onclick="handleAction('query')">
+        <button class="btn btn-danger btn-lg" id="btnQuery" onclick="handleAction('query')">
           查詢紀錄
         </button>
       </div>
@@ -210,9 +215,7 @@
     </div>
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 
   <script>
     // --- 全域變數：模擬 Session ---
@@ -383,6 +386,7 @@
     }
 
     async function handleAction(type) {
+      $("#loadingSpin").show();
       let selectedCust = $("#queryCustN").val();
       if (selectedCust === "其他") {
         selectedCust = $("#queryCustNOther").val();
@@ -393,6 +397,14 @@
       }
 
       if (!validateQuery()) return;
+
+      // 處理新增或更新時，禁用按鈕防止重複點擊
+      if (type === 'add' || type === 'update') {
+        $('#btnAdd').prop('disabled', true);
+        $('#btnUpdate').prop('disabled', true);
+      } else if (type === 'query') {
+        $('#btnQuery').prop('disabled', true);
+      }
 
       const formObj = {
         date: $("#queryDate").val(),
@@ -414,6 +426,7 @@
 
       // --- 需求 7：新使用者電話詢問 ---
       if ((type === "add" || type === "update") && GLOBAL_DATA.isNewBinding) {
+        $("#loadingSpin").hide();
         const { value: tel } = await Swal.fire({
           title: "初次綁定資料",
           text: `系統檢測到此 Email 尚未綁定 "${formObj.userName}"，請輸入您的聯絡電話以完成綁定`,
@@ -432,13 +445,18 @@
         } else {
           return;
         }
+        $("#loadingSpin").show();
       }
 
-      $("#loadingSpin").show();
 
       google.script.run
         .withSuccessHandler(function (res) {
           $("#loadingSpin").hide();
+          // 處理完成後，恢復按鈕功能
+          $('#btnAdd').prop('disabled', false);
+          $('#btnUpdate').prop('disabled', false);
+          $('#btnQuery').prop('disabled', false);
+
 
           if (res.success && formObj.isNewBinding) {
             GLOBAL_DATA.isNewBinding = false;
@@ -490,6 +508,13 @@
               if (res.success) backToSearch();
             });
           }
+        }).withFailureHandler(function (err) {
+          $("#loadingSpin").hide();
+          // 處理失敗後，恢復按鈕功能
+          $('#btnAdd').prop('disabled', false);
+          $('#btnUpdate').prop('disabled', false);
+          $('#btnQuery').prop('disabled', false);
+          Swal.fire('操作失敗', err.message, 'error');
         })
         .processSR01Data(formObj, type);
     }
