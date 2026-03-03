@@ -214,14 +214,16 @@
           }
         });
       });
-      $('#loading').hide();
+      // $('#loading').hide();
     });
 
     function loadDropdown() {
+
       google.script.run.withSuccessHandler(function (list) {
         const select = $('#selectSrId');
         select.empty().append('<option value="" disabled selected>請選擇服務編碼...</option>');
         list.forEach(id => select.append(`<option value="${id}">${id}</option>`));
+        $('#loading').hide();
       }).getLtcCodeList();
     }
 
@@ -252,7 +254,7 @@
       $('#ltcForm')[0].reset();
       $('#inputSrDetail').val(''); // 確保 textarea 也被清空
     }
- 
+
   </script>
 </body>
 <?!= includeFooter(); ?>

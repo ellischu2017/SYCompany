@@ -3,123 +3,138 @@
  * 修改點：同時讀取 SYCompany (主表) 與 SYTemp (更新表) 的 User 資料
  */
 function getSRServer01InitData() {
-  var userEmail = Session.getActiveUser().getEmail();
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "SRServer01_InitData";
+  const cached = cache.get(cacheKey);
+  let data;
 
-  // 1. 讀取 SYCompany > User (主名單)
-  var userSheet = MainSpreadsheet.getSheetByName("User");
-  var userMap = new Map(); // 使用 Map 以便用 Name 進行合併
+  if (cached) {
+    data = JSON.parse(cached);
+  } else {
+    // 如果快取中沒有資料，則從試算表讀取
+    var userMap = new Map(); // 使用 Map 以便用 Name 進行合併
 
-  if (userSheet) {
-    var rawUsers = userSheet.getDataRange().getValues();
-    var headers = rawUsers[0];
+    // --- 以下為從試算表讀取資料的原始邏輯 ---
+    // 1. 讀取 SYCompany > User (主名單)
+    var userSheet = MainSpreadsheet.getSheetByName("User");
 
-    var idxName = getColIndex(headers, "User_N");
-    var idxEmail = getColIndex(headers, "User_Email");
-    if (idxEmail === -1) idxEmail = getColIndex(headers, "Email");
-    var idxCust = getColIndex(headers, "Cust_N");
+    if (userSheet) {
+      var rawUsers = userSheet.getDataRange().getValues();
+      var headers = rawUsers[0];
 
-    if (idxName !== -1) {
-      for (var i = 1; i < rawUsers.length; i++) {
-        var row = rawUsers[i];
-        var name = String(row[idxName]).trim();
-        if (name) {
-          userMap.set(name, {
-            name: name,
-            email: idxEmail !== -1 ? String(row[idxEmail]).trim() : "",
-            favCustStr: idxCust !== -1 ? String(row[idxCust]) : ""
-          });
-        }
-      }
-    }
-  }
+      var idxName = getColIndex(headers, "User_N");
+      var idxEmail = getColIndex(headers, "User_Email");
+      if (idxEmail === -1) idxEmail = getColIndex(headers, "Email");
+      var idxCust = getColIndex(headers, "Cust_N");
 
-  // 2. 讀取 SYTemp > User (更新名單) 並覆蓋/合併
-  try {
-    var tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
-    var tempUserSheet = tempSS.getSheetByName("User");
-    if (tempUserSheet) {
-      var tempUsers = tempUserSheet.getDataRange().getValues();
-      var tHeaders = tempUsers[0];
-      var tNameIdx = getColIndex(tHeaders, "User_N");
-      var tEmailIdx = getColIndex(tHeaders, "User_Email");
-      if (tEmailIdx === -1) tEmailIdx = getColIndex(tHeaders, "Email");
-
-      if (tNameIdx !== -1 && tEmailIdx !== -1) {
-        for (var j = 1; j < tempUsers.length; j++) {
-          var tRow = tempUsers[j];
-          var tName = String(tRow[tNameIdx]).trim();
-          var tEmail = String(tRow[tEmailIdx]).trim();
-
-          if (tName) {
-            if (userMap.has(tName)) {
-              // 若主名單已有，則更新 Email (以 Temp 為準)
-              var uObj = userMap.get(tName);
-              if (tEmail) uObj.email = tEmail;
-            } else {
-              // 若主名單沒有，則新增 (視需求，通常只會更新既有員工的綁定)
-              userMap.set(tName, {
-                name: tName,
-                email: tEmail,
-                favCustStr: "" // Temp 表可能沒有個案關聯資料
-              });
-            }
+      if (idxName !== -1) {
+        for (var i = 1; i < rawUsers.length; i++) {
+          var row = rawUsers[i];
+          var name = String(row[idxName]).trim();
+          if (name) {
+            userMap.set(name, {
+              name: name,
+              email: idxEmail !== -1 ? String(row[idxEmail]).trim() : "",
+              favCustStr: idxCust !== -1 ? String(row[idxCust]) : ""
+            });
           }
         }
       }
     }
-  } catch (e) {
-    console.log("讀取 SYTemp > User 失敗: " + e.toString());
-  }
 
-  // 轉回陣列
-  var userData = Array.from(userMap.values());
+    // 2. 讀取 SYTemp > User (更新名單) 並覆蓋/合併
+    try {
+      var tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
+      var tempUserSheet = tempSS.getSheetByName("User");
+      if (tempUserSheet) {
+        var tempUsers = tempUserSheet.getDataRange().getValues();
+        var tHeaders = tempUsers[0];
+        var tNameIdx = getColIndex(tHeaders, "User_N");
+        var tEmailIdx = getColIndex(tHeaders, "User_Email");
+        if (tEmailIdx === -1) tEmailIdx = getColIndex(tHeaders, "Email");
 
-  // 3. 取得 Cust 資料
-  var custSheet = MainSpreadsheet.getSheetByName("Cust");
-  var custData = [];
-  if (custSheet) {
-    var rawCusts = custSheet.getDataRange().getValues();
-    var cHeaders = rawCusts[0];
-    var idxCName = getColIndex(cHeaders, "Cust_N");
-    var idxCLTC = getColIndex(cHeaders, "LTC_Code");
+        if (tNameIdx !== -1 && tEmailIdx !== -1) {
+          for (var j = 1; j < tempUsers.length; j++) {
+            var tRow = tempUsers[j];
+            var tName = String(tRow[tNameIdx]).trim();
+            var tEmail = String(tRow[tEmailIdx]).trim();
 
-    if (idxCName !== -1 && idxCLTC !== -1) {
-      for (var k = 1; k < rawCusts.length; k++) {
-        custData.push({
-          name: rawCusts[k][idxCName],
-          ltcCodeStr: String(rawCusts[k][idxCLTC])
-        });
+            if (tName) {
+              if (userMap.has(tName)) {
+                // 若主名單已有，則更新 Email (以 Temp 為準)
+                var uObj = userMap.get(tName);
+                if (tEmail) uObj.email = tEmail;
+              } else {
+                // 若主名單沒有，則新增 (視需求，通常只會更新既有員工的綁定)
+                userMap.set(tName, {
+                  name: tName,
+                  email: tEmail,
+                  favCustStr: "" // Temp 表可能沒有個案關聯資料
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log("讀取 SYTemp > User 失敗: " + e.toString());
+    }
+
+    // 轉回陣列
+    var userData = Array.from(userMap.values());
+
+    // 3. 取得 Cust 資料
+    var custSheet = MainSpreadsheet.getSheetByName("Cust");
+    var custData = [];
+    if (custSheet) {
+      var rawCusts = custSheet.getDataRange().getValues();
+      var cHeaders = rawCusts[0];
+      var idxCName = getColIndex(cHeaders, "Cust_N");
+      var idxCLTC = getColIndex(cHeaders, "LTC_Code");
+
+      if (idxCName !== -1 && idxCLTC !== -1) {
+        for (var k = 1; k < rawCusts.length; k++) {
+          custData.push({
+            name: rawCusts[k][idxCName],
+            ltcCodeStr: String(rawCusts[k][idxCLTC])
+          });
+        }
       }
     }
-  }
 
-  // 4. 取得 LTC_Code 資料
-  var ltcSheet = MainSpreadsheet.getSheetByName("LTC_Code");
-  var ltcIds = [];
-  if (ltcSheet) {
-    var rawLtc = ltcSheet.getDataRange().getValues();
-    var lHeaders = rawLtc[0];
-    var idxSRID = getColIndexSafe(lHeaders, "SR_ID");
-    var idxCont = getColIndexSafe(lHeaders, "SR_Cont");
-    var targetIdx = idxSRID !== -1 ? idxSRID : 0; // 若找不到標題，預設第一欄
-    var seen = {};
+    // 4. 取得 LTC_Code 資料
+    var ltcSheet = MainSpreadsheet.getSheetByName("LTC_Code");
+    var ltcIds = [];
+    if (ltcSheet) {
+      var rawLtc = ltcSheet.getDataRange().getValues();
+      var lHeaders = rawLtc[0];
+      var idxSRID = getColIndexSafe(lHeaders, "SR_ID");
+      var idxCont = getColIndexSafe(lHeaders, "SR_Cont");
+      var targetIdx = idxSRID !== -1 ? idxSRID : 0; // 若找不到標題，預設第一欄
+      var seen = {};
 
-    for (var k = 1; k < rawLtc.length; k++) {
-      var code = rawLtc[k][targetIdx].toString().trim();
-      var cont = idxCont !== -1 ? rawLtc[k][idxCont].toString().trim() : "";
-      if (code && !seen[code]) {
-        seen[code] = true;
-        ltcIds.push({ id: code, cont: cont });
+      for (var k = 1; k < rawLtc.length; k++) {
+        var code = rawLtc[k][targetIdx].toString().trim();
+        var cont = idxCont !== -1 ? rawLtc[k][idxCont].toString().trim() : "";
+        if (code && !seen[code]) {
+          seen[code] = true;
+          ltcIds.push({ id: code, cont: cont });
+        }
       }
     }
+    data = {
+      users: userData,
+      custs: custData,
+      ltcCodes: ltcIds,
+    };
+
+    // 將資料存入快取，設定 6 小時過期
+    cache.put(cacheKey, JSON.stringify(data), 21600);
   }
 
-  return {
-    email: userEmail,
-    users: userData,
-    custs: custData,
-    ltcCodes: ltcIds
-  };
+  // 加入當前使用者的 email 並回傳
+  data.email = Session.getActiveUser().getEmail();
+  return data;
 }
 
 /**
@@ -127,6 +142,13 @@ function getSRServer01InitData() {
  * 修改點：若為新綁定 (isNewBinding)，寫入 SYTemp > User
  */
 function processSR01Data(formObj, actionType) {
+  // 根據日期預先產生快取 key，以便後續清除
+  let yearmonth = "";
+  if (formObj && formObj.date) {
+    const d = new Date(formObj.date);
+    yearmonth = Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyyMM");
+  }
+
   try {
     var targetSs = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
 
@@ -170,6 +192,7 @@ function processSR01Data(formObj, actionType) {
         newRow[tTelIdx] = formObj.userTel;
         tempUserSheet.appendRow(newRow);
       }
+      CacheService.getScriptCache().remove("SRServer01_InitData");
     }
 
     // --- 以下為標準 SR_Data 處理邏輯 ---
@@ -196,6 +219,10 @@ function processSR01Data(formObj, actionType) {
 
     if (actionType === "add") {
       targetSheet.appendRow(rowData);
+      // 清除對應月份的案主列表快取
+      if (yearmonth) {
+        CacheService.getScriptCache().remove("CustN_" + yearmonth);
+      }
       return { success: true, message: "新增紀錄成功" };
     }
 
@@ -235,6 +262,10 @@ function processSR01Data(formObj, actionType) {
           return { success: true, message: "資料已更新" };
         } else if (actionType === "delete") {
           targetSheet.deleteRow(i + 1);
+          // 清除對應月份的案主列表快取
+          if (yearmonth) {
+            CacheService.getScriptCache().remove("CustN_" + yearmonth);
+          }
           return { success: true, message: "資料已刪除" };
         }
       }

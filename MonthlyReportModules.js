@@ -1,16 +1,35 @@
 /**
  * 獲取個案清單供前端下拉選單使用
  */
-function getCustN() {
-  // getTargetsheet 定義在 Utilities.js 中
-  // var ss = getTargetsheet("SYTemp", "SYTemp");
-  var sCust = MainSpreadsheet.getSheetByName("Cust");
-  var data = sCust.getDataRange().getValues();
+function getCustN(yearmonth) {
+  // 加入快取機制，避免重複讀取試算表
+  var cache = CacheService.getScriptCache();
+  var cacheKey = "CustN_" + (yearmonth || "All");
+  var cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
   var custNames = [];
 
-  // 假設 Cust 工作表第一欄是 Cust_N
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0]) custNames.push(data[i][0]);
+  if (yearmonth) {
+    var allDataMap = getAllDataMapFromSources(yearmonth);
+    custNames = Object.keys(allDataMap);
+    custNames.sort(function (a, b) {
+      return a.localeCompare(b);
+    });
+  } else {
+    var sCust = MainSpreadsheet.getSheetByName("Cust");
+    var data = sCust.getDataRange().getValues();
+    // 假設 Cust 工作表第一欄是 Cust_N
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0]) custNames.push(data[i][0]);
+    }
+  }
+  
+  // 寫入快取，設定 20 分鐘 (1200秒)
+  try {
+    cache.put(cacheKey, JSON.stringify(custNames), 1200);
+  } catch (e) {
+    Logger.log("快取失敗 (資料過大): " + e.toString());
   }
   return custNames;
 }
@@ -25,7 +44,7 @@ function genreport(yearmonth, custn, regen) {
   // --- 如果是單一個案處理 ---
   if (custn !== "all") {
     // 1. 準備單一案主所需的資料 (跟批次邏輯一樣，先抓取必要的 Map)
-    var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
+    var allDataMap = getAllDataMapFromSources(yearmonth);
     var custBase = getCustInfoMap();
     var ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
     var templateSheet =
@@ -70,7 +89,7 @@ function genreport(yearmonth, custn, regen) {
 
   // 如果是第一次執行或月份變了，就初始化
   if (!progress || progress.yearmonth !== yearmonth) {
-    allCusts = getCustN();
+    allCusts = getCustN(yearmonth);
     currentIndex = 0;
   } else {
     allCusts = progress.allCusts;
@@ -80,7 +99,7 @@ function genreport(yearmonth, custn, regen) {
   // 預讀資料 (優化效能)
   // var year = yearmonth.substring(0, 4);
   // var month = yearmonth.substring(4, 6);
-  var allDataMap = getAllDataMapFromSources(yearmonth, year, month);
+  var allDataMap = getAllDataMapFromSources(yearmonth);
   var custBase = getCustInfoMap();
   var ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
 
@@ -155,9 +174,9 @@ function processSingleReport(
     sheet = template.copyTo(ssFile).setName(custn);
   } else {
     var lastR = sheet.getLastRow();
-    if (lastR >= 6) {
+    if (lastR >= 7) {
       sheet
-        .getRange(6, 1, lastR - 5, 7)
+        .getRange(7, 1, lastR - 6, 7)
         .clearContent()
         .setBorder(false, false, false, false, false, false);
     }
@@ -220,7 +239,7 @@ function processSingleReport(
 
     // 設置行高 (此動作較慢，但已大幅減少調用次數)
     for (var i = 0; i < finalValues.length; i++) {
-      if (sheet.getRowHeight(6 + i) < 50) sheet.setRowHeight(6 + i, 50);
+      if (sheet.getRowHeight(7 + i) < 50) sheet.setRowHeight(7 + i, 50);
     }
   }
   sortSheetsAsc(ssFile); // 選用：每次生成後將工作表依名稱反向排序
@@ -243,7 +262,14 @@ async function genPdfFile(yearmonth, custn, regen) {
     // 取得該個案的Pdf Url 
     var pdfUrl = getTarget("PdfUrl", "PD" + yearmonth + "_" + custn);
     if (pdfUrl && !regen) {
-      return pdfUrl;
+      return {
+        status: "complete",
+        currentIndex: 1,
+        total: 1,
+        message: "個案 " + custn + " 報表處理完成！",
+        btntext: "查看報表",
+        url: pdfUrl,
+      };
     } else {
       // 呼叫 genreport 生成報表，這裡可以直接呼叫 processSingleReport 以避免重複讀取資料，但為了保持邏輯清晰，我們先呼叫 genreport 
       if (!allSheetNames.includes(custn)) {
@@ -314,6 +340,9 @@ async function genPdfFile(yearmonth, custn, regen) {
     } else {
       // 生成 PDF
       await processSinglePdf(yearmonth, name, regen);
+      // 加入延遲以避免觸發 Google API 速率限制 (Too Many Requests)
+      // 1.5 秒應該足以應付大多數情況
+      Utilities.sleep(1500);
     }
 
   }
@@ -346,6 +375,12 @@ async function genPdfFile(yearmonth, custn, regen) {
 
 }
 
+/**
+ * 使用 pdf-lib 庫將多個 PDF 檔案合併成一個 PDF，並儲存到 Drive 中
+ * @param {Array} pdfIds - 要合併的 PDF 檔案 ID 陣列
+ * @param {String} yearmonth - 年月字串，用於命名合併後的 PDF 檔案
+ * @returns {String} 合併後 PDF 的網址
+ */
 async function mergePdfs(pdfIds, yearmonth) {
   // --- 1. 載入 pdf-lib 庫 (只載入一次) ---
   var setTimeout = function (f, t) { Utilities.sleep(t || 0); return f(); };
@@ -393,6 +428,9 @@ async function mergePdfs(pdfIds, yearmonth) {
   return file.getUrl();
 }
 
+/**
+ * 核心邏輯：生成單一案主報表
+ */
 async function processSinglePdf(yearmonth, custn, regen) {
   const ssReportFile = getTargetsheet("ReportsUrl", "RP" + yearmonth).Spreadsheet;
   const sheet = ssReportFile.getSheetByName(custn);
@@ -477,6 +515,15 @@ async function processSinglePdf(yearmonth, custn, regen) {
   } else {
     pdfFolder = folder.createFolder("PDF");
   }
+
+  // 如果 regen == true，先檢查並刪除舊檔
+  if (regen) {
+    var existingFiles = pdfFolder.getFilesByName(fileName);
+    while (existingFiles.hasNext()) {
+      existingFiles.next().setTrashed(true);
+    }
+  }
+
   const file = DriveApp.createFile(blob);
   pdfFolder.addFile(file);
   folder.removeFile(file); // 從根目錄移除，避免混亂
@@ -491,7 +538,18 @@ async function processSinglePdf(yearmonth, custn, regen) {
 /**
  * 預先讀取所有資料並分類 (Map: Name -> Rows[])
  */
-function getAllDataMapFromSources(yearmonth, year, month) {
+function getAllDataMapFromSources(yearmonth) {
+  // 1. 加入快取機制，避免重複讀取 (設定 30 分鐘)
+  var cache = CacheService.getScriptCache();
+  var cacheKey = "DataMap_" + yearmonth;
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    // Logger.log("從快取讀取 " + cacheKey);
+    return JSON.parse(cached);
+  }
+
+  var year = yearmonth.substring(0, 4);
+  var month = yearmonth.substring(4, 6);
   var ssAnnual = getTargetsheet("RecUrl", "SY" + year).Spreadsheet.getSheetByName(
     yearmonth,
   );
@@ -528,6 +586,14 @@ function getAllDataMapFromSources(yearmonth, year, month) {
       dataMap[name].push(r);
     }
   });
+
+  // 2. 寫入快取 (如果資料過大則跳過)
+  try {
+    cache.put(cacheKey, JSON.stringify(dataMap), 1800); // 1800 秒 = 30 分鐘
+  } catch (e) {
+    Logger.log("快取失敗 (資料過大): " + e.toString());
+    // 資料過大時直接返回，不快取
+  }
   return dataMap;
 }
 
@@ -535,6 +601,14 @@ function getAllDataMapFromSources(yearmonth, year, month) {
  * 預先讀取所有個案基本資料
  */
 function getCustInfoMap() {
+  // 1. 加入快取機制
+  var cache = CacheService.getScriptCache();
+  var cacheKey = "CustInfoMap";
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   var sCust = MainSpreadsheet.getSheetByName("Cust");
   var data = sCust.getDataRange().getValues();
   var infoMap = {};
@@ -542,7 +616,7 @@ function getCustInfoMap() {
 
   for (var i = 1; i < data.length; i++) {
     var name = data[i][0];
-    if (name) {
+    if (name && !infoMap[name]) {
       custNames.push(name);
       infoMap[name] = {
         sex: data[i][1],
@@ -551,7 +625,31 @@ function getCustInfoMap() {
       };
     }
   }
-  return { names: custNames, info: infoMap };
+
+  sCust = MainSpreadsheet.getSheetByName("OldCust");
+  data = sCust.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var name = data[i][0];
+    if (name && !infoMap[name]) {
+      custNames.push(name);
+      infoMap[name] = {
+        sex: data[i][1],
+        bd: formatDate(data[i][2]),
+        add: data[i][3],
+      };
+    }
+  }
+
+
+  var result = { names: custNames, info: infoMap };
+
+  // 2. 寫入快取 (設定 6 小時, 如果資料過大則跳過)
+  try {
+    cache.put(cacheKey, JSON.stringify(result), 21600);
+  } catch (e) {
+    Logger.log("快取失敗 (資料過大): " + e.toString());
+  }
+  return result;
 }
 
 /**

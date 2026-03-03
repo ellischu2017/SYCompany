@@ -56,10 +56,27 @@
     .form-group {
       margin-bottom: 20px;
     }
+
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
   </style>
 </head>
 
 <body>
+  <div id="loadingSpin" class="loading">
+    <div class="spinner-border text-danger" role="status"></div>
+  </div>
+
   <nav class="navbar navbar-dark bg-secondary sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas"
@@ -116,13 +133,13 @@
         </div>
         <div class="row g-4">
           <div class="d-grid gap-2 col-6">
-            <button id="btnReport" class="btn btn-primary btn-lg shadow-sm">
+            <button id="btnReport" type="button" class="btn btn-primary btn-lg shadow-sm">
               <i class="fas fa-search me-2"></i>1.查詢 / 產生報表
             </button>
           </div>
 
           <div class="d-grid gap-2 col-6">
-            <button id="btnGenPdf" class="btn btn-info btn-lg text-dark shadow-sm">
+            <button id="btnGenPdf" type="button" class="btn btn-info btn-lg text-dark shadow-sm">
               <i class="fas fa-file-pdf me-2"></i>2.查詢 / 產生Pdf
             </button>
           </div>
@@ -154,51 +171,99 @@
       // 3. 綁定按鈕事件
       $("#btnReport").click(handleReportGeneration);
       $("#btnGenPdf").click(handlePdfGeneration);
+
+      // 4. 綁定月份變更事件
+      $("#qrymonth").change(function () {
+        initCustSelect();
+      });
+
+      // $("#loadingSpin").fadeOut();
     });
 
     // --- 核心邏輯 ---
 
-    function handleReportGeneration() {
+    function handleReportGeneration(e) {
+      if (e) e.preventDefault();
       var yearmonth = $("#qrymonth").val();
       var custn = $("#qrycust").val();
       var regen = $("#chkRegen").prop("checked");
-      // console.log("強制重新生成報表:", regen);
       if (!yearmonth || !custn) {
         Swal.fire("提示", "請選擇月份與個案", "warning");
         return;
       }
 
-      // 初始化 UI
-      $("#progressArea").fadeIn();
-      updateProgressBar(0, 100, "啟動中...");
-      $("#btnReport").prop("disabled", true); // 禁用按鈕防止重複點擊
-      $("#btnGenPdf").prop("disabled", true); // 禁用按鈕防止重複點擊
-      $("#qrycust").prop("disabled", true); // 禁用個案選單防止變更
-      $("#qrymonth").prop("disabled", true); // 禁用月份選單防止變更
-      callGenReport(yearmonth, custn, regen);
+      const startProcess = () => {
+        // 初始化 UI
+        $("#progressArea").fadeIn();
+        updateProgressBar(0, 100, "啟動中...");
+        $("#btnReport").prop("disabled", true); // 禁用按鈕防止重複點擊
+        $("#btnGenPdf").prop("disabled", true); // 禁用按鈕防止重複點擊
+        $("#qrycust").prop("disabled", true); // 禁用個案選單防止變更
+        $("#qrymonth").prop("disabled", true); // 禁用月份選單防止變更
+        $("#chkRegen").prop("disabled", true); // 禁用覆寫選項防止變更
+        callGenReport(yearmonth, custn, regen);
+      };
+
+      if (regen) {
+        Swal.fire({
+          title: '確定要覆寫報表嗎？',
+          text: "這將會覆蓋掉先前產生的報表資料，確定要繼續嗎？",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: '是的，覆寫',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            startProcess();
+          }
+        });
+      } else {
+        startProcess();
+      }
     }
 
-    function handlePdfGeneration() {
+    function handlePdfGeneration(e) {
+      if (e) e.preventDefault();
       var yearmonth = $("#qrymonth").val();
       var custn = $("#qrycust").val();
       var regen = $("#chkRegen").prop("checked");
-      // console.log("強制重新生成報表:", regen);
       if (!yearmonth || !custn) {
         Swal.fire("提示", "請選擇月份與個案", "warning");
         return;
       }
 
-      // 初始化 UI
-      $("#progressArea").fadeIn();
-      updateProgressBar(0, 100, "啟動中...");
-      $("#btnReport").prop("disabled", true); // 禁用按鈕防止重複點擊
-      $("#btnGenPdf").prop("disabled", true); // 禁用按鈕防止重複點擊
-      $("#qrycust").prop("disabled", true); // 禁用個案選單防止變更
-      $("#qrymonth").prop("disabled", true); // 禁用月份選單防止變更
-      callGenPdf(yearmonth, custn, regen);
+      const startProcess = () => {
+        // 初始化 UI
+        $("#progressArea").fadeIn();
+        updateProgressBar(0, 100, "啟動中...");
+        $("#btnReport").prop("disabled", true); // 禁用按鈕防止重複點擊
+        $("#btnGenPdf").prop("disabled", true); // 禁用按鈕防止重複點擊
+        $("#qrycust").prop("disabled", true); // 禁用個案選單防止變更
+        $("#qrymonth").prop("disabled", true); // 禁用月份選單防止變更
+        $("#chkRegen").prop("disabled", true); // 禁用覆寫選項防止變更
+        callGenPdf(yearmonth, custn, regen);
+      };
+
+      if (regen) {
+        Swal.fire({
+          title: '確定要覆寫 PDF 嗎？',
+          text: "這將會刪除舊的 PDF 檔案並重新產生，確定要繼續嗎？",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: '是的，覆寫',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            startProcess();
+          }
+        });
+      } else {
+        startProcess();
+      }
     }
 
     function initMonthSelect() {
+      $("#loadingSpin").css("display", "flex").show();
       var startYear = 2026;
       var startMonth = 1;
       var now = new Date();
@@ -228,10 +293,18 @@
           $select.append($("<option>", { value: val, text: text }));
         }
       }
+      // 在完成載入後，預選第一個
+      $select.find("option").first().prop("selected", true);
+      $("#loadingSpin").hide();
     }
 
     function initCustSelect() {
-      var sessionCust = sessionStorage.getItem("RpCustN");
+      $("#loadingSpin").show();
+      var yearmonth = $("#qrymonth").val();
+      if (!yearmonth) return;
+
+      var sessionKey = "RpCustN_" + yearmonth;
+      var sessionCust = sessionStorage.getItem(sessionKey);
       var $select = $("#qrycust");
 
       if (sessionCust) {
@@ -242,24 +315,27 @@
         populateCustSelect(JSON.parse(sessionCust)); // 接著填入從 Session 來的資料
       } else {
         // 讀取中狀態
+        $select.empty();
         $select.html("<option disabled selected>資料讀取中...</option>");
 
         google.script.run
           .withSuccessHandler(function (custArgs) {
             var list = ["all"].concat(custArgs);
-            sessionStorage.setItem("RpCustN", JSON.stringify(list));
+            sessionStorage.setItem(sessionKey, JSON.stringify(list));
 
             $select.empty(); // 清除 "讀取中..."
             $select.append(
               '<option value="" disabled selected>請選擇個案名稱</option>',
             );
             populateCustSelect(list);
+            $("#loadingSpin").hide();
           })
           .withFailureHandler(function (err) {
             $select.html("<option disabled selected>讀取失敗</option>");
             Swal.fire("錯誤", "無法讀取個案清單: " + err.message, "error");
+            $("#loadingSpin").hide();
           })
-          .getCustN();
+          .getCustN(yearmonth);
       }
     }
 
@@ -289,6 +365,7 @@
             $("#btnGenPdf").prop("disabled", false); // 啟用按鈕
             $("#qrycust").prop("disabled", false); // 啟用選單
             $("#qrymonth").prop("disabled", false); // 啟用選單
+            $("#chkRegen").prop("disabled", false); // 啟用覆寫選項
 
             Swal.fire({
               icon: "success",
@@ -309,6 +386,7 @@
           $("#btnGenPdf").prop("disabled", false); // 啟用按鈕
           $("#qrycust").prop("disabled", false); // 啟用選單
           $("#qrymonth").prop("disabled", false); // 啟用選單
+          $("#chkRegen").prop("disabled", false); // 啟用覆寫選項
           Swal.fire("系統錯誤", err.message, "error");
         })
         .genreport(yearmonth, custn, regen);
@@ -331,6 +409,8 @@
             $("#btnReport").prop("disabled", false); // 啟用按鈕
             $("#qrycust").prop("disabled", false); // 啟用選單
             $("#qrymonth").prop("disabled", false); // 啟用選單
+            $("#chkRegen").prop("disabled", false); // 啟用覆寫選項
+
             Swal.fire({
               icon: "success",
               title: "處理完成",
@@ -350,6 +430,7 @@
           $("#btnReport").prop("disabled", false); // 啟用按鈕
           $("#qrycust").prop("disabled", false); // 啟用選單
           $("#qrymonth").prop("disabled", false); // 啟用選單
+          $("#chkRegen").prop("disabled", false); // 啟用覆寫選項
           Swal.fire("系統錯誤", err.message, "error");
         })
         .genPdfFile(yearmonth, custn, regen);

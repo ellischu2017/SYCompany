@@ -345,13 +345,14 @@
         $('#detailSection').hide();   // 隱藏詳細資料表單
         $('#searchSection').show();   // 顯示查詢與新增區塊
       });
-      $('#loadingSpin').hide();
+      // $('#loadingSpin').hide();
     });
 
     //
 
     // 載入下拉選單
     function loadDropdown() {
+      $('#loadingSpin').show();
       google.script.run.withSuccessHandler(function (list) {
         const select = $('#selectCustName');
         select.empty();
@@ -363,6 +364,7 @@
             select.append(`<option value="${name}">${name}</option>`);
           });
         }
+        $('#loadingSpin').hide();
       }).getCustList();
     }
 
@@ -433,7 +435,7 @@
       clearForm();                  // 清空表單內容
       loadDropdown();               // 重新整理下拉選單（確保資料同步）
     }
-       
+
   </script>
 </body>
 <?!= includeFooter(); ?>

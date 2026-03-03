@@ -39,6 +39,18 @@ function monthlyMaintenanceJob() {
 }
 
 /**
+ * 每月10日維護任務：搬移上個月資料至年度試算表
+ * 建議觸發時間：每月 10 日 00:00 - 01:00
+ */
+function monthlyTenMaintenanceJob() {
+  //搬移上個月資料至年度試算表
+  processSRDataMigration();
+  console.log("每月10日維護任務完成：資料已搬移。");
+
+
+}
+
+/**
  * 每日維護任務：遷移 7 天前資料與同步 User 名單
  * 建議觸發時間：每日 00:00 - 01:00
  */
@@ -47,14 +59,16 @@ function dailyMaintenanceJob() {
   const tmpSheet = ssSYTemp.getSheetByName("SR_Data");
   const tarSheet = MainSpreadsheet.getSheetByName("Cust");
 
+  // 1. 同步主資料
   processUserSync(MainSpreadsheet, ssSYTemp);
   processCustSync();
+  // 2. 匯入新紀錄至 SYTemp
   processTransferData("all", true);
-  processSRDataMigration(MainSpreadsheet, ssSYTemp);
-
+  // 3. 在資料遷移前，先處理 SYTemp 中的所有資料
   removeSRDuplicates(tmpSheet);
   UpdateCustLTCCode(tmpSheet, tarSheet);
-  // const sSYyear = getTargetsheet("RecUrl","")
+  // 4. 將 SYTemp 中的舊資料遷移至年度表單
+  // processSRDataMigration(MainSpreadsheet, ssSYTemp);
 }
 
 
@@ -131,6 +145,7 @@ function UpdateCustLTCCode(srcSheet, tarSheet) {
 
   console.log("資料整合完成，總客戶數: " + combinedData.size);
   // console.log("更新完成！");
+  CacheService.getScriptCache().remove("SRServer01_InitData");
 }
 
 /**
@@ -161,7 +176,7 @@ function syncMasterTablePermissions() {
     if (email) managerEmails.push(email.toString().trim().toLowerCase());
   }
 
-  var RootFolder = getTargetDir("FloderUrl", "SYCompany");
+  var RootFolder = getTargetDir("FolderUrl", "SYCompany");
   var targetFileIds = [{ Name: "SYCompany", UrlID: RootFolder.id }]; // 包含 SYCompany 本身
   targetFileIds.push({ Name: "SYTemp", UrlID: getTargetsheet("SYTemp", "SYTemp").id }); // 包含 SYTemp
 
@@ -170,16 +185,23 @@ function syncMasterTablePermissions() {
     var fileName = item.Name;
     console.log("正在處理試算表: " + item.Name + " (ID: " + item.UrlID + ")");
     try {
-      managerEmails.forEach(function (email) {
-        var resource = {
-          role: "writer",
-          type: "user",
-          emailAddress: email,
-        };
+      var file = DriveApp.getFileById(fileId);
+      var ownerEmail = file.getOwner().getEmail().toLowerCase();
+      // 先取得目前的編輯者名單，避免重複呼叫 API
+      var currentEditors = file.getEditors().map(function (u) { return u.getEmail().toLowerCase(); });
 
-        Drive.Permissions.create(resource, fileId, {
-          sendNotificationEmails: false,
-        });
+      managerEmails.forEach(function (email) {
+        // 只有當 email 不在目前的編輯者名單中，且不是擁有者時，才新增權限
+        if (currentEditors.indexOf(email) === -1 && email !== ownerEmail) {
+          var resource = {
+            role: "writer",
+            type: "user",
+            emailAddress: email,
+          };
+          Drive.Permissions.create(resource, fileId, {
+            sendNotificationEmails: false,
+          });
+        }
       });
 
       var file = DriveApp.getFileById(fileId);
@@ -352,34 +374,29 @@ function processUserSync(mainSS, tempSS) {
     tempUserSheet.deleteRows(2, tempUserSheet.getLastRow() - 1);
     console.log("暫存表清理完畢。");
   }
+  CacheService.getScriptCache().remove("SRServer01_InitData");
 }
 
 /**
- * 處理 SR_Data 遷移：7天前資料搬移至年度試算表
+ * 處理 SR_Data 遷移：上個月資料搬移至年度試算表
  * 修正：日期偏移、新增首列凍結、設定日期欄位格式
  */
-function processSRDataMigration(mainSS, tempSS) {
+function processSRDataMigration() {
   console.log("processSRDataMigration 開始遷移 SR_Data 資料...");
-  if (!mainSS) {
-    mainSS = MainSpreadsheet;
-    console.log("mainSS 未提供，使用預設 MainSpreadsheet");
-  }
-
-  if (!tempSS) {
-    tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
-    console.log("tempSS 未提供，使用預設 SYTemp");
-  }
-
+  mainSS = MainSpreadsheet;
+  tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
+  // SYTemp > SR_Data 工作表
   const srSheet = tempSS.getSheetByName("SR_Data");
   if (!srSheet) return;
-
+  // 1. 讀取資料
   const data = srSheet.getDataRange().getValues();
   if (data.length <= 1) return;
-
+  // 2. 計算遷移截止日期 (本月1號)
   const headers = data[0];
-  const today = new Date();
   const cutoffDate = new Date();
-  cutoffDate.setDate(today.getDate() - 8); // 7 天前
+  cutoffDate.setDate(1);
+  //cutoffDate.setDate(today.getDate() - 8); // 7 天前
+  Logger.log("資料遷移截止日期 (cutoffDate): " + cutoffDate.toISOString());
 
   const migrationMap = {};
   const rowsToKeep = [headers];
@@ -404,34 +421,37 @@ function processSRDataMigration(mainSS, tempSS) {
     row[0] = formattedDate;
 
     if (dateObj < cutoffDate) {
-      let year = dateObj.getFullYear();
-      if (!migrationMap[year]) migrationMap[year] = [];
-      migrationMap[year].push(row);
+      let yearmonth = dateObj.getFullYear() + Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "MM");
+      if (!migrationMap[yearmonth]) migrationMap[yearmonth] = [];
+      migrationMap[yearmonth].push(row);
     } else {
       rowsToKeep.push(row);
     }
   }
 
-  for (let year in migrationMap) {
+  for (let yearmonth in migrationMap) {
+    let year = yearmonth.substring(0, 4)
+    let month = yearmonth.substring(4, 6);
     let syName = "SY" + year;
-    let targetUrl = getUrlFromRecUrl(mainSS, syName);
-
-    if (!targetUrl) {
-      targetUrl = createNewYearlySS(mainSS, syName);
-      createdNewSS = true;
+    // get target spredsheet
+    let tarspredsheet = getTargetsheet("RecUrl", syName).Spreadsheet;
+    // get target sheet name is yyyyMM
+    let tarsheetName = year+month;
+    let tarSheet = tarspredsheet.getSheetByName(tarsheetName);
+    Logger.log(`處理 ${yearmonth} 資料，目標試算表: ${syName}, 目標工作表: ${tarsheetName}`);
+    // move data to target sheet
+    let targetUrl = tarspredsheet.getUrl();
+    if (targetUrl) {
+      appendDataToExternalSS(targetUrl, yearmonth, migrationMap[yearmonth]);
     }
     console.log("搬移資料至 " + year + " 年試算表，網址: " + targetUrl);
-    console.log("搬移筆數: " + migrationMap[year].length);
-    if (targetUrl) {
-      appendDataToExternalSS(targetUrl, year, migrationMap[year]);
-    }
+    console.log("搬移筆數: " + migrationMap[yearmonth].length);
   }
 
   // 同步權限如果有新建立年度試算表
   if (createdNewSS) {
     syncMasterTablePermissions();
-  }
-
+  }  
   // 清理 SR_Data 工作表，只保留未遷移資料
   srSheet.clearContents();
   srSheet
@@ -493,14 +513,19 @@ function appendDataToExternalSS(url, year, rows) {
     if (currentFilter) {
       currentFilter.remove();
     }
+    
+    targetSheet.setFrozenRows(1);
 
     const fullRange = targetSheet.getDataRange();
     const newFilter = fullRange.createFilter();
-    newFilter.sort([
-      { column: 1, ascending: true },
-      { column: 3, ascending: true },
-    ]);
-
+    if (fullRange.getNumRows() > 1) {
+      targetSheet.getRange(2, 1, fullRange.getNumRows() - 1, fullRange.getNumColumns()).sort([
+        { column: 1, ascending: true },
+        { column: 3, ascending: true },
+      ]);
+    }
+    removeSRDuplicates(targetSheet);
+    
     console.log(
       `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`,
     );
@@ -661,6 +686,10 @@ function processCustSync() {
     targetSheet
       .getRange(2, 1, finalRows.length, targetHeaders.length)
       .setValues(finalRows);
+    // 清除個案基本資料快取，因為資料已變動
+    CacheService.getScriptCache().remove("CustInfoMap");
+    CacheService.getScriptCache().remove("CustN_All");
+    CacheService.getScriptCache().remove("SRServer01_InitData");
     console.log(`同步完成！ 更新：${updateCount} 筆 新增：${insertCount} 筆`);
   } else {
     console.log("資料皆為最新，無需更新。");

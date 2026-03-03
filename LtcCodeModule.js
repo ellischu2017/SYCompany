@@ -64,6 +64,7 @@ function addLtcCodeData(formObj) {
       .getRange(2, 1, lastRow - 1, lastColumn)
       .sort({ column: 1, ascending: true });
   }
+  CacheService.getScriptCache().remove("SRServer01_InitData");
   return { success: true, message: "編碼新增成功！" };
 }
 
@@ -79,6 +80,7 @@ function updateLtcCodeData(formObj) {
       const rowNum = i + 1;
       sheet.getRange(rowNum, 2).setValue(formObj.srName);
       sheet.getRange(rowNum, 3).setValue(formObj.srDetail);
+      CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "編碼資料更新成功！" };
     }
   }
@@ -95,6 +97,7 @@ function deleteLtcCodeData(srId) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == srId) {
       sheet.deleteRow(i + 1);
+      CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "編碼刪除成功！" };
     }
   }

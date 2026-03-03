@@ -7,6 +7,11 @@
  * 取得「Manager」工作表的管理員姓名列表
  */
 function getManaList() {
+  // 1. 嘗試從快取讀取
+  const cache = CacheService.getScriptCache();
+  const cachedList = cache.get("ManaList");
+  if (cachedList) return JSON.parse(cachedList);
+
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   if (!sheet) return [];
 
@@ -14,7 +19,11 @@ function getManaList() {
   if (lastRow < 2) return [];
 
   const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  return data.map((r) => r[0]).filter((n) => n !== "");
+  const list = data.map((r) => r[0]).filter((n) => n !== "");
+
+  // 2. 寫入快取 (設定 30 分鐘過期)
+  cache.put("ManaList", JSON.stringify(list), 1800);
+  return list;
 }
 
 /**
@@ -64,6 +73,9 @@ function addManaData(formObj) {
       .getRange(2, 1, lastRow - 1, lastColumn)
       .sort({ column: 1, ascending: true });
   }
+  // 清除快取，確保下次讀取到最新名單
+  CacheService.getScriptCache().remove("ManaList");
+  syncMasterTablePermissions();
   return { success: true, message: "新增成功！" };
 }
 
@@ -79,6 +91,9 @@ function updateManaData(formObj) {
       const rowNum = i + 1;
       sheet.getRange(rowNum, 2).setValue(formObj.manaEmail);
       sheet.getRange(rowNum, 3).setValue("'" + formObj.manaTel);
+      // 清除快取
+      CacheService.getScriptCache().remove("ManaList");
+      syncMasterTablePermissions();
       return { success: true, message: "資料更新成功！" };
     }
   }
@@ -95,6 +110,8 @@ function deleteManaData(manaName) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == manaName) {
       sheet.deleteRow(i + 1);
+      // 清除快取
+      CacheService.getScriptCache().remove("ManaList");
       return { success: true, message: "刪除成功！" };
     }
   }

@@ -192,14 +192,16 @@
           }
         });
       });
-      $('#loading').hide();
+      // $('#loading').hide();
     });
 
     function loadDropdown() {
+      $('#loading').css('display', 'flex');
       google.script.run.withSuccessHandler(function (list) {
         const select = $('#selectSYName');
         select.empty().append('<option value="" disabled selected>請選擇代碼...</option>');
         list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
+        $('#loading').hide();
       }).getRecUrlList();
     }
 

@@ -33,21 +33,29 @@ const MainSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
  */
 function includeFooter() {
   let suggestUrl = "";
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "SYSuggestUrl";
+  
+  // 1. 嘗試從快取讀取，如果有就直接使用
+  suggestUrl = cache.get(cacheKey);
 
-  try {
-    const sheet = MainSpreadsheet.getSheetByName("SYTemp");
-
-    if (sheet) {
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === "SYSuggest") {
-          suggestUrl = data[i][1];
-          break;
+  if (!suggestUrl) {
+    try {
+      const sheet = MainSpreadsheet.getSheetByName("SYTemp");
+      if (sheet) {
+        const data = sheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          if (data[i][0] === "SYSuggest") {
+            suggestUrl = data[i][1];
+            // 2. 寫入快取，設定 6 小時 (21600秒) 後過期
+            cache.put(cacheKey, suggestUrl, 21600);
+            break;
+          }
         }
       }
+    } catch (e) {
+      console.log("取得意見反應網址失敗: " + e.message);
     }
-  } catch (e) {
-    console.log("取得意見反應網址失敗: " + e.message);
   }
 
   const template = HtmlService.createTemplateFromFile("Footer");
@@ -59,8 +67,15 @@ function includeFooter() {
  * 提供給 HTML 範本呼叫，用來載入導航列組件
  */
 function includeNav() {
+  // 加入快取機制，避免每次都重新讀取檔案
+  var cache = CacheService.getScriptCache();
+  var cachedNav = cache.get("NavHTML");
+  if (cachedNav) return cachedNav;
+
   var template = HtmlService.createTemplateFromFile("Nav");
-  return template.evaluate().getContent();
+  var content = template.evaluate().getContent();
+  cache.put("NavHTML", content, 21600); // 快取 6 小時
+  return content;
 }
 
 /**
@@ -242,7 +257,7 @@ function removeSRDuplicates(sheet) {
   // 檢查是否所有欄位都存在
   if (indices.includes(-1)) {
     const missing = targetFields.filter((_, i) => indices[i] === -1);
-    SpreadsheetApp.getUi().alert("找不到欄位: " + missing.join(", "));
+    console.error("removeSRDuplicates 錯誤: 找不到欄位 " + missing.join(", "));
     return;
   }
 
@@ -427,6 +442,7 @@ function processLTCCodes() {
       sCust.getRange(i + 1, tarIdx + 1).setValue(processedArr.join(","));
     }
   }
+  CacheService.getScriptCache().remove("SRServer01_InitData");
 }
 
 /**
@@ -513,4 +529,5 @@ function UpdateUserName() {
   tarSheet.getRange(2, 1, updatedRows.length, tarHeaders.length).setValues(updatedRows);
 
   console.log("資料更新完成！");
+  CacheService.getScriptCache().remove("SRServer01_InitData");
 }

@@ -178,6 +178,13 @@ function processUserSync01() {
  * 2. > 7天 ：SY+yyyy > yyyyMM (工作表名稱)
  */
 function processSRData(formObj, actionType) {
+  // 根據日期預先產生快取 key，以便後續清除
+  let yearmonth = "";
+  if (formObj && formObj.date) {
+    const d = new Date(formObj.date);
+    yearmonth = Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyyMM");
+  }
+
   try {
     // --- 1. 計算日期與判斷目標 ---
     var inputDate = new Date(formObj.date);
@@ -244,6 +251,10 @@ function processSRData(formObj, actionType) {
 
     if (actionType === "add") {
       targetSheet.appendRow(rowData);
+      // 清除對應月份的案主列表快取
+      if (yearmonth) {
+        CacheService.getScriptCache().remove("CustN_" + yearmonth);
+      }
       return {
         success: true,
         message: "資料已成功存入 " + targetSS.getName() + " > " + sheetName,
@@ -294,6 +305,10 @@ function processSRData(formObj, actionType) {
           };
         } else if (actionType === "delete") {
           targetSheet.deleteRow(i + 1);
+          // 清除對應月份的案主列表快取
+          if (yearmonth) {
+            CacheService.getScriptCache().remove("CustN_" + yearmonth);
+          }
           return {
             success: true,
             message: "資料已從 " + sheetName + " 刪除。",

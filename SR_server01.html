@@ -404,24 +404,8 @@
         $('#btnUpdate').prop('disabled', true);
       } else if (type === 'query') {
         $('#btnQuery').prop('disabled', true);
-      }
-
-      const formObj = {
-        date: $("#queryDate").val(),
-        SRTimes: $("#querySRTimes").val(),
-        email: $("#currentUserEmail").val(),
-        userName: $("#queryUserN").val(),
-        custName: selectedCust,
-        payType: $("#queryPType").val(),
-        srId: $("#querySrId").val(),
-        srRec: $("#inputSrRec").val(),
-        loc: $("#inputLoc").val(),
-        mood: $("#inputMood").val(),
-        spcons: $("#inputSpcons").val(),
-        userTel: "",
-        isNewBinding: false
-      };
-
+      }      
+      const formObj = getFormObject(selectedCust);
       let exSPCONS = await getSPCons(formObj);
 
       // --- 需求 7：新使用者電話詢問 ---
@@ -518,6 +502,25 @@
         })
         .processSR01Data(formObj, type);
     }
+
+    function getFormObject(selectedCust) {
+      return {
+        date: $("#queryDate").val(),
+        SRTimes: $("#querySRTimes").val(),
+        email: $("#currentUserEmail").val(),
+        userName: $("#queryUserN").val(),
+        custName: selectedCust,
+        payType: $("#queryPType").val(),
+        srId: $("#querySrId").val(),
+        srRec: $("#inputSrRec").val(),
+        loc: $("#inputLoc").val(),
+        mood: $("#inputMood").val(),
+        spcons: $("#inputSpcons").val(),
+        userTel: "",
+        isNewBinding: GLOBAL_DATA.isNewBinding // 直接從全域變數讀取
+      };
+    }
+
 
     function backToSearch() {
       $("#detailSection").hide();

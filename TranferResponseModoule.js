@@ -261,6 +261,23 @@ function processSingleCustomerInternal(
           .getRange(lastRow + 1, 1, uniqueRows.length, uniqueRows[0].length)
           .setValues(uniqueRows);
 
+        // --- 清除相關月份的快取 ---
+        const addedMonths = new Set();
+        uniqueRows.forEach(row => {
+          // 日期在第一欄 (index 0)
+          const d = new Date(row[0]);
+          const yyyyMM = Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyyMM");
+          addedMonths.add(yyyyMM);
+        });
+
+        addedMonths.forEach(ym => {
+          CacheService.getScriptCache().remove("CustN_" + ym);
+        });
+
+        if (addedMonths.size > 0) {
+          result.log += `> 已清除受影響月份的快取: ${Array.from(addedMonths).join(", ")}\n`;
+        }
+
         result.count = uniqueRows.length;
         result.log += `> 新增 ${uniqueRows.length} 筆資料。\n`;
 

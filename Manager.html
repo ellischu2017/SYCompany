@@ -129,7 +129,7 @@
     $(document).ready(function () {
       $('#loading').css('display', 'flex');
       loadDropdown();
-
+      
       $('#btnQuery').click(function () {
         const name = $('#selectManaName').val();
         if (!name) return Swal.fire('提示', '請選擇管理員', 'warning');
@@ -145,7 +145,7 @@
           }
         }).queryManaData(name);
       });
-
+      
       $('#btnAddInit').click(function () {
         Swal.fire({
           title: '輸入新管理員姓名',
@@ -160,7 +160,7 @@
           }
         });
       });
-
+      
       $('#btnSave').click(function () {
         const mode = $('#formMode').val();
         const data = {
@@ -170,7 +170,7 @@
         };
         $('#loading').show();
         const action = (mode === 'add') ? 'addManaData' : 'updateManaData';
-
+        
         google.script.run.withSuccessHandler(function (res) {
           $('#loading').hide();
           if (res.success) {
@@ -183,7 +183,7 @@
           }
         })[action](data);
       });
-
+      
       $('#btnDelete').click(function () {
         const name = $('#inputManaName').val();
         Swal.fire({
@@ -201,17 +201,19 @@
           }
         });
       });
-      $('#loading').hide();
+      // $('#loading').hide();
     });
-
-    function loadDropdown() {
+    
+    function loadDropdown() {      
+      $('#loading').css('display', 'flex');
       google.script.run.withSuccessHandler(function (list) {
         const select = $('#selectManaName');
         select.empty().append('<option value="" disabled selected>請選擇管理員...</option>');
         list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
+        $('#loading').hide();
       }).getManaList();
     }
-
+    
     function switchToDetailMode(mode) {
       $('#searchSection').hide();
       $('#detailSection').show();

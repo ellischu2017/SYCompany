@@ -64,6 +64,7 @@ function addUserData(formObj) {
       .getRange(2, 1, lastRow - 1, lastColumn)
       .sort({ column: 1, ascending: true });
   }
+  CacheService.getScriptCache().remove("SRServer01_InitData");
   return { success: true, message: "新增成功！" };
 }
 
@@ -79,6 +80,7 @@ function updateUserData(formObj) {
       const rowNum = i + 1;
       sheet.getRange(rowNum, 2).setValue(formObj.userEmail);
       sheet.getRange(rowNum, 3).setValue("'" + formObj.userTel);
+      CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "資料更新成功！" };
     }
   }
@@ -95,6 +97,7 @@ function deleteUserData(userName) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == userName) {
       sheet.deleteRow(i + 1);
+      CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "刪除成功！" };
     }
   }

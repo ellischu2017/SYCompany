@@ -95,6 +95,10 @@ function addCustData(formObj) {
       .getRange(2, 1, lastRow - 1, lastColumn)
       .sort({ column: 1, ascending: true });
   }
+  // 清除個案基本資料快取
+  CacheService.getScriptCache().remove("CustInfoMap");
+  CacheService.getScriptCache().remove("CustN_All");
+  CacheService.getScriptCache().remove("SRServer01_InitData");
   return { success: true, message: "新增成功！新增成功並已完成姓名排序！" };
 }
 
@@ -119,6 +123,9 @@ function updateCustData(formObj) {
       sheet.getRange(rowNum, 10).setValue("'" + formObj.ecTel);
       sheet.getRange(rowNum, 11).setValue(formObj.ltcCode || "");
 
+      // 清除個案基本資料快取
+      CacheService.getScriptCache().remove("CustInfoMap");
+      CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "資料更新成功！" };
     }
   }
@@ -135,6 +142,10 @@ function deleteCustData(custName) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == custName) {
       sheet.deleteRow(i + 1);
+      // 清除個案基本資料快取
+      CacheService.getScriptCache().remove("CustInfoMap");
+      CacheService.getScriptCache().remove("CustN_All");
+      CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "刪除成功！" };
     }
   }
