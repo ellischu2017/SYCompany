@@ -80,16 +80,30 @@
 
     <div id="searchSection" class="card shadow-sm mb-4">
       <div class="card-body">
-        <h5 class="card-title mb-3">個案選擇</h5>
+        <h5 class="card-title mb-3">執行中個案：</h5>
         <div class="mb-3">
-          <label for="selectCustName" class="form-label">請選擇個案姓名：</label>
           <select class="form-select" id="selectCustName">
             <option value="" disabled selected>載入中...</option>
           </select>
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-search"></i> 查詢</button>
-          <button class="btn btn-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
+        <div class="d-flex gap-3">
+          <button class="btn btn-primary" id="btnQuery" type="button"> <i class="fas fa-user-edit"></i> 修改</button>
+          <button class="btn btn-secondary" id="btnArchive" type="button"> <i class="fas fa-lock"></i> 結案</button>
+          <button class="btn btn-danger" id="btnAddInit" type="button"> <i class="fas fa-user-plus"></i> 新增</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <h5 class="card-title mb-3">封存中個案</h5>
+        <div class="mb-3">
+          <select class="form-select" id="selectOldCustName">
+            <option value="" disabled selected>載入中...</option>
+          </select>
+        </div>
+        <div class="d-flex gap-3">
+          <button class="btn btn-primary" id="btnQueryOld" type="button"> <i class="fas fa-user-edit"></i> 修改</button>
+          <button class="btn btn-secondary" id="btnUnarchive" type="button"> <i class="fas fa-lock-open"></i>
+            重啟</button>
+          <button class="btn btn-danger" id="btnDelete" type="button"> <i class="fas fa-user-minus"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -101,9 +115,11 @@
       <div class="card-body">
         <form id="custForm">
           <input type="hidden" id="formMode" value="update">
+          <input type="hidden" id="sourceSheet">
 
           <div class="mb-3">
             <label class="form-label">個案姓名 (Cust_N)</label>
+            <!-- 在新增模式，這裡會是空的，所以需要一個 input 來儲存 -->
             <div id="displayCustName" class="cust-label"></div>
             <input type="hidden" id="inputCustName">
           </div>
@@ -161,19 +177,26 @@
           </div>
 
           <div class="mb-3">
-            <label for="inputLtcCode" class="form-label">服務項目 (Cust_LTC_Code)</label>
-            <textarea class="form-control" id="inputLtcCode" rows="5" placeholder="請輸入服務項目以 ',' 分開"></textarea>
+            <label for="inputcustLtcCode" class="form-label">服務項目 (Cust_LTC_Code)</label>
+            <textarea class="form-control" id="inputcustLtcCode" rows="5" placeholder="請輸入服務項目以 ',' 分開"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label for="inputLtcCode" class="form-label">服務項目快取 (LTC_Code)</label>
+            <input type="text" class="form-control" id="inputLtcCode" disabled>
+          </div>
+
+          <div class="mb-3">
+            <label for="inputFormUrl" class="form-label">舊表單網址 (Form_Url)</label>
+            <input type="text" class="form-control" id="inputFormUrl" placeholder="請輸入舊表單網址">
           </div>
 
           <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
-            <button type="button" class="btn btn-primary" id="btnSave">
-              <i class="fas fa-save"></i> 更新資料
-            </button>
-            <button type="button" class="btn btn-danger" id="btnDelete">
-              <i class="fas fa-trash-alt"></i> 刪除
-            </button>
-
-            <button type="button" class="btn btn-outline-dark" id="btnBack">返回搜尋</button>
+            <button class="btn btn-primary" id="btnSave" type="button" style="display: none;"> <i class="fas fa-save"></i> 儲存</button>
+            <button class="btn btn-secondary" id="btnDetailArchive" type="button" style="display: none;"> <i class="fas fa-lock"></i> 封存</button>
+            <button class="btn btn-info" id="btnDetailUnarchive" type="button" style="display: none;"> <i class="fas fa-lock-open"></i> 解封</button>
+            <button class="btn btn-danger" id="btnDetailDelete" type="button" style="display: none;"> <i class="fas fa-user-minus"></i> 刪除</button>
+            <button class="btn btn-outline-dark" id="btnBack" type="button"> <i class="fas fa-undo-alt"></i> 返回搜尋</button>
           </div>
         </form>
       </div>
@@ -195,10 +218,10 @@
   <script>
     $(document).ready(function () {
       $('#loadingSpin').css('display', 'flex');
-      // 頁面載入時，先抓取下拉選單資料
-      loadDropdown();
+      // 頁面載入時，抓取所有初始資料
+      loadInitialData();
 
-      // 當生日欄位數值改變時，自動更新年齡標註
+      // ==================== 事件處理 ====================
       $('#inputCustBirth').on('change', function () {
         updateAgeDisplay($(this).val());
       });
@@ -210,17 +233,37 @@
           Swal.fire('提示', '請先選擇一位個案', 'warning');
           return;
         }
-        $('#loadingSpin').show();
+        
+        const allCustData = JSON.parse(sessionStorage.getItem('custData'));
+        const customer = allCustData.find(c => c.Cust_N === selectedName);
 
-        google.script.run.withSuccessHandler(function (response) {
-          $('#loadingSpin').hide();
-          if (response.found) {
-            populateForm(response.rowResult);
-            switchToDetailMode('update');
-          } else {
-            Swal.fire('錯誤', '找不到該個案資料', 'error');
-          }
-        }).queryCustData(selectedName);
+        if (customer) {
+          populateForm(customer);
+          $('#sourceSheet').val('Cust'); // 標記出處
+          switchToDetailMode('update');
+        } else {
+          Swal.fire('錯誤', '在快取中找不到該個案資料，請嘗試重新整理頁面。', 'error');
+        }
+      });
+
+      // 查詢封存中個案按鈕事件
+      $('#btnQueryOld').click(function () {
+        const selectedName = $('#selectOldCustName').val();
+        if (!selectedName) {
+          Swal.fire('提示', '請先選擇一位封存個案', 'warning');
+          return;
+        }
+
+        const allOldCustData = JSON.parse(sessionStorage.getItem('oldCustData'));
+        const customer = allOldCustData.find(c => c.Cust_N === selectedName);
+
+        if (customer) {
+          populateForm(customer);
+          $('#sourceSheet').val('OldCust'); // 標記出處
+          switchToDetailMode('queryOld');
+        } else {
+          Swal.fire('錯誤', '在快取中找不到該個案資料，請嘗試重新整理頁面。', 'error');
+        }
       });
 
       // 新增按鈕事件 (初始畫面)
@@ -244,6 +287,7 @@
             clearForm();
             $('#displayCustName').text(newName);
             $('#inputCustName').val(newName);
+            $('#sourceSheet').val('Cust');
             switchToDetailMode('add');
           }
         });
@@ -253,6 +297,7 @@
       $('#btnSave').click(function () {
         const mode = $('#formMode').val();
         const formData = {
+          // 從 input 欄位收集資料
           custName: $('#inputCustName').val(),
           custSex: $('#inputCustSex').val(),
           custBirth: $('#inputCustBirth').val(),
@@ -263,7 +308,9 @@
           officeTel: $('#inputOfficeTel').val(),
           ecName: $('#inputEcName').val(),
           ecTel: $('#inputEcTel').val(),
-          ltcCode: $('#inputLtcCode').val()
+          custltcCode: $('#inputcustLtcCode').val(),
+          ltcCode: $('#inputLtcCode').val(),
+          formUrl: $('#inputFormUrl').val()
         };
 
         if (!formData.custBirth) {
@@ -273,51 +320,156 @@
 
         $('#loadingSpin').show();
 
+        const sheetName = $('#sourceSheet').val();
+
         if (mode === 'add') {
-          // 新增模式
           google.script.run.withSuccessHandler(function (res) {
             $('#loadingSpin').hide();
             if (res.success) {
-              Swal.fire({
-                title: '成功',
-                text: res.message,
-                icon: 'success',
-                confirmButtonText: '確定'
-              }).then(() => {
-                // 新增後「重新整理頁面」以載入新的下拉清單並回到初始狀態
-                backToSearch();
-              });
+              Swal.fire('成功', res.message, 'success').then(() => backToSearch(true)); // true 表示需要重載資料
             } else {
               Swal.fire('失敗', res.message, 'error');
             }
           }).addCustData(formData);
-        } else {
-          // 更新模式
-          google.script.run.withSuccessHandler(function (res) {
+        } else if (mode === 'update' || mode === 'queryOld') {
+          google.script.run.withSuccessHandler(function(res) {
             $('#loadingSpin').hide();
             if (res.success) {
-              Swal.fire({
-                title: '更新成功',
-                text: res.message,
-                icon: 'success',
-                confirmButtonText: '確定'
-              }).then(() => {
-                // 更新後「回到查詢頁面」而不是重整，這樣速度較快
-                // 也可以選擇用 window.location.reload();
-                backToSearch();
-              });
+              // 更新 sessionStorage
+              updateSessionStorage(formData, sheetName);
+              Swal.fire('成功', res.message, 'success').then(() => backToSearch(false)); // false 表示不重載
             } else {
               Swal.fire('失敗', res.message, 'error');
             }
-          }).updateCustData(formData);
+          }).updateCustData(formData, sheetName);
         }
       });
 
+      // 封存按鈕 (搜尋頁)
+      $('#btnArchive').click(function() {
+        const custName = $('#selectCustName').val();
+        if (!custName) return Swal.fire('提示', '請選擇要封存的個案', 'warning');
+        handleMoveCustomer(custName, 'Cust', 'OldCust');
+      });
 
+      // 解封按鈕 (搜尋頁)
+      $('#btnUnarchive').click(function() {
+        const custName = $('#selectOldCustName').val();
+        if (!custName) return Swal.fire('提示', '請選擇要解封的個案', 'warning');
+        handleMoveCustomer(custName, 'OldCust', 'Cust');
+      });
+
+      // 封存按鈕 (詳情頁)
+      $('#btnDetailArchive').click(function() {
+        const custName = $('#inputCustName').val();
+        handleMoveCustomer(custName, 'Cust', 'OldCust', true); // true 表示在詳情頁操作
+      });
+
+      // 解封按鈕 (詳情頁)
+      $('#btnDetailUnarchive').click(function() {
+        const custName = $('#inputCustName').val();
+        handleMoveCustomer(custName, 'OldCust', 'Cust', true); // true 表示在詳情頁操作
+      });
 
       // 刪除按鈕事件
       $('#btnDelete').click(function () {
+        const custName = $('#selectOldCustName').val();
+        if (!custName) return Swal.fire('提示', '請選擇要刪除的封存個案', 'warning');
+        handleDeleteCustomer(custName, 'OldCust');
+      });
+
+      // 刪除按鈕 (詳情頁)
+      $('#btnDetailDelete').click(function() {
         const custName = $('#inputCustName').val();
+        handleDeleteCustomer(custName, 'OldCust', true); // true 表示在詳情頁操作
+      });
+
+      $('#btnBack').click(function () {
+        backToSearch(false);
+      });
+    });
+
+    // ==================== 資料處理函式 ====================
+
+    // 處理個案移動 (封存/解封)
+    function handleMoveCustomer(custName, fromSheet, toSheet, fromDetail = false) {
+      const actionText = fromSheet === 'Cust' ? '封存' : '解封';
+      Swal.fire({
+        title: `確定要${actionText}個案 "${custName}" 嗎?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '確定',
+        cancelButtonText: '取消'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // --- 1. 立即在 Session 中執行 ---
+          const fromStorageKey = fromSheet === 'Cust' ? 'custData' : 'oldCustData';
+          const toStorageKey = toSheet === 'Cust' ? 'custData' : 'oldCustData';
+
+          let fromArray = JSON.parse(sessionStorage.getItem(fromStorageKey)) || [];
+          let toArray = JSON.parse(sessionStorage.getItem(toStorageKey)) || [];
+
+          const customerIndex = fromArray.findIndex(c => c.Cust_N === custName);
+          if (customerIndex === -1) {
+            Swal.fire({ title: '錯誤', text: '在快取中找不到要移動的個案資料。', icon: 'error' });
+            return;
+          }
+
+          // 從來源陣列移除並取得該個案
+          const [customerToMove] = fromArray.splice(customerIndex, 1);
+
+          // 加入到目標陣列並排序
+          toArray.push(customerToMove);
+          toArray.sort((a, b) => a.Cust_N.localeCompare(b.Cust_N));
+
+          // 更新 sessionStorage
+          sessionStorage.setItem(fromStorageKey, JSON.stringify(fromArray));
+          sessionStorage.setItem(toStorageKey, JSON.stringify(toArray));
+
+          // --- 2. 立即更新 UI ---
+          Swal.fire({
+            title: '成功',
+            text: `個案 "${custName}" 已${actionText}！正在背景同步資料...`,
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+          });
+
+          if (fromDetail) {
+            backToSearch(false); // 從詳情頁返回，不強制重載
+          } else {
+            populateDropdowns(); // 在搜尋頁，僅重整下拉選單
+          }
+
+          // --- 3. 非同步在背景執行伺服器端操作 ---
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (res.success) {
+                console.log(`背景同步成功: ${res.message}`);
+              } else {
+                console.error(`背景同步失敗: ${res.message}`);
+                Swal.fire({
+                  title: '背景同步失敗',
+                  text: `您的操作已在介面上完成，但與伺服器同步時發生錯誤: ${res.message}。建議您重新整理頁面以確保資料一致。`,
+                  icon: 'error'
+                });
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.error(`背景同步失敗 (伺服器錯誤): ${error.message}`);
+              Swal.fire({
+                title: '背景同步失敗',
+                text: `您的操作已在介面上完成，但與伺服器連線時發生嚴重錯誤: ${error.message}。建議您重新整理頁面以確保資料一致。`,
+                icon: 'error'
+              });
+            })
+            .moveCustomer(custName, fromSheet, toSheet);
+        }
+      });
+    }
+
+    // 處理刪除
+    function handleDeleteCustomer(custName, sheetName, fromDetail = false) {
         Swal.fire({
           title: '確定刪除?',
           text: `將刪除個案：${custName} 的所有資料，此動作無法復原！`,
@@ -328,58 +480,169 @@
           cancelButtonText: '取消'
         }).then((result) => {
           if (result.isConfirmed) {
-            $('#loadingSpin').show();
-            google.script.run.withSuccessHandler(function (res) {
-              $('#loadingSpin').hide();
-              if (res.success) {
-                Swal.fire('已刪除', res.message, 'success').then(
-                  () => { backToSearch(); });
-              } else {
-                Swal.fire('錯誤', res.message, 'error');
-              }
-            }).deleteCustData(custName);
+            // --- 1. 立即在 Session 中執行 ---
+            const storageKey = 'oldCustData'; // 刪除操作只針對封存個案
+            let dataArray = JSON.parse(sessionStorage.getItem(storageKey)) || [];
+
+            const customerIndex = dataArray.findIndex(c => c.Cust_N === custName);
+            if (customerIndex === -1) {
+              Swal.fire({ title: '錯誤', text: '在快取中找不到要刪除的個案資料。', icon: 'error' });
+              return;
+            }
+
+            // 從陣列中移除該個案
+            dataArray.splice(customerIndex, 1);
+
+            // 更新 sessionStorage
+            sessionStorage.setItem(storageKey, JSON.stringify(dataArray));
+
+            // --- 2. 立即更新 UI ---
+            Swal.fire({
+              title: '成功',
+              text: `個案 "${custName}" 已刪除！正在背景同步資料...`,
+              icon: 'success',
+              timer: 1500,
+              showConfirmButton: false
+            });
+
+            if (fromDetail) {
+              backToSearch(false); // 從詳情頁返回，不強制重載
+            } else {
+              populateDropdowns(); // 在搜尋頁，僅重整下拉選單
+            }
+
+            // --- 3. 非同步在背景執行伺服器端操作 ---
+            google.script.run
+              .withSuccessHandler(function(res) {
+                if (res.success) {
+                  console.log(`背景同步成功: ${res.message}`);
+                } else {
+                  console.error(`背景同步失敗: ${res.message}`);
+                  Swal.fire({
+                    title: '背景同步失敗',
+                    text: `您的操作已在介面上完成，但與伺服器同步時發生錯誤: ${res.message}。建議您重新整理頁面以確保資料一致。`,
+                    icon: 'error'
+                  });
+                }
+              })
+              .withFailureHandler(function(error) {
+                console.error(`背景同步失敗 (伺服器錯誤): ${error.message}`);
+                Swal.fire({
+                  title: '背景同步失敗',
+                  text: `您的操作已在介面上完成，但與伺服器連線時發生嚴重錯誤: ${error.message}。建議您重新整理頁面以確保資料一致。`,
+                  icon: 'error'
+                });
+              })
+              .deleteCustData(custName, sheetName);
           }
         });
-      });
-      $('#btnBack').click(function () {
-        $('#detailSection').hide();   // 隱藏詳細資料表單
-        $('#searchSection').show();   // 顯示查詢與新增區塊
-      });
-      // $('#loadingSpin').hide();
-    });
+    }
 
-    //
-
-    // 載入下拉選單
-    function loadDropdown() {
+    // 載入所有初始資料到 sessionStorage
+    function loadInitialData() {
       $('#loadingSpin').show();
-      google.script.run.withSuccessHandler(function (list) {
+      google.script.run
+        .withSuccessHandler(function (data) {
+          sessionStorage.setItem('custData', JSON.stringify(data.active));
+          sessionStorage.setItem('oldCustData', JSON.stringify(data.archived));
+          populateDropdowns();
+          $('#loadingSpin').hide();
+        })
+        .withFailureHandler(function (error) {
+          $('#loadingSpin').hide();
+          Swal.fire('載入失敗', '無法取得個案清單：' + error.message, 'error');
+          $('#selectCustName').empty().append('<option value="" disabled selected>載入失敗</option>');
+          $('#selectOldCustName').empty().append('<option value="" disabled selected>載入失敗</option>');
+        })
+        .getAllCustData();
+    }
+
+    // 從 sessionStorage 填充下拉選單
+    function populateDropdowns() {
+      try {
+        const data = {
+          active: JSON.parse(sessionStorage.getItem('custData')) || [],
+          archived: JSON.parse(sessionStorage.getItem('oldCustData')) || []
+        };
+        
+        // 1. 填入 #selectCustName (執行中)
         const select = $('#selectCustName');
         select.empty();
         select.append('<option value="" disabled selected>請選擇個案...</option>');
-        if (list.length === 0) {
+        if (data.active.length === 0) {
           select.append('<option value="" disabled>無資料</option>');
         } else {
-          list.forEach(function (name) {
-            select.append(`<option value="${name}">${name}</option>`);
+          data.active.forEach(function (customer) {
+            select.append(`<option value="${customer.Cust_N}">${customer.Cust_N}</option>`);
           });
         }
-        $('#loadingSpin').hide();
-      }).getCustList();
+
+        // 2. 填入 #selectOldCustName (封存中)
+        const selectOld = $('#selectOldCustName');
+        selectOld.empty();
+        selectOld.append('<option value="" disabled selected>請選擇封存個案...</option>');
+        if (data.archived.length === 0) {
+          selectOld.append('<option value="" disabled>無資料</option>');
+        } else {
+          data.archived.forEach(function (customer) {
+            selectOld.append(`<option value="${customer.Cust_N}">${customer.Cust_N}</option>`);
+          });
+        }
+      } catch (e) {
+        console.error("填充下拉選單失敗:", e);
+        Swal.fire('錯誤', '讀取快取資料失敗，請重新整理。', 'error');
+      }
     }
 
-    // 切換顯示模式 (add/update)
+    // 更新 sessionStorage 中的單筆資料
+    function updateSessionStorage(formData, sheetName) {
+      const storageKey = sheetName === 'Cust' ? 'custData' : 'oldCustData';
+      let dataArray = JSON.parse(sessionStorage.getItem(storageKey)) || [];
+      const index = dataArray.findIndex(c => c.Cust_N === formData.custName);
+      if (index !== -1) {
+        // 更新現有資料
+        // 將前端表單資料 (formData) 轉換為後端資料結構 (Sheet 欄位)
+        const updatedFields = {
+          Cust_N: formData.custName,
+          Cust_Sex: formData.custSex,
+          Cust_BD: formData.custBirth,
+          Cust_Add: formData.custAddr,
+          Sup_N: formData.supName,
+          DSup_N: formData.dsupName,
+          Sup_Tel: formData.supTel,
+          Office_Tel: formData.officeTel,
+          Cust_EC: formData.ecName,
+          Cust_EC_Tel: formData.ecTel,
+          Cust_LTC_Code: formData.custltcCode,
+          LTC_Code: formData.ltcCode,
+          Form_Url: formData.formUrl
+        };
+        
+        dataArray[index] = { ...dataArray[index], ...updatedFields };
+        sessionStorage.setItem(storageKey, JSON.stringify(dataArray));
+      }
+    }
+
+    // ==================== UI 控制函式 ====================
+
+    // 切換到詳情/編輯模式
     function switchToDetailMode(mode) {
       $('#searchSection').hide(); // 隱藏查詢區塊 
       $('#detailSection').show(); // 顯示編輯區塊 
       $('#formMode').val(mode);
 
+      // Hide all buttons first to ensure a clean state
+      $('#btnSave, #btnDetailArchive, #btnDetailUnarchive, #btnDetailDelete').hide();
+
       if (mode === 'add') {
-        $('#btnSave').html('<i class="fas fa-save"></i> 新增資料');
-        $('#btnDelete').hide(); // 新增模式不顯示刪除鈕
-      } else {
-        $('#btnSave').html('<i class="fas fa-sync"></i> 更新'); // 更新鈕 
-        $('#btnDelete').show(); // 刪除鈕 
+        $('#btnSave').html('<i class="fas fa-save"></i> 新增資料').show();
+      } else if (mode === 'update') { // For active customer query
+        $('#btnSave').html('<i class="fas fa-sync"></i> 更新資料').show();
+        $('#btnDetailArchive').show();
+      } else if (mode === 'queryOld') { // For archived customer query
+        $('#btnSave').html('<i class="fas fa-sync"></i> 更新資料').show(); // 允許編輯封存資料
+        $('#btnDetailUnarchive').show();
+        $('#btnDetailDelete').show();
       }
     }
 
@@ -388,17 +651,19 @@
       $('#displayCustName').text(data.Cust_N); // 以標籤顯示 
       $('#inputCustName').val(data.Cust_N);
       $('#inputCustSex').val(data.Cust_Sex);
-      $('#inputCustBirth').val(data.Cust_BD);
+      $('#inputCustBirth').val(data.Cust_BD || '');
       // 填入資料後立即計算年齡
       updateAgeDisplay(data.Cust_BD);
-      $('#inputCustAddr').val(data.Cust_Add);
-      $('#inputSupName').val(data.Sup_N);
-      $('#inputDSupName').val(data.DSup_N);
-      $('#inputSupTel').val(data.Sup_Tel);
-      $('#inputOfficeTel').val(data.Office_Tel);
-      $('#inputEcName').val(data.Cust_EC);
-      $('#inputEcTel').val(data.Cust_EC_Tel);
-      $('#inputLtcCode').val(data.Cust_LTC_Code);
+      $('#inputCustAddr').val(data.Cust_Add || '');
+      $('#inputSupName').val(data.Sup_N || '');
+      $('#inputDSupName').val(data.DSup_N || '');
+      $('#inputSupTel').val(data.Sup_Tel || '');
+      $('#inputOfficeTel').val(data.Office_Tel || '');
+      $('#inputEcName').val(data.Cust_EC || '');
+      $('#inputEcTel').val(data.Cust_EC_Tel || '');
+      $('#inputcustLtcCode').val(data.Cust_LTC_Code || '');
+      $('#inputLtcCode').val(data.LTC_Code || '');
+      $('#inputFormUrl').val(data.Form_Url || '');
     }
 
     // 清空表單
@@ -408,6 +673,7 @@
       $('#inputCustName').val('');
     }
 
+    // ==================== 輔助函式 ====================
     // 計算年齡的函式
     function calculateAge(birthDateString) {
       if (!birthDateString) return "--";
@@ -428,12 +694,16 @@
       $('#displayAge').text(`年齡：${age} 歲`);
     }
 
-    // 新增一個輔助函式：回到查詢初始狀態
-    function backToSearch() {
+    // 回到查詢初始狀態
+    function backToSearch(forceReload) {
       $('#detailSection').hide();   // 隱藏詳細資料表單
       $('#searchSection').show();   // 顯示查詢與新增區塊
       clearForm();                  // 清空表單內容
-      loadDropdown();               // 重新整理下拉選單（確保資料同步）
+      if (forceReload) {
+        loadInitialData(); // 從伺服器重新載入所有資料
+      } else {
+        populateDropdowns(); // 僅從快取重新整理下拉選單
+      }
     }
 
   </script>

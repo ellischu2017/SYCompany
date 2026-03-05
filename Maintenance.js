@@ -62,11 +62,13 @@ function dailyMaintenanceJob() {
   // 1. 同步主資料
   processUserSync(MainSpreadsheet, ssSYTemp);
   processCustSync();
+  processOldCustSync();
   // 2. 匯入新紀錄至 SYTemp
   processTransferData("all", true);
   // 3. 在資料遷移前，先處理 SYTemp 中的所有資料
   removeSRDuplicates(tmpSheet);
   UpdateCustLTCCode(tmpSheet, tarSheet);
+  UpdateUserCustName();
   // 4. 將 SYTemp 中的舊資料遷移至年度表單
   // processSRDataMigration(MainSpreadsheet, ssSYTemp);
 }
@@ -436,7 +438,7 @@ function processSRDataMigration() {
     // get target spredsheet
     let tarspredsheet = getTargetsheet("RecUrl", syName).Spreadsheet;
     // get target sheet name is yyyyMM
-    let tarsheetName = year+month;
+    let tarsheetName = year + month;
     let tarSheet = tarspredsheet.getSheetByName(tarsheetName);
     Logger.log(`處理 ${yearmonth} 資料，目標試算表: ${syName}, 目標工作表: ${tarsheetName}`);
     // move data to target sheet
@@ -451,7 +453,7 @@ function processSRDataMigration() {
   // 同步權限如果有新建立年度試算表
   if (createdNewSS) {
     syncMasterTablePermissions();
-  }  
+  }
   // 清理 SR_Data 工作表，只保留未遷移資料
   srSheet.clearContents();
   srSheet
@@ -513,7 +515,7 @@ function appendDataToExternalSS(url, year, rows) {
     if (currentFilter) {
       currentFilter.remove();
     }
-    
+
     targetSheet.setFrozenRows(1);
 
     const fullRange = targetSheet.getDataRange();
@@ -525,7 +527,7 @@ function appendDataToExternalSS(url, year, rows) {
       ]);
     }
     removeSRDuplicates(targetSheet);
-    
+
     console.log(
       `成功搬移並排序 ${rows.length} 筆資料至 ${year} 年 ${monthStr} 表`,
     );
@@ -603,13 +605,14 @@ function processCustSync() {
 
   // 2. 建立欄位索引字典
   const getIdx = (headers, name) => headers.indexOf(name);
-  const srcIdx = { name: 0, sex: 1, bd: 2, add: 3, ltc: 5 }; // 根據 CSV 結構固定或動態獲取
+  const srcIdx = { name: 0, sex: 1, bd: 2, add: 3, formurl: 4, ltc: 5 }; // 根據 CSV 結構固定或動態獲取
   const tarIdx = {
     name: getIdx(targetHeaders, "Cust_N"),
     sex: getIdx(targetHeaders, "Cust_Sex"),
     bd: getIdx(targetHeaders, "Cust_BD"),
     add: getIdx(targetHeaders, "Cust_Add"),
     ltc: getIdx(targetHeaders, "Cust_LTC_Code"),
+    formurl: getIdx(targetHeaders, "Form_Url"),
   };
 
   // 3. 將目標表轉換為 Map 物件，方便以「姓名」快速查詢
@@ -640,6 +643,7 @@ function processCustSync() {
       bd: sBD,
       add: sRow[srcIdx.add],
       ltc: sRow[srcIdx.ltc],
+      formurl: sRow[srcIdx.formurl],
     };
 
     if (targetMap.has(sName)) {
@@ -657,13 +661,16 @@ function processCustSync() {
         tRow[tarIdx.sex] !== newData.sex ||
         tBD !== newData.bd ||
         tRow[tarIdx.add] !== newData.add ||
-        tRow[tarIdx.ltc] !== newData.ltc;
+        tRow[tarIdx.ltc] !== newData.ltc ||
+        tRow[tarIdx.formurl] !== newData.formurl;
+
 
       if (isChanged) {
         finalRows[tEntry.index][tarIdx.sex] = newData.sex;
         finalRows[tEntry.index][tarIdx.bd] = newData.bd;
         finalRows[tEntry.index][tarIdx.add] = newData.add;
         finalRows[tEntry.index][tarIdx.ltc] = newData.ltc;
+        finalRows[tEntry.index][tarIdx.formurl] = newData.formurl;
         updateCount++;
       }
     } else {
@@ -674,6 +681,127 @@ function processCustSync() {
       newRow[tarIdx.bd] = newData.bd;
       newRow[tarIdx.add] = newData.add;
       newRow[tarIdx.ltc] = newData.ltc;
+      newRow[tarIdx.formurl] = newData.formurl;
+
+      finalRows.push(newRow);
+      insertCount++;
+    }
+  });
+
+  // 5. 寫回資料
+  if (updateCount > 0 || insertCount > 0) {
+    // 寫回所有資料 (包含更新後與新增的)
+    targetSheet
+      .getRange(2, 1, finalRows.length, targetHeaders.length)
+      .setValues(finalRows);
+    // 清除個案基本資料快取，因為資料已變動
+    CacheService.getScriptCache().remove("CustInfoMap");
+    CacheService.getScriptCache().remove("CustN_All");
+    CacheService.getScriptCache().remove("SRServer01_InitData");
+    console.log(`同步完成！ 更新：${updateCount} 筆 新增：${insertCount} 筆`);
+  } else {
+    console.log("資料皆為最新，無需更新。");
+  }
+}
+
+function processOldCustSync() {
+  console.log(
+    "processCustSync 開始同步 Case_Reports > 結案個案清單 > OldCust 資料...",
+  );
+  const SOURCE_SS_ID = "1ib8q-lKJgLEhRVrwncnRqOyKNauMqaV2wtYEpGlmRlk";
+
+  const sourceSheet =
+    SpreadsheetApp.openById(SOURCE_SS_ID).getSheetByName("結案個案清單");
+  const targetSheet = MainSpreadsheet.getSheetByName("OldCust");
+
+  // 1. 取得來源與目標的所有資料
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const targetData = targetSheet.getDataRange().getValues();
+
+  const sourceHeaders = sourceData[0];
+  const targetHeaders = targetData[0];
+  const sourceRows = sourceData.slice(1);
+  const targetRows = targetData.slice(1);
+
+  // 2. 建立欄位索引字典
+  const getIdx = (headers, name) => headers.indexOf(name);
+  const srcIdx = { name: 0, sex: 1, bd: 2, add: 3, formurl: 4, ltc: 5 }; // 根據 CSV 結構固定或動態獲取
+  const tarIdx = {
+    name: getIdx(targetHeaders, "Cust_N"),
+    sex: getIdx(targetHeaders, "Cust_Sex"),
+    bd: getIdx(targetHeaders, "Cust_BD"),
+    add: getIdx(targetHeaders, "Cust_Add"),
+    ltc: getIdx(targetHeaders, "Cust_LTC_Code"),
+    formurl: getIdx(targetHeaders, "Form_Url"),
+  };
+
+  // 3. 將目標表轉換為 Map 物件，方便以「姓名」快速查詢
+  // Key: 姓名, Value: 該列在陣列中的索引與資料內容
+  let targetMap = new Map();
+  targetRows.forEach((row, index) => {
+    const name = row[tarIdx.name];
+    if (name) targetMap.set(name, { index: index, data: row });
+  });
+
+  let updateCount = 0;
+  let insertCount = 0;
+  let finalRows = [...targetRows]; // 複製一份目標資料來修改
+
+  // 4. 遍歷來源資料進行比對
+  sourceRows.forEach((sRow) => {
+    const sName = sRow[srcIdx.name];
+    if (!sName) return; // 跳過空列
+
+    // 格式化來源生日 (處理日期物件轉字串比對)
+    const sBD =
+      sRow[srcIdx.bd] instanceof Date
+        ? Utilities.formatDate(sRow[srcIdx.bd], "GMT+8", "yyyy/M/d")
+        : sRow[srcIdx.bd];
+
+    const newData = {
+      sex: sRow[srcIdx.sex],
+      bd: sBD,
+      add: sRow[srcIdx.add],
+      ltc: sRow[srcIdx.ltc],
+      formurl: sRow[srcIdx.formurl],
+    };
+
+    if (targetMap.has(sName)) {
+      // --- 狀況 A: 姓名已存在，檢查內容是否不同 ---
+      let tEntry = targetMap.get(sName);
+      let tRow = tEntry.data;
+
+      // 比對日期需要特別小心，建議轉字串比對
+      const tBD =
+        tRow[tarIdx.bd] instanceof Date
+          ? Utilities.formatDate(tRow[tarIdx.bd], "GMT+8", "yyyy/M/d")
+          : tRow[tarIdx.bd];
+
+      const isChanged =
+        tRow[tarIdx.sex] !== newData.sex ||
+        tBD !== newData.bd ||
+        tRow[tarIdx.add] !== newData.add ||
+        tRow[tarIdx.ltc] !== newData.ltc ||
+        tRow[tarIdx.formurl] !== newData.formurl;
+
+
+      if (isChanged) {
+        finalRows[tEntry.index][tarIdx.sex] = newData.sex;
+        finalRows[tEntry.index][tarIdx.bd] = newData.bd;
+        finalRows[tEntry.index][tarIdx.add] = newData.add;
+        finalRows[tEntry.index][tarIdx.ltc] = newData.ltc;
+        finalRows[tEntry.index][tarIdx.formurl] = newData.formurl;
+        updateCount++;
+      }
+    } else {
+      // --- 狀況 B: 姓名不存在，新增一列 ---
+      let newRow = new Array(targetHeaders.length).fill("");
+      newRow[tarIdx.name] = sName;
+      newRow[tarIdx.sex] = newData.sex;
+      newRow[tarIdx.bd] = newData.bd;
+      newRow[tarIdx.add] = newData.add;
+      newRow[tarIdx.ltc] = newData.ltc;
+      newRow[tarIdx.formurl] = newData.formurl;
 
       finalRows.push(newRow);
       insertCount++;

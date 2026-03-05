@@ -93,7 +93,7 @@
           <select class="form-select" id="querySRTimes">
             <option value="1" selected>第一次</option>
             <option value="2">第二次</option>
-            <option value="3">第三次</option>            
+            <option value="3">第三次</option>
             <option value="4">第四次</option>
             <option value="5">第五次</option>
           </select>
@@ -141,7 +141,7 @@
       </div>
 
       <div class="d-grid gap-2 mt-3">
-        <button class="btn btn-danger btn-lg" id="btnQuery" onclick="handleAction('query')">
+        <button class="btn btn-danger btn-lg" id="btnQuery">
           查詢紀錄
         </button>
       </div>
@@ -202,13 +202,13 @@
         </div>
       </div>
       <div class="d-grid gap-2">
-        <button class="btn btn-primary btn-lg" id="btnUpdate" onclick="handleAction('update')">
+        <button class="btn btn-primary btn-lg" id="btnUpdate">
           更新紀錄
         </button>
-        <button class="btn btn-success btn-lg" id="btnAdd" onclick="handleAction('add')">
+        <button class="btn btn-success btn-lg" id="btnAdd">
           確認存檔
         </button>
-        <button class="btn btn-secondary btn-lg" onclick="backToSearch()">
+        <button class="btn btn-secondary btn-lg" id="btnBack">
           返回查詢
         </button>
       </div>
@@ -223,6 +223,8 @@
       users: [],      // SYCompany > User + SYTemp > User
       custs: [],      // SYCompany > Cust
       ltcCodes: [],   // SYCompany > LTC_Code
+      srData: [],
+      srDataHeaders: [],
       currentUser: null,
       isNewBinding: false
     };
@@ -230,21 +232,25 @@
     $(document).ready(function () {
       $('#loadingSpin').css('display', 'flex').show();
 
-      // --- 需求 8：日期前後只能 7 天 ---
       const today = new Date();
+      const dayOfMonth = today.getDate();
+
       const formatDate = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-
       $("#queryDate").val(formatDate(today));
-      const minDate = new Date(today); minDate.setDate(today.getDate() - 7);
-      const maxDate = new Date(today); maxDate.setDate(today.getDate() + 7);
+
+      let minDate;
+      if (dayOfMonth <= 10) {
+        minDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      } else {
+        minDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      }
       $("#queryDate").attr("min", formatDate(minDate));
-      $("#queryDate").attr("max", formatDate(maxDate));
-      // ---------------------------------
+      $("#queryDate").attr("max", formatDate(today));
 
       // 初始化：一次抓取所有資料
       google.script.run
@@ -275,6 +281,31 @@
       $("#queryCustNOther").change(function () {
         updateSrIdSelect($(this).val());
       });
+
+      $("#btnQuery").click(async function () {
+        $("#loadingSpin").show();
+        $('#btnQuery').prop('disabled', true);
+        await handleAction("query");
+        $('#btnQuery').prop('disabled', false);
+      });
+
+      $("#btnAdd").click(async function () {
+        $("#loadingSpin").show();
+        $('#btnAdd').prop('disabled', true);
+        await handleAction("add");
+        $('#btnAdd').prop('disabled', false);
+      });
+
+      $("#btnUpdate").click(async function () {
+        $("#loadingSpin").show();
+        $('#btnUpdate').prop('disabled', true);
+        await handleAction("update");
+        $('#btnUpdate').prop('disabled', false);
+      });
+
+      $("#btnBack").click(function () {
+        backToSearch();
+      });
     });
 
     // --- 初始化成功回調 ---
@@ -284,6 +315,11 @@
       GLOBAL_DATA.users = data.users;
       GLOBAL_DATA.custs = data.custs;
       GLOBAL_DATA.ltcCodes = data.ltcCodes;
+      if (data.srData && data.srData.length > 0) {
+        GLOBAL_DATA.srDataHeaders = data.srData[0];
+        // The rest is data.
+        GLOBAL_DATA.srData = data.srData.slice(1);
+      }
 
       $("#currentUserEmail").val(data.email);
 
@@ -370,6 +406,11 @@
       });
     }
 
+    // Helper to get column index from srDataHeaders
+    function getColIndex(name) {
+      return GLOBAL_DATA.srDataHeaders.indexOf(name);
+    }
+
     function validateQuery() {
       if (
         !$("#queryDate").val() ||
@@ -386,121 +427,168 @@
     }
 
     async function handleAction(type) {
-      $("#loadingSpin").show();
       let selectedCust = $("#queryCustN").val();
       if (selectedCust === "其他") {
         selectedCust = $("#queryCustNOther").val();
         if (!selectedCust) {
+          $("#loadingSpin").hide();
           Swal.fire("提示", "請選擇其他個案姓名", "warning");
           return;
         }
       }
 
-      if (!validateQuery()) return;
+      if (!validateQuery()) {
+        $("#loadingSpin").hide();
+        return;
+      }
 
-      // 處理新增或更新時，禁用按鈕防止重複點擊
-      if (type === 'add' || type === 'update') {
-        $('#btnAdd').prop('disabled', true);
-        $('#btnUpdate').prop('disabled', true);
-      } else if (type === 'query') {
-        $('#btnQuery').prop('disabled', true);
-      }      
-      const formObj = getFormObject(selectedCust);
-      let exSPCONS = await getSPCons(formObj);
+      const formObj = getFormObject(selectedCust);      // 印出 formObj 以供偵錯
+      console.log("formObj for debugging:", formObj);
+
+
+      if (type === 'query') {
+
+        // Client-side search
+        const idx = {
+          date: getColIndex('Date'),
+          srTimes: getColIndex('SRTimes'),
+          custN: getColIndex('CUST_N'),
+          userN: getColIndex('USER_N'),
+          payType: getColIndex('Pay_Type'),
+          srId: getColIndex('SR_ID')
+        };
+        // 印出 srData 以供偵錯
+        console.log("GLOBAL_DATA.srData for debugging:", GLOBAL_DATA.srData);
+
+        const foundRow = GLOBAL_DATA.srData.find(row =>
+          String(row[idx.date]).trim() === formObj.date.trim() &&
+          String(row[idx.srTimes]).trim() === formObj.SRTimes.trim() &&
+          String(row[idx.custN]).trim() === formObj.custName.trim() &&
+          String(row[idx.userN]).trim() === formObj.userName.trim() &&
+          String(row[idx.payType]).trim() === formObj.payType.trim() &&
+          String(row[idx.srId]).trim() === formObj.srId.trim()
+        );
+
+        $("#loadingSpin").hide();
+
+        if (foundRow) {
+          const data = {
+            srRec: foundRow[getColIndex('SR_REC')],
+            loc: foundRow[getColIndex('LOC')],
+            mood: foundRow[getColIndex('MOOD')],
+            spcons: foundRow[getColIndex('SPCONS')]
+          };
+          fillQueryLabel(formObj);
+          fillDetail(data);
+          $("#inputSrRec").focus();
+          $("#detailSection").show();
+          $("#searchSection").hide();
+          $("#btnAdd").hide();
+          $("#btnUpdate").show();
+        } else {
+          let exSPCONS = await getSPCons(formObj);
+          Swal.fire({
+            title: "查無此紀錄，是否要新增一筆紀錄並開始編輯？",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            confirmButtonText: "是，新增紀錄",
+            cancelButtonText: "否",
+          }).then((result) => {
+            if (result.isConfirmed) {
+              fillQueryLabel(formObj);
+              setTimeout(function () { $("#inputSrRec").val("").focus(); }, 50);
+              $("#inputLoc").val(exSPCONS.loc || "清醒");
+              $("#inputMood").val(exSPCONS.mood || "穩定");
+              $("#inputSpcons").val(exSPCONS.spcons || "無");
+              $("#detailSection").show();
+              $("#searchSection").hide();
+              $("#btnUpdate").hide();
+              $("#btnAdd").show();
+            }
+          });
+        }
+        return;
+      }
 
       // --- 需求 7：新使用者電話詢問 ---
       if ((type === "add" || type === "update") && GLOBAL_DATA.isNewBinding) {
         $("#loadingSpin").hide();
         const { value: tel } = await Swal.fire({
           title: "初次綁定資料",
-          text: `系統檢測到此 Email 尚未綁定 "${formObj.userName}"，請輸入您的聯絡電話以完成綁定`,
+          text: `系統檢測到此 Email 尚未綁定 "${formObj.userName}"，請輸入您的聯絡電話以完成綁定。`,
           input: "text",
           inputLabel: "聯絡電話 (User_Tel)",
           inputPlaceholder: "例：0912345678",
           showCancelButton: true,
           inputValidator: (value) => {
-            if (!value) return "電話號碼不能為空！";
+            if (!value) return "電話號碼不能為空！"
           },
         });
 
         if (tel) {
           formObj.userTel = "'" + tel;
-          formObj.isNewBinding = true; // 標記為新綁定，後端將更新至 SYTemp
+          formObj.isNewBinding = true;
         } else {
+          $("#loadingSpin").hide();
           return;
         }
         $("#loadingSpin").show();
       }
 
+      // --- Client-side data manipulation ---
+      const rowData = [
+        formObj.date, formObj.SRTimes, formObj.custName, formObj.userName,
+        formObj.payType, formObj.srId, formObj.srRec, formObj.loc,
+        formObj.mood, formObj.spcons
+      ];
 
+      if (type === 'add') {
+        GLOBAL_DATA.srData.push(rowData);
+      } else if (type === 'update') {
+        const idx = { date: getColIndex('Date'), srTimes: getColIndex('SRTimes'), custN: getColIndex('CUST_N'), userN: getColIndex('USER_N'), payType: getColIndex('Pay_Type'), srId: getColIndex('SR_ID') };
+        const rowIndex = GLOBAL_DATA.srData.findIndex(row =>
+          String(row[idx.date]).trim() === formObj.date.trim() &&
+          String(row[idx.srTimes]).trim() === formObj.SRTimes.trim() &&
+          String(row[idx.custN]).trim() === formObj.custName.trim() &&
+          String(row[idx.userN]).trim() === formObj.userName.trim() &&
+          String(row[idx.payType]).trim() === formObj.payType.trim() &&
+          String(row[idx.srId]).trim() === formObj.srId.trim()
+        );
+        if (rowIndex > -1) {
+          GLOBAL_DATA.srData[rowIndex] = rowData;
+        } else {
+          GLOBAL_DATA.srData.push(rowData);
+        }
+      }
+
+      // --- Asynchronous server update (Fire and Forget) ---
       google.script.run
-        .withSuccessHandler(function (res) {
-          $("#loadingSpin").hide();
-          // 處理完成後，恢復按鈕功能
-          $('#btnAdd').prop('disabled', false);
-          $('#btnUpdate').prop('disabled', false);
-          $('#btnQuery').prop('disabled', false);
-
-
-          if (res.success && formObj.isNewBinding) {
-            GLOBAL_DATA.isNewBinding = false;
-            $("#queryUserN").prop("disabled", true);
-            let u = GLOBAL_DATA.users.find(u => u.name === formObj.userName);
-            if (u) {
-              u.email = formObj.email;
-            }
-          }
-
-          if (type === "query") {
-            if (res.found) {
-              fillQueryLabel(formObj);
-              fillDetail(res.data);
-              $("#inputSrRec").focus();
-              $("#detailSection").show();
-              $("#searchSection").hide();
-              $("#btnAdd").hide();
-              $("#btnUpdate").show();
-            } else {
-              Swal.fire({
-                title: "查無此紀錄，是否要新增一筆紀錄並開始編輯？",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#d33",
-                confirmButtonText: "是，新增紀錄",
-                cancelButtonText: "否",
-              }).then((result) => {
-                if (result.isConfirmed) {
-                  fillQueryLabel(formObj);
-                  setTimeout(function () { $("#inputSrRec").val("").focus(); }, 50);
-                  $("#inputLoc").val(exSPCONS.loc || "清醒");
-                  $("#inputMood").val(exSPCONS.mood || "穩定");
-                  $("#inputSpcons").val(exSPCONS.spcons || "無");
-                  $("#detailSection").show();
-                  $("#searchSection").hide();
-                  $("#btnUpdate").hide();
-                  $("#btnAdd").show();
-                }
-              });
-            }
-          } else {
-            Swal.fire({
-              icon: res.success ? "success" : "error",
-              title: res.success ? "成功" : "失敗",
-              text: res.message,
-              timer: res.success ? 1500 : null,
-            }).then(() => {
-              if (res.success) backToSearch();
-            });
-          }
-        }).withFailureHandler(function (err) {
-          $("#loadingSpin").hide();
-          // 處理失敗後，恢復按鈕功能
-          $('#btnAdd').prop('disabled', false);
-          $('#btnUpdate').prop('disabled', false);
-          $('#btnQuery').prop('disabled', false);
-          Swal.fire('操作失敗', err.message, 'error');
+        .withFailureHandler(function (err) {
+          console.error("Background sync failed:", err.message);
+          showToast('error', '背景同步失敗');
         })
         .processSR01Data(formObj, type);
+
+      // --- Immediate UI Feedback ---
+      $("#loadingSpin").hide();
+
+      if (formObj.isNewBinding) {
+        GLOBAL_DATA.isNewBinding = false;
+        $("#queryUserN").prop("disabled", true);
+        let u = GLOBAL_DATA.users.find(u => u.name === formObj.userName);
+        if (u) { u.email = formObj.email; }
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "成功",
+        text: type === 'add' ? '紀錄已新增' : '紀錄已更新',
+        timer: 1500,
+        showConfirmButton: false,
+      }).then(() => {
+        backToSearch();
+      });
     }
 
     function getFormObject(selectedCust) {

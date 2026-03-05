@@ -10,7 +10,14 @@ function getSRServer01InitData() {
 
   if (cached) {
     data = JSON.parse(cached);
-  } else {
+    // 檢查快取資料是否包含 srData，若無則視為過期，強制重抓
+    if (!data.hasOwnProperty('srData')) {
+      console.log("快取資料結構過舊，強制重新整理...");
+      data = null; // 將 data 設為 null 以觸發下方的重抓邏輯
+    }
+  }
+
+  if (!data) {
     // 如果快取中沒有資料，則從試算表讀取
     var userMap = new Map(); // 使用 Map 以便用 Name 進行合併
 
@@ -122,14 +129,41 @@ function getSRServer01InitData() {
         }
       }
     }
+
+    // 5. 取得 SYTemp > SR_Data
+    var srDataSheet = getTargetsheet("SYTemp", "SYTemp").Spreadsheet.getSheetByName("SR_Data");
+    var srData = [];
+    if (srDataSheet) {
+      var rawSrData = srDataSheet.getDataRange().getValues();
+      if (rawSrData.length > 0) {
+        var srHeaders = rawSrData[0];
+        var dateColIdx = getColIndex(srHeaders, "Date");
+        
+        // Convert date objects to string to be able to JSON.stringify them for cache.
+        // Also, we need headers on the client side.
+        srData = rawSrData.map(function(row, index) {
+          if (index === 0) return row; // keep headers
+          if (dateColIdx > -1 && row[dateColIdx] instanceof Date) {
+            row[dateColIdx] = Utilities.formatDate(row[dateColIdx], Session.getScriptTimeZone(), "yyyy-MM-dd");
+          }
+          return row;
+        });
+      }
+    }
     data = {
       users: userData,
       custs: custData,
       ltcCodes: ltcIds,
+      srData: srData,
     };
 
     // 將資料存入快取，設定 6 小時過期
-    cache.put(cacheKey, JSON.stringify(data), 21600);
+    try {
+      cache.put(cacheKey, JSON.stringify(data), 21600);
+    } catch (e) {
+      // 如果資料量太大無法存入快取，僅記錄錯誤但繼續執行，讓使用者本次操作仍可成功。
+      console.log("快取寫入失敗 (資料可能過大): " + e.message);
+    }
   }
 
   // 加入當前使用者的 email 並回傳

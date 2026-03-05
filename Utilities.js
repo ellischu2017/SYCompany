@@ -400,7 +400,7 @@ function getIdFromUrl(url) {
  * @returns 
  */
 
-function processLTCCodes() {
+function processCustLTCCodes() {
   // const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sCust = MainSpreadsheet.getSheetByName("Cust");
   const data = sCust.getDataRange().getValues();
@@ -450,7 +450,7 @@ function processLTCCodes() {
  * @returns 
  */
 
-function UpdateUserName() {
+function UpdateUserCustName() {
   const now = new Date();
   now.setMonth(now.getMonth() - 1);
   const timeZone = Session.getScriptTimeZone();
