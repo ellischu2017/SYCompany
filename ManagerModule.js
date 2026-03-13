@@ -4,6 +4,29 @@
  */
 
 /**
+ * 取得所有管理員資料 (用於前端快取)
+ */
+function getAllManagerData() {
+  const sheet = MainSpreadsheet.getSheetByName("Manager");
+  if (!sheet) return [];
+
+  const data = sheet.getDataRange().getValues();
+  const result = [];
+
+  // 從第 2 列開始 (索引 1)
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) {
+      result.push({
+        Mana_N: data[i][0].toString(),
+        Mana_Email: data[i][1] ? data[i][1].toString() : "",
+        Mana_Tel: data[i][2] ? data[i][2].toString() : ""
+      });
+    }
+  }
+  return result;
+}
+
+/**
  * 取得「Manager」工作表的管理員姓名列表
  */
 function getManaList() {

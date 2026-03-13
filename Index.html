@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
-  
-  <head>
-    <base target="_top">
-    <title>舒漾長照服務紀錄單管理系統</title>
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<head>
+  <base target="_top">
+  <title>舒漾長照服務紀錄單管理系統</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <style>
     /* 自定義樣式以優化手機體驗 */
@@ -93,102 +93,106 @@
     <div class="row g-4">
 
       <div class="col-12">
-        <a href="<?!= getScriptUrl() ?>?page=Cust" class="btn btn-primary w-100 menu-btn rounded-pill">
+        <a id="pageCust" onclick="openPageUrl('Cust','_self');" class="btn btn-primary w-100 menu-btn rounded-pill">
           <i class="fas fa-user-injured me-2"></i> 個案管理系統
         </a>
       </div>
 
       <div class="col-12 col-md-6">
-        <a href="<?!= getScriptUrl() ?>?page=User" class="btn btn-success w-100 menu-btn rounded-pill">
+        <a id="pageUser" onclick="openPageUrl('User');" class="btn btn-success w-100 menu-btn rounded-pill">
           <i class="fas fa-user-nurse me-2"></i> 居服員管理系統
         </a>
       </div>
 
       <div class="col-12 col-md-6">
-        <a href="<?!= getScriptUrl() ?>?page=Manager" class="btn btn-success w-100 menu-btn rounded-pill">
+        <a id="pageManager" onclick="openPageUrl('Manager');" class="btn btn-success w-100 menu-btn rounded-pill">
           <i class="fas fa-user-nurse me-2"></i> 管理員管理系統
         </a>
       </div>
 
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=LTC_Code" class="btn btn-info text-white w-100 menu-btn rounded-3"
-          style="height: 60px; font-size: 1rem;">
+        <a id="pageLTC_Code" onclick="openPageUrl('LTC_Code');" class="btn btn-info text-white w-100 menu-btn rounded-pill">
           <i class="fas fa-list-ol me-2"></i> 長照編碼
         </a>
       </div>
 
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=RecUrl" class="btn btn-info text-white w-100 menu-btn rounded-3"
-          style="height: 60px; font-size: 1rem;">
+        <a id="pageRecUrl" onclick="openPageUrl('RecUrl');" class="btn btn-info text-white w-100 menu-btn rounded-pill">
           <i class="fas fa-link me-2"></i> 網址管理
         </a>
       </div>
 
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=SR_server" class="btn btn-warning text-dark w-100 menu-btn rounded-3">
+        <a id="SR_server" onclick="openPageUrl('SR_server');" class="btn btn-warning text-dark w-100 menu-btn rounded-pill">
           <i class="fas fa-file-medical me-2"></i> 舒漾電子服務紀錄(管理端)
         </a>
       </div>
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=SR_server01" class="btn btn-danger text-white w-100 menu-btn rounded-3"
-          target="_blank">
+        <a id="SR_server01" onclick="openPageUrl('SR_server01','_blank');"
+          class="btn btn-danger text-white w-100 menu-btn rounded-pill">
           <i class="fas fa-file-medical me-2"></i> 舒漾電子服務紀錄(用戶端)
         </a>
       </div>
       <hr>
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=TranferResponse"
-          class="btn btn-secondary text-white w-100 menu-btn rounded-3">
+        <a id="TranferResponse" onclick="openPageUrl('TranferResponse')"
+          class="btn btn-secondary text-white w-100 menu-btn rounded-pill">
           <i class="fas fa-truck-moving me-2"></i> 資料轉換系統
         </a>
       </div>
 
       <div class="col-6">
-        <a href="<?!= getScriptUrl() ?>?page=MonthlyReport"
-          class="btn btn-secondary text-white w-100 menu-btn rounded-3">
+        <a id="pageMonthlyReport" onclick="openPageUrl('MonthlyReport')"
+          class="btn btn-secondary text-white w-100 menu-btn rounded-pill">
           <i class="fas fa-server me-2"></i> 月報表查詢系統
         </a>
+      </div>
+      <hr class="my-4">
+      <div class="col-12">
+        <a onclick="openPageUrl('OpenSpreadSheet');" class="btn btn-outline-dark w-100 menu-btn rounded-pill">
+          <i class="fas fa-file-excel me-2"></i> 開啟試算表
+        </a>
+      </div>
+      <div class="container mt-2 text-end">
+        <small class="text-muted">
+          <i class="fas fa-user-circle"></i> 當前管理員：
+          <?= userEmail ?>
+        </small>
+      </div>
     </div>
-    <div class="container mt-2 text-end">
-      <small class="text-muted">
-        <i class="fas fa-user-circle"></i> 當前管理員：
-        <?= userEmail ?>
-      </small>
-    </div>
-  </div>
 
 
 
 
-  <script>
-    // 頁面加載完成後的初始化邏輯
-    $(document).ready(function () {
-      checkAuthContext();
-      $('#loading').css('display', 'flex');
-      console.log("舒漾長照系統 - Index 頁面載入完成");
-      $('#loading').hide();
-      // 檢查如果沒有 userEmail (代表繞過後端載入，雖然機率低)
-      if (!"<?= userEmail ?>") {
-        window.top.location.href = "<?= webAppUrl ?>";
+    <script>
+      // 頁面加載完成後的初始化邏輯
+      $(document).ready(function () {
+        checkAuthContext();
+        $('#loading').css('display', 'flex');
+        console.log("舒漾長照系統 - Index 頁面載入完成");
+        $('#loading').hide();
+        // 檢查如果沒有 userEmail (代表繞過後端載入，雖然機率低)
+        if (!"<?= userEmail ?>") {
+          window.top.location.href = "<?= webAppUrl ?>";
+        }
+      });
+
+
+      /**
+       * 檢查 URL 參數，確保與 Google Session 同步
+       */
+      function checkAuthContext() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentAuthUser = urlParams.get('authuser');
+
+        // 如果網址沒有 authuser 參數，可以視需求決定是否補上，
+        // 避免在多帳號環境下跳轉回預設的 0 號帳號
+        if (currentAuthUser === null) {
+          console.log("提示：當前網址未指定 authuser，建議由官方入口進入以確保權限正確。");
+        }
       }
-    });
 
-
-    /**
-     * 檢查 URL 參數，確保與 Google Session 同步
-     */
-    function checkAuthContext() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentAuthUser = urlParams.get('authuser');
-
-      // 如果網址沒有 authuser 參數，可以視需求決定是否補上，
-      // 避免在多帳號環境下跳轉回預設的 0 號帳號
-      if (currentAuthUser === null) {
-        console.log("提示：當前網址未指定 authuser，建議由官方入口進入以確保權限正確。");
-      }
-    }
-
-  </script>
+    </script>
 </body>
 <?!= includeFooter(); ?>
 

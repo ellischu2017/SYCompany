@@ -81,9 +81,10 @@
             <option value="" disabled selected>載入中...</option>
           </select>
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-primary flex-grow-1" id="btnQuery">查詢</button>
-          <button class="btn btn-success flex-grow-1" id="btnAddInit">新增</button>
+        <div class="d-flex gap-3">
+          <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
+          <button class="btn btn-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
+          <button class="btn btn-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -105,10 +106,10 @@
             <label class="form-label">電話 (User_Tel)</label>
             <input type="text" class="form-control" id="inputUserTel" placeholder="0900000000">
           </div>
-          <div class="d-grid gap-2 mt-4">
-            <button type="button" class="btn btn-success" id="btnSave">更新資料</button>
-            <button type="button" class="btn btn-danger" id="btnDelete">刪除</button>
-            <button type="button" class="btn btn-secondary" onclick="backToSearch()">返回搜尋</button>
+          <div class="d-flex gap-3 mt-4">
+            <button type="button" class="btn btn-success flex-grow-1" id="btnSave"><i class="fas fa-save"></i> 更新資料</button>
+            <button type="button" class="btn btn-danger flex-grow-1" id="btnDelete"><i class="fas fa-trash"></i> 刪除</button>
+            <button type="button" class="btn btn-secondary flex-grow-1" id="btnBack" onclick="backToSearch()">返回搜尋</button>
           </div>
         </form>
       </div>
@@ -129,31 +130,46 @@
   <script>
     $(document).ready(function () {
       $('#loading').css('display', 'flex');
-      loadDropdown();
+      // 1. 載入初始資料
+      loadInitialData();
 
+      // 2. 查詢按鈕 (改為讀取 Session)
       $('#btnQuery').click(function () {
         const name = $('#selectUserName').val();
         if (!name) return Swal.fire('提示', '請選擇居服員', 'warning');
-        $('#loading').show();
-        google.script.run.withSuccessHandler(function (res) {
-          $('#loading').hide();
-          if (res.found) {
-            $('#displayUserName').text(res.rowResult.User_N);
-            $('#inputUserName').val(res.rowResult.User_N);
-            $('#inputUserEmail').val(res.rowResult.User_Email);
-            $('#inputUserTel').val(res.rowResult.User_Tel);
-            switchToDetailMode('update');
-          }
-        }).queryUserData(name);
+        
+        const users = JSON.parse(sessionStorage.getItem('userData')) || [];
+        const user = users.find(u => u.User_N === name);
+        
+        if (user) {
+          $('#displayUserName').text(user.User_N);
+          $('#inputUserName').val(user.User_N);
+          $('#inputUserEmail').val(user.User_Email);
+          $('#inputUserTel').val(user.User_Tel);
+          switchToDetailMode('update');
+        } else {
+          Swal.fire('錯誤', '找不到該居服員資料，請重新整理頁面', 'error');
+        }
       });
 
+      // 3. 新增按鈕
       $('#btnAddInit').click(function () {
         Swal.fire({
           title: '輸入新居服員姓名',
           input: 'text',
-          showCancelButton: true
+          showCancelButton: true,
+          inputValidator: (value) => {
+            if (!value) return '請輸入姓名';
+          }
         }).then((result) => {
           if (result.isConfirmed && result.value) {
+            // 前端檢查重複
+            const users = JSON.parse(sessionStorage.getItem('userData')) || [];
+            if (users.some(u => u.User_N === result.value)) {
+              Swal.fire('錯誤', '該居服員姓名已存在', 'error');
+              return;
+            }
+
             $('#userForm')[0].reset();
             $('#displayUserName').text(result.value);
             $('#inputUserName').val(result.value);
@@ -162,6 +178,7 @@
         });
       });
 
+      // 4. 儲存按鈕 (新增/更新)
       $('#btnSave').click(function () {
         const mode = $('#formMode').val();
         const data = {
@@ -169,22 +186,26 @@
           userEmail: $('#inputUserEmail').val(),
           userTel: $('#inputUserTel').val()
         };
-        $('#loading').show();
-        const action = (mode === 'add') ? 'addUserData' : 'updateUserData';
 
+        if (!data.userName) return Swal.fire('提示', '姓名不能為空', 'warning');
+
+        // 立即更新 UI & Session
+        updateSessionAndUI(mode, data);
+
+        // 背景同步
+        const action = (mode === 'add') ? 'addUserData' : 'updateUserData';
         google.script.run.withSuccessHandler(function (res) {
-          $('#loading').hide();
-          if (res.success) {
-            Swal.fire('成功', res.message, 'success').then(() => {
-              if (mode === 'add') backToSearch();
-              else backToSearch();
-            });
+          if (!res.success) {
+            Swal.fire('同步失敗', res.message + ' 請重新整理頁面。', 'error');
           } else {
-            Swal.fire('失敗', res.message, 'error');
+            console.log('背景同步成功:', res.message);
           }
+        }).withFailureHandler(function(err){
+             Swal.fire('同步錯誤', err.message, 'error');
         })[action](data);
       });
 
+      // 5. 刪除按鈕
       $('#btnDelete').click(function () {
         const name = $('#inputUserName').val();
         Swal.fire({
@@ -194,25 +215,120 @@
           confirmButtonColor: '#d33'
         }).then((result) => {
           if (result.isConfirmed) {
-            $('#loading').show();
+            // 立即更新 UI & Session
+            deleteFromSessionAndUI(name);
+
+            // 背景同步
             google.script.run.withSuccessHandler(function (res) {
-              $('#loading').hide();
-              Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
+               if (!res.success) {
+                 Swal.fire('同步失敗', res.message, 'error');
+               } else {
+                 console.log('背景刪除成功');
+               }
+            }).withFailureHandler(function(err){
+               Swal.fire('同步錯誤', err.message, 'error');
             }).deleteUserData(name);
           }
         });
       });
-      // $('#loading').hide();
+
+      // 6. 從搜尋頁直接刪除
+      $('#btnDeleteFromSearch').click(function () {
+        const name = $('#selectUserName').val();
+        if (!name) return Swal.fire('提示', '請選擇要刪除的居服員', 'warning');
+
+        Swal.fire({
+          title: '確定要刪除此居服員?',
+          text: `您確定要刪除「${name}」嗎？此動作無法復原！`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          confirmButtonText: '是的，刪除！',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // 立即更新 UI & Session
+            deleteFromSessionAndUI(name);
+
+            // 背景同步
+            google.script.run.withSuccessHandler(function (res) {
+              if (!res.success) {
+                Swal.fire('同步失敗', res.message, 'error');
+              } else {
+                console.log('背景刪除成功');
+              }
+            }).withFailureHandler(function (err) {
+              Swal.fire('同步錯誤', err.message, 'error');
+            }).deleteUserData(name);
+          }
+        });
+      });
     });
 
-    function loadDropdown() {
-      $('#loading').css('display', 'flex');
-      google.script.run.withSuccessHandler(function (list) {
-        const select = $('#selectUserName');
-        select.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
-        list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
+    function loadInitialData() {
+      google.script.run.withSuccessHandler(function (data) {
+        sessionStorage.setItem('userData', JSON.stringify(data));
+        populateDropdown();
         $('#loading').hide();
-      }).getUserList();
+      }).withFailureHandler(function(err){
+        $('#loading').hide();
+        Swal.fire('載入失敗', err.message, 'error');
+      }).getAllUserData();
+    }
+
+    function populateDropdown() {
+      const users = JSON.parse(sessionStorage.getItem('userData')) || [];
+      const select = $('#selectUserName');
+      select.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
+      users.forEach(u => select.append(`<option value="${u.User_N}">${u.User_N}</option>`));
+    }
+
+    function updateSessionAndUI(mode, data) {
+      let users = JSON.parse(sessionStorage.getItem('userData')) || [];
+      
+      if (mode === 'add') {
+        users.push({
+          User_N: data.userName,
+          User_Email: data.userEmail,
+          User_Tel: data.userTel
+        });
+        // 排序
+        users.sort((a, b) => a.User_N.localeCompare(b.User_N));
+      } else {
+        const idx = users.findIndex(u => u.User_N === data.userName);
+        if (idx !== -1) {
+          users[idx].User_Email = data.userEmail;
+          users[idx].User_Tel = data.userTel;
+        }
+      }
+      
+      sessionStorage.setItem('userData', JSON.stringify(users));
+      
+      Swal.fire({
+        icon: 'success',
+        title: '成功',
+        text: mode === 'add' ? '新增成功 (背景同步中)' : '更新成功 (背景同步中)',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
+      backToSearch();
+    }
+
+    function deleteFromSessionAndUI(name) {
+      let users = JSON.parse(sessionStorage.getItem('userData')) || [];
+      users = users.filter(u => u.User_N !== name);
+      sessionStorage.setItem('userData', JSON.stringify(users));
+      
+      Swal.fire({
+        icon: 'success',
+        title: '已刪除',
+        text: '資料已刪除 (背景同步中)',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
+      backToSearch();
     }
 
     function switchToDetailMode(mode) {
@@ -226,7 +342,7 @@
     function backToSearch() {
       $('#detailSection').hide();
       $('#searchSection').show();
-      loadDropdown();
+      populateDropdown();
     }
 
   </script>

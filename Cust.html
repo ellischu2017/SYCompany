@@ -318,30 +318,55 @@
           return;
         }
 
-        $('#loadingSpin').show();
-
         const sheetName = $('#sourceSheet').val();
 
+        // --- Client-side Duplicate Check (New) ---
         if (mode === 'add') {
-          google.script.run.withSuccessHandler(function (res) {
-            $('#loadingSpin').hide();
-            if (res.success) {
-              Swal.fire('成功', res.message, 'success').then(() => backToSearch(true)); // true 表示需要重載資料
-            } else {
-              Swal.fire('失敗', res.message, 'error');
-            }
-          }).addCustData(formData);
-        } else if (mode === 'update' || mode === 'queryOld') {
-          google.script.run.withSuccessHandler(function(res) {
-            $('#loadingSpin').hide();
-            if (res.success) {
-              // 更新 sessionStorage
-              updateSessionStorage(formData, sheetName);
-              Swal.fire('成功', res.message, 'success').then(() => backToSearch(false)); // false 表示不重載
-            } else {
-              Swal.fire('失敗', res.message, 'error');
-            }
-          }).updateCustData(formData, sheetName);
+          const active = JSON.parse(sessionStorage.getItem('custData')) || [];
+          const archived = JSON.parse(sessionStorage.getItem('oldCustData')) || [];
+          // Check if name exists in either list
+          if (active.some(c => c.Cust_N === formData.custName) || archived.some(c => c.Cust_N === formData.custName)) {
+            Swal.fire('錯誤', '該個案姓名已存在 (包含封存名單)！', 'error');
+            return;
+          }
+        }
+
+        // --- 1. Optimistic Update (Session & UI) ---
+        updateSessionAndUI(mode, formData, sheetName);
+
+        // --- 2. Background Server Sync ---
+        const action = (mode === 'add') ? 'addCustData' : 'updateCustData';
+        const serverCall = (mode === 'add') 
+          ? google.script.run.addCustData(formData)
+          : google.script.run.updateCustData(formData, sheetName);
+
+        // Attach handlers to the runner (Note: GAS client-side syntax usually requires chaining handlers before the function call)
+        // Correct pattern: google.script.run.withSuccessHandler(...).func(...)
+        
+        if (mode === 'add') {
+             google.script.run.withSuccessHandler(function(res) {
+                 if (!res.success) {
+                     console.error('Background sync failed:', res.message);
+                     Swal.fire('同步失敗', '伺服器同步失敗: ' + res.message, 'error');
+                 } else {
+                     console.log('Background sync success (Add)');
+                 }
+             }).withFailureHandler(function(err) {
+                 console.error('Server error:', err);
+                 Swal.fire('同步錯誤', '伺服器連線錯誤: ' + err.message, 'error');
+             }).addCustData(formData);
+        } else {
+             google.script.run.withSuccessHandler(function(res) {
+                 if (!res.success) {
+                     console.error('Background sync failed:', res.message);
+                     Swal.fire('同步失敗', '伺服器同步失敗: ' + res.message, 'error');
+                 } else {
+                     console.log('Background sync success (Update)');
+                 }
+             }).withFailureHandler(function(err) {
+                 console.error('Server error:', err);
+                 Swal.fire('同步錯誤', '伺服器連線錯誤: ' + err.message, 'error');
+             }).updateCustData(formData, sheetName);
         }
       });
 
@@ -594,15 +619,14 @@
       }
     }
 
-    // 更新 sessionStorage 中的單筆資料
-    function updateSessionStorage(formData, sheetName) {
-      const storageKey = sheetName === 'Cust' ? 'custData' : 'oldCustData';
+    // 更新 Session 並回饋 UI (新增與更新通用)
+    function updateSessionAndUI(mode, formData, sheetName) {
+      // 如果是新增，預設存入 custData (Active)
+      const storageKey = (sheetName === 'Cust' || mode === 'add') ? 'custData' : 'oldCustData';
       let dataArray = JSON.parse(sessionStorage.getItem(storageKey)) || [];
-      const index = dataArray.findIndex(c => c.Cust_N === formData.custName);
-      if (index !== -1) {
-        // 更新現有資料
-        // 將前端表單資料 (formData) 轉換為後端資料結構 (Sheet 欄位)
-        const updatedFields = {
+      
+      // 將前端表單資料 (formData) 轉換為後端資料結構 (Sheet 欄位)
+      const newRecord = {
           Cust_N: formData.custName,
           Cust_Sex: formData.custSex,
           Cust_BD: formData.custBirth,
@@ -616,11 +640,30 @@
           Cust_LTC_Code: formData.custltcCode,
           LTC_Code: formData.ltcCode,
           Form_Url: formData.formUrl
-        };
-        
-        dataArray[index] = { ...dataArray[index], ...updatedFields };
-        sessionStorage.setItem(storageKey, JSON.stringify(dataArray));
+      };
+
+      if (mode === 'add') {
+          dataArray.push(newRecord);
+          // 簡單排序 (依姓名)
+          dataArray.sort((a, b) => a.Cust_N.localeCompare(b.Cust_N));
+      } else {
+          const index = dataArray.findIndex(c => c.Cust_N === formData.custName);
+          if (index !== -1) {
+              dataArray[index] = { ...dataArray[index], ...newRecord };
+          }
       }
+      
+      sessionStorage.setItem(storageKey, JSON.stringify(dataArray));
+      
+      Swal.fire({
+        icon: 'success',
+        title: '成功',
+        text: (mode === 'add' ? '新增' : '更新') + '成功 (背景同步中)',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
+      backToSearch(false); // false = 不重新從伺服器載入
     }
 
     // ==================== UI 控制函式 ====================

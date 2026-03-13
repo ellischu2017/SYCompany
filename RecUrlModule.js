@@ -18,6 +18,25 @@ function getRecUrlList() {
 }
 
 /**
+ * 取得所有 RecUrl 資料 (用於前端快取)
+ */
+function getAllRecUrlData() {
+  const sheet = MainSpreadsheet.getSheetByName("RecUrl");
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const result = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) {
+      result.push({
+        SY_N: data[i][0],
+        SY_Url: data[i][1]
+      });
+    }
+  }
+  return result;
+}
+
+/**
  * 查詢特定個案的網址資料
  */
 function queryRecUrlData(syName) {

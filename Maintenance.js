@@ -705,6 +705,7 @@ function processCustSync() {
 }
 
 function processOldCustSync() {
+  //
   console.log(
     "processCustSync 開始同步 Case_Reports > 結案個案清單 > OldCust 資料...",
   );

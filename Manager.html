@@ -81,9 +81,10 @@
             <option value="" disabled selected>載入中...</option>
           </select>
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-primary flex-grow-1" id="btnQuery">查詢</button>
-          <button class="btn btn-success flex-grow-1" id="btnAddInit">新增</button>
+        <div class="d-flex gap-3">
+          <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
+          <button class="btn btn-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
+          <button class="btn btn-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -105,10 +106,10 @@
             <label class="form-label">電話 (Mana_Tel)</label>
             <input type="text" class="form-control" id="inputManaTel" placeholder="0900000000">
           </div>
-          <div class="d-grid gap-2 mt-4">
-            <button type="button" class="btn btn-success" id="btnSave">更新資料</button>
-            <button type="button" class="btn btn-danger" id="btnDelete">刪除</button>
-            <button type="button" class="btn btn-secondary" onclick="backToSearch()">返回搜尋</button>
+          <div class="d-flex gap-3 mt-4">
+            <button type="button" class="btn btn-success flex-grow-1" id="btnSave"><i class="fas fa-save"></i> 更新資料</button>
+            <button type="button" class="btn btn-danger flex-grow-1" id="btnDelete"><i class="fas fa-trash"></i> 刪除</button>
+            <button type="button" class="btn btn-secondary flex-grow-1" id="btnBack" onclick="backToSearch()">返回搜尋</button>
           </div>
         </form>
       </div>
@@ -128,31 +129,42 @@
   <script>
     $(document).ready(function () {
       $('#loading').css('display', 'flex');
-      loadDropdown();
-      
+      loadInitialData();
+
       $('#btnQuery').click(function () {
         const name = $('#selectManaName').val();
         if (!name) return Swal.fire('提示', '請選擇管理員', 'warning');
-        $('#loading').show();
-        google.script.run.withSuccessHandler(function (res) {
-          $('#loading').hide();
-          if (res.found) {
-            $('#displayManaName').text(res.rowResult.Mana_N);
-            $('#inputManaName').val(res.rowResult.Mana_N);
-            $('#inputManaEmail').val(res.rowResult.Mana_Email);
-            $('#inputManaTel').val(res.rowResult.Mana_Tel);
-            switchToDetailMode('update');
-          }
-        }).queryManaData(name);
+
+        const managers = JSON.parse(sessionStorage.getItem('managerData')) || [];
+        const manager = managers.find(m => m.Mana_N === name);
+
+        if (manager) {
+          $('#displayManaName').text(manager.Mana_N);
+          $('#inputManaName').val(manager.Mana_N);
+          $('#inputManaEmail').val(manager.Mana_Email);
+          $('#inputManaTel').val(manager.Mana_Tel);
+          switchToDetailMode('update');
+        } else {
+          Swal.fire('錯誤', '找不到該管理員資料，請重新整理頁面', 'error');
+        }
       });
-      
+
       $('#btnAddInit').click(function () {
         Swal.fire({
           title: '輸入新管理員姓名',
           input: 'text',
-          showCancelButton: true
+          showCancelButton: true,
+          inputValidator: (value) => {
+            if (!value) return '請輸入姓名';
+          }
         }).then((result) => {
           if (result.isConfirmed && result.value) {
+            const managers = JSON.parse(sessionStorage.getItem('managerData')) || [];
+            if (managers.some(m => m.Mana_N === result.value)) {
+              Swal.fire('錯誤', '該管理員姓名已存在', 'error');
+              return;
+            }
+
             $('#ManaForm')[0].reset();
             $('#displayManaName').text(result.value);
             $('#inputManaName').val(result.value);
@@ -160,7 +172,7 @@
           }
         });
       });
-      
+
       $('#btnSave').click(function () {
         const mode = $('#formMode').val();
         const data = {
@@ -168,22 +180,25 @@
           manaEmail: $('#inputManaEmail').val(),
           manaTel: $('#inputManaTel').val()
         };
-        $('#loading').show();
+
+        if (!data.manaName) return Swal.fire('提示', '姓名不能為空', 'warning');
+
+        // 立即更新 UI & Session
+        updateSessionAndUI(mode, data);
+
+        // 背景同步
         const action = (mode === 'add') ? 'addManaData' : 'updateManaData';
-        
         google.script.run.withSuccessHandler(function (res) {
-          $('#loading').hide();
-          if (res.success) {
-            Swal.fire('成功', res.message, 'success').then(() => {
-              if (mode === 'add') backToSearch();
-              else backToSearch();
-            });
+          if (!res.success) {
+            Swal.fire('同步失敗', res.message + ' 請重新整理頁面。', 'error');
           } else {
-            Swal.fire('失敗', res.message, 'error');
+            console.log('背景同步成功:', res.message);
           }
+        }).withFailureHandler(function (err) {
+          Swal.fire('同步錯誤', err.message, 'error');
         })[action](data);
       });
-      
+
       $('#btnDelete').click(function () {
         const name = $('#inputManaName').val();
         Swal.fire({
@@ -193,27 +208,102 @@
           confirmButtonColor: '#d33'
         }).then((result) => {
           if (result.isConfirmed) {
-            $('#loading').show();
+            // 立即更新 UI & Session
+            deleteFromSessionAndUI(name);
+
+            // 背景同步
             google.script.run.withSuccessHandler(function (res) {
-              $('#loading').hide();
-              Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
+              if (!res.success) {
+                Swal.fire('同步失敗', res.message, 'error');
+              } else {
+                console.log('背景刪除成功');
+              }
+            }).withFailureHandler(function (err) {
+              Swal.fire('同步錯誤', err.message, 'error');
             }).deleteManaData(name);
           }
         });
       });
-      // $('#loading').hide();
+
+      $('#btnDeleteFromSearch').click(function () {
+        const name = $('#selectManaName').val();
+        if (!name) return Swal.fire('提示', '請選擇要刪除的管理員', 'warning');
+
+        Swal.fire({
+          title: '確定要刪除此管理員?',
+          text: `您確定要刪除「${name}」嗎？此動作無法復原！`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          confirmButtonText: '是的，刪除！',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            deleteFromSessionAndUI(name);
+
+            google.script.run.withSuccessHandler(function (res) {
+              if (!res.success) {
+                Swal.fire('同步失敗', res.message, 'error');
+              } else {
+                console.log('背景刪除成功');
+              }
+            }).withFailureHandler(function (err) {
+              Swal.fire('同步錯誤', err.message, 'error');
+            }).deleteManaData(name);
+          }
+        });
+      });
     });
-    
-    function loadDropdown() {      
-      $('#loading').css('display', 'flex');
-      google.script.run.withSuccessHandler(function (list) {
-        const select = $('#selectManaName');
-        select.empty().append('<option value="" disabled selected>請選擇管理員...</option>');
-        list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
+
+    function loadInitialData() {
+      google.script.run.withSuccessHandler(function (data) {
+        sessionStorage.setItem('managerData', JSON.stringify(data));
+        populateDropdown();
         $('#loading').hide();
-      }).getManaList();
+      }).withFailureHandler(function (err) {
+        $('#loading').hide();
+        Swal.fire('載入失敗', err.message, 'error');
+      }).getAllManagerData();
     }
-    
+
+    function populateDropdown() {
+      const managers = JSON.parse(sessionStorage.getItem('managerData')) || [];
+      const select = $('#selectManaName');
+      select.empty().append('<option value="" disabled selected>請選擇管理員...</option>');
+      managers.forEach(m => select.append(`<option value="${m.Mana_N}">${m.Mana_N}</option>`));
+    }
+
+    function updateSessionAndUI(mode, data) {
+      let managers = JSON.parse(sessionStorage.getItem('managerData')) || [];
+
+      if (mode === 'add') {
+        managers.push({ Mana_N: data.manaName, Mana_Email: data.manaEmail, Mana_Tel: data.manaTel });
+        managers.sort((a, b) => a.Mana_N.localeCompare(b.Mana_N));
+      } else {
+        const idx = managers.findIndex(m => m.Mana_N === data.manaName);
+        if (idx !== -1) {
+          managers[idx].Mana_Email = data.manaEmail;
+          managers[idx].Mana_Tel = data.manaTel;
+        }
+      }
+
+      sessionStorage.setItem('managerData', JSON.stringify(managers));
+
+      Swal.fire({ icon: 'success', title: '成功', text: (mode === 'add' ? '新增' : '更新') + '成功 (背景同步中)', timer: 1500, showConfirmButton: false });
+
+      backToSearch();
+    }
+
+    function deleteFromSessionAndUI(name) {
+      let managers = JSON.parse(sessionStorage.getItem('managerData')) || [];
+      managers = managers.filter(m => m.Mana_N !== name);
+      sessionStorage.setItem('managerData', JSON.stringify(managers));
+
+      Swal.fire({ icon: 'success', title: '已刪除', text: '資料已刪除 (背景同步中)', timer: 1500, showConfirmButton: false });
+
+      backToSearch();
+    }
+
     function switchToDetailMode(mode) {
       $('#searchSection').hide();
       $('#detailSection').show();
@@ -225,10 +315,10 @@
     function backToSearch() {
       $('#detailSection').hide();
       $('#searchSection').show();
-      loadDropdown();
+      populateDropdown();
     }
 
-           
+
   </script>
 </body>
 <?!= includeFooter(); ?>

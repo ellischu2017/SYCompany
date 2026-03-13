@@ -4,6 +4,29 @@
  */
 
 /**
+ * 取得所有服務編碼資料 (用於前端初始化 Session)
+ */
+function getAllLtcCodeData() {
+  const sheet = MainSpreadsheet.getSheetByName("LTC_Code");
+  if (!sheet) return [];
+
+  const data = sheet.getDataRange().getValues();
+  const result = [];
+
+  // 假設第一列是標題，從第二列開始
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) { // SR_ID 不為空
+      result.push({
+        SR_ID: data[i][0],
+        SR_Name: data[i][1],
+        SR_Detail: data[i][2]
+      });
+    }
+  }
+  return result;
+}
+
+/**
  * 取得「LTC_Code」工作表的服務編碼列表 (SR_ID)
  */
 function getLtcCodeList() {

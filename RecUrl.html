@@ -82,8 +82,9 @@
           </select>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-primary flex-grow-1" id="btnQuery">查詢</button>
-          <button class="btn btn-success flex-grow-1" id="btnAddInit">新增</button>
+          <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
+          <button class="btn btn-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
+          <button class="btn btn-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -91,6 +92,7 @@
     <div id="detailSection" class="card shadow-sm hidden-section">
       <div class="card-body">
         <form id="urlForm">
+          <input type="hidden" id="formMode" value="update">
           <div class="mb-3">
             <label class="form-label">服務紀錄單代碼 (SY_N)</label>
             <div id="displaySYName" class="url-label"></div>
@@ -100,10 +102,13 @@
             <label for="inputRecUrl" class="form-label">服務紀錄單網址 (SY_Url)</label>
             <textarea class="form-control" id="inputRecUrl" rows="4" placeholder="請貼上 Google 表單或紀錄單連結"></textarea>
           </div>
-          <div class="d-grid gap-2 mt-4">
-            <button type="button" class="btn btn-secondary" id="btnSave">儲存資料</button>
-            <button type="button" class="btn btn-danger" id="btnDelete">刪除</button>
-            <button type="button" class="btn btn-outline-dark" onclick="backToSearch()">返回搜尋</button>
+          <div class="d-flex gap-3 justify-content-center mt-2">
+            <button type="button" class="btn btn-secondary flex-grow-1" id="btnSave"><i class="fas fa-save"></i>
+              儲存資料</button>
+            <button type="button" class="btn btn-danger flex-grow-1" id="btnDelete"><i class="fas fa-trash"></i>
+              刪除</button>
+            <button type="button" class="btn btn-outline-dark flex-grow-1" id="btnBack" onclick="backToSearch()"><i
+                class="fas fa-undo-alt"></i> 返回搜尋</button>
           </div>
         </form>
       </div>
@@ -123,22 +128,24 @@
   <script>
     $(document).ready(function () {
       $('#loading').css('display', 'flex');
-      loadDropdown();
+      loadInitialData();
 
       // 查詢按鈕
       $('#btnQuery').click(function () {
         const name = $('#selectSYName').val();
         if (!name) return Swal.fire('提示', '服務紀錄單代碼', 'warning');
-        $('#loading').show();
-        google.script.run.withSuccessHandler(function (res) {
-          $('#loading').hide();
-          if (res.found) {
-            $('#displaySYName').text(res.rowResult.SY_N);
-            $('#inputSYName').val(res.rowResult.SY_N);
-            $('#inputRecUrl').val(res.rowResult.SY_Url);
-            switchToDetailMode('update');
-          }
-        }).queryRecUrlData(name);
+        
+        const list = JSON.parse(sessionStorage.getItem('recUrlData')) || [];
+        const item = list.find(r => r.SY_N === name);
+
+        if (item) {
+          $('#displaySYName').text(item.SY_N);
+          $('#inputSYName').val(item.SY_N);
+          $('#inputRecUrl').val(item.SY_Url);
+          switchToDetailMode('update');
+        } else {
+          Swal.fire('錯誤', '找不到該資料，請重新整理頁面', 'error');
+        }
       });
 
       // 新增初始按鈕 (彈出視窗輸入姓名)
@@ -149,6 +156,13 @@
           showCancelButton: true
         }).then((result) => {
           if (result.isConfirmed && result.value) {
+            // 前端檢查重複
+            const list = JSON.parse(sessionStorage.getItem('recUrlData')) || [];
+            if (list.some(r => r.SY_N === result.value)) {
+              Swal.fire('錯誤', '該代碼已存在', 'error');
+              return;
+            }
+
             $('#urlForm')[0].reset();
             $('#displaySYName').text(result.value);
             $('#inputSYName').val(result.value);
@@ -159,64 +173,143 @@
 
       // 儲存按鈕 (不論新增或更新都調用 saveRecUrlData)
       $('#btnSave').click(function () {
+        const mode = $('#formMode').val();
         const data = {
           syName: $('#inputSYName').val(),
           recUrl: $('#inputRecUrl').val()
         };
         if (!data.recUrl) return Swal.fire('提示', '請輸入網址', 'warning');
 
-        $('#loading').show();
+        // 1. 更新 Session 與 UI (立即反應)
+        updateSessionAndUI(mode, data);
+
+        // 2. 背景同步
         google.script.run.withSuccessHandler(function (res) {
-          $('#loading').hide();
-          Swal.fire('成功', res.message, 'success').then(() => {
-            backToSearch();
-          });
+          if (!res.success) {
+            console.error('背景同步失敗:', res.message);
+            Swal.fire('同步失敗', res.message, 'error');
+          } else {
+            console.log('背景同步成功');
+          }
+        }).withFailureHandler(function(err){
+            console.error('背景同步錯誤:', err);
         }).saveRecUrlData(data);
       });
 
       // 刪除按鈕
       $('#btnDelete').click(function () {
         const name = $('#inputSYName').val();
+        confirmAndDelete(name);
+      });
+
+      // 從搜尋頁刪除
+      $('#btnDeleteFromSearch').click(function () {
+        const name = $('#selectSYName').val();
+        if (!name) return Swal.fire('提示', '請選擇要刪除的項目', 'warning');
+        confirmAndDelete(name);
+      });
+
+      function confirmAndDelete(name) {
         Swal.fire({
-          title: '確定要刪除此網址?',
+          title: '確定要刪除?',
+          text: `將刪除 ${name} 的資料，此動作無法復原！`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonColor: '#d33'
         }).then((result) => {
           if (result.isConfirmed) {
-            $('#loading').show();
+            // 1. 更新 Session 與 UI (立即反應)
+            deleteFromSessionAndUI(name);
+
+            // 2. 背景同步
             google.script.run.withSuccessHandler(function (res) {
-              $('#loading').hide();
-              Swal.fire('已刪除', res.message, 'success').then(() => backToSearch());
+              if (!res.success) {
+                 Swal.fire('同步失敗', res.message, 'error');
+              } else {
+                 console.log('背景刪除成功');
+              }
+            }).withFailureHandler(function(err){
+                console.error('背景同步錯誤:', err);
             }).deleteRecUrlData(name);
           }
         });
-      });
-      // $('#loading').hide();
+      }
     });
 
-    function loadDropdown() {
-      $('#loading').css('display', 'flex');
-      google.script.run.withSuccessHandler(function (list) {
+    function loadInitialData() {
+      google.script.run.withSuccessHandler(function (data) {
+        sessionStorage.setItem('recUrlData', JSON.stringify(data));
+        populateDropdown();
+        $('#loading').hide();
+      }).withFailureHandler(function(err){
+        $('#loading').hide();
+        Swal.fire('載入失敗', err.message, 'error');
+      }).getAllRecUrlData();
+    }
+
+    function populateDropdown() {
+      const list = JSON.parse(sessionStorage.getItem('recUrlData')) || [];
         const select = $('#selectSYName');
         select.empty().append('<option value="" disabled selected>請選擇代碼...</option>');
-        list.forEach(name => select.append(`<option value="${name}">${name}</option>`));
-        $('#loading').hide();
-      }).getRecUrlList();
+        list.forEach(item => select.append(`<option value="${item.SY_N}">${item.SY_N}</option>`));
+    }
+
+    function updateSessionAndUI(mode, data) {
+      let list = JSON.parse(sessionStorage.getItem('recUrlData')) || [];
+      
+      if (mode === 'add') {
+        list.push({ SY_N: data.syName, SY_Url: data.recUrl });
+        // 簡單排序
+        list.sort((a, b) => a.SY_N.localeCompare(b.SY_N));
+      } else {
+        const idx = list.findIndex(r => r.SY_N === data.syName);
+        if (idx !== -1) {
+          list[idx].SY_Url = data.recUrl;
+        }
+      }
+      
+      sessionStorage.setItem('recUrlData', JSON.stringify(list));
+      
+      Swal.fire({
+        icon: 'success',
+        title: '成功',
+        text: (mode === 'add' ? '新增' : '更新') + '成功 (背景同步中)',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
+      backToSearch();
+    }
+
+    function deleteFromSessionAndUI(name) {
+      let list = JSON.parse(sessionStorage.getItem('recUrlData')) || [];
+      list = list.filter(r => r.SY_N !== name);
+      sessionStorage.setItem('recUrlData', JSON.stringify(list));
+      
+      Swal.fire({
+        icon: 'success',
+        title: '已刪除',
+        text: '資料已刪除 (背景同步中)',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
+      backToSearch();
     }
 
     function switchToDetailMode(mode) {
       $('#searchSection').hide();
       $('#detailSection').show();
+      $('#formMode').val(mode);
       if (mode === 'add') $('#btnDelete').hide(); else $('#btnDelete').show();
     }
 
     function backToSearch() {
       $('#detailSection').hide();
       $('#searchSection').show();
-      loadDropdown();
+      populateDropdown();
     }
-            
+
   </script>
 </body>
 <?!= includeFooter(); ?>

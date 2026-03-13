@@ -131,6 +131,7 @@
             </label>
           </div>
         </div>
+        
         <div class="row g-4">
           <div class="d-grid gap-2 col-6">
             <button id="btnReport" type="button" class="btn btn-primary btn-lg shadow-sm">
@@ -313,6 +314,7 @@
           '<option value="" disabled selected>請選擇個案名稱</option>',
         );
         populateCustSelect(JSON.parse(sessionCust)); // 接著填入從 Session 來的資料
+        $("#loadingSpin").hide();
       } else {
         // 讀取中狀態
         $select.empty();

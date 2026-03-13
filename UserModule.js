@@ -18,6 +18,29 @@ function getUserList() {
 }
 
 /**
+ * 取得所有居服員資料 (用於前端快取)
+ */
+function getAllUserData() {
+  const sheet = MainSpreadsheet.getSheetByName("User");
+  if (!sheet) return [];
+
+  const data = sheet.getDataRange().getValues();
+  const result = [];
+
+  // 從第 2 列開始 (索引 1)
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) {
+      result.push({
+        User_N: data[i][0].toString(),
+        User_Email: data[i][1] ? data[i][1].toString() : "",
+        User_Tel: data[i][2] ? data[i][2].toString() : ""
+      });
+    }
+  }
+  return result;
+}
+
+/**
  * 查詢居服員詳細資料
  */
 function queryUserData(userName) {
@@ -101,5 +124,5 @@ function deleteUserData(userName) {
       return { success: true, message: "刪除成功！" };
     }
   }
-  return { success: false, message: "刪除失敗。" };
+  return { success: false, message: "找不到資料，無法刪除。" };
 }

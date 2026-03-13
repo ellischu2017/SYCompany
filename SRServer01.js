@@ -3,19 +3,7 @@
  * 修改點：同時讀取 SYCompany (主表) 與 SYTemp (更新表) 的 User 資料
  */
 function getSRServer01InitData() {
-  const cache = CacheService.getScriptCache();
-  const cacheKey = "SRServer01_InitData";
-  const cached = cache.get(cacheKey);
   let data;
-
-  if (cached) {
-    data = JSON.parse(cached);
-    // 檢查快取資料是否包含 srData，若無則視為過期，強制重抓
-    if (!data.hasOwnProperty('srData')) {
-      console.log("快取資料結構過舊，強制重新整理...");
-      data = null; // 將 data 設為 null 以觸發下方的重抓邏輯
-    }
-  }
 
   if (!data) {
     // 如果快取中沒有資料，則從試算表讀取
@@ -156,14 +144,6 @@ function getSRServer01InitData() {
       ltcCodes: ltcIds,
       srData: srData,
     };
-
-    // 將資料存入快取，設定 6 小時過期
-    try {
-      cache.put(cacheKey, JSON.stringify(data), 21600);
-    } catch (e) {
-      // 如果資料量太大無法存入快取，僅記錄錯誤但繼續執行，讓使用者本次操作仍可成功。
-      console.log("快取寫入失敗 (資料可能過大): " + e.message);
-    }
   }
 
   // 加入當前使用者的 email 並回傳

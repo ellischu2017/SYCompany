@@ -23,7 +23,7 @@
     <p>
       <i class="fas fa-comment-dots"></i>
       對系統有任何建議嗎？
-      <a href="<?!= getScriptUrl() ?>?page=Suggest" target="_blank">提交意見</a>
+      <a id="pageSuggest" onclick="openPageUrl('Suggest','_blank');" class="btn btn-danger text-white">提交意見</a>
     </p>
     <small>&copy; 2026 舒漾居家長照服務管理系統</small>
   </div>
@@ -119,4 +119,13 @@
 
   }
 
+  const SCRIPT_URL = "<?!= getScriptUrl() ?>";
+  function openPageUrl(pageName, target = "_top") {
+    //網址
+    if (target === "_self" || target === "_top") {
+      window.top.location.href = SCRIPT_URL + "?page=" + pageName;
+    } else {
+      window.open(SCRIPT_URL + "?page=" + pageName, target);
+    }
+  }
 </script>
