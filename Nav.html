@@ -1,49 +1,69 @@
 <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
   <li class="nav-item">
-    <a class="nav-link" id="navIndex" href="javascript:void(0)" onclick="openPageUrl('Index' + '&v=' + Date.now());"><i class="fas fa-home me-2"></i>首頁</a>
+    <a class="nav-link" id="navIndex" href="#"
+      onclick="event.preventDefault(); openPageUrl('Index' + '&v=' + Date.now());"><i
+        class="fas fa-home me-2"></i>首頁</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navCust" href="javascript:void(0)" onclick="openPageUrl('Cust' + '&v=' + Date.now())"><i class="fas fa-user-injured me-2"></i>個案管理系統</a>
+    <a class="nav-link" id="navCust" href="#"
+      onclick="event.preventDefault(); openPageUrl('Cust' + '&v=' + Date.now())"><i
+        class="fas fa-user-injured me-2"></i>個案管理系統</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navUser" href="javascript:void(0)" onclick="openPageUrl('User' + '&v=' + Date.now())"><i class="fas fa-user-nurse me-2"></i>居服員管理系統</a>
+    <a class="nav-link" id="navUser" href="#"
+      onclick="event.preventDefault(); openPageUrl('User' + '&v=' + Date.now())"><i
+        class="fas fa-user-nurse me-2"></i>居服員管理系統</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navManager" href="javascript:void(0)" onclick="openPageUrl('Manager' + '&v=' + Date.now())"><i class="fas fa-user-nurse me-2"></i>管理員管理系統</a>
+    <a class="nav-link" id="navManager" href="#"
+      onclick="event.preventDefault(); openPageUrl('Manager' + '&v=' + Date.now())"><i
+        class="fas fa-user-nurse me-2"></i>管理員管理系統</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navLTC_Code" href="javascript:void(0)" onclick="openPageUrl('LTC_Code' + '&v=' + Date.now())"><i class="fas fa-list-ol me-2"></i>長照編碼管理</a>
+    <a class="nav-link" id="navLTC_Code" href="#"
+      onclick="event.preventDefault(); openPageUrl('LTC_Code' + '&v=' + Date.now())"><i
+        class="fas fa-list-ol me-2"></i>長照編碼管理</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navRecUrl" href="javascript:void(0)" onclick="openPageUrl('RecUrl' + '&v=' + Date.now())"><i class="fas fa-link me-2"></i>服務紀錄單年份網址管理</a>
+    <a class="nav-link" id="navRecUrl" href="#"
+      onclick="event.preventDefault(); openPageUrl('RecUrl' + '&v=' + Date.now())"><i
+        class="fas fa-link me-2"></i>服務紀錄單年份網址管理</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navSR_server" href="javascript:void(0)" onclick="openPageUrl('SR_server' + '&v=' + Date.now())"><i
+    <a class="nav-link" id="navSR_server" href="#"
+      onclick="event.preventDefault(); openPageUrl('SR_server' + '&v=' + Date.now())"><i
         class="fas fa-file-medical me-2"></i>電子服務紀錄管理(管理端)</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="navSR_server01" href="javascript:void(0)" onclick="openPageUrl('SR_server01' + '&v=' + Date.now(), '_blank')"><i
+    <a class="nav-link" id="navSR_server01" href="#"
+      onclick="event.preventDefault(); openPageUrl('SR_server01' + '&v=' + Date.now(), '_blank')"><i
         class="fas fa-file-medical me-2"></i>電子服務紀錄管理(用戶端)</a>
   </li>
   <hr class="my-2" />
 
   <li class="nav-item">
-    <a class="nav-link" id="navTranferResponse" href="javascript:void(0)" onclick="openPageUrl('TranferResponse' + '&v=' + Date.now())"><i class="fas fa-truck-moving me-2"></i>資料轉換系統</a>
+    <a class="nav-link" id="navTranferResponse" href="#"
+      onclick="event.preventDefault(); openPageUrl('TranferResponse' + '&v=' + Date.now())"><i
+        class="fas fa-truck-moving me-2"></i>資料轉換系統</a>
   </li>
 
   <li class="nav-item">
-    <a class="nav-link" id="navMonthlyReport" href="javascript:void(0)" onclick="openPageUrl('MonthlyReport' + '&v=' + Date.now())"><i class="fas fa-server me-2"></i>月報表查詢系統</a>
+    <a class="nav-link" id="navMonthlyReport" href="#"
+      onclick="event.preventDefault(); openPageUrl('MonthlyReport' + '&v=' + Date.now())"><i
+        class="fas fa-server me-2"></i>月報表查詢系統</a>
   </li>
   <hr class="my-2" />
 
   <li class="nav-item">
-    <a class="nav-link" id="navOpenSpreadSheet" href="javascript:void(0)" onclick="openPageUrl('OpenSpreadSheet' + '&v=' + Date.now())"><i class="fas fa-file-excel me-2"></i>開啟試算表</a>
+    <a class="nav-link" id="navOpenSpreadSheet" href="#"
+      onclick="event.preventDefault(); openPageUrl('OpenSpreadSheet' + '&v=' + Date.now())"><i
+        class="fas fa-file-excel me-2"></i>開啟試算表</a>
   </li>
 
   <hr class="my-2" />
 
   <li class="nav-item">
-    <a class="nav-link text-primary fw-bold" id="navDaily" href="javascript:void(0)" onclick="
+    <a class="nav-link text-primary fw-bold" id="navDaily" href="#" onclick="
         event.preventDefault();
         runManualMaintenance();
       ">
@@ -52,11 +72,27 @@
   </li>
 
   <li class="nav-item">
-    <a class="nav-link text-danger fw-bold" id="navSyncSheet" href="javascript:void(0)" onclick="
+    <a class="nav-link text-danger fw-bold" id="navSyncSheet" href="#" onclick="
         event.preventDefault();
         syncPermissions();
       ">
       <i class="fas fa-shield-alt me-2"></i>同步試算表權限
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link text-info fw-bold" id="navClearCache" href="#" onclick="
+        event.preventDefault();
+        clearCache();
+      ">
+      <i class="fas fa-broom me-2"></i>清除系統快取
+    </a>
+  </li>
+
+  <hr class="my-2" />
+  <li class="nav-item">
+    <a class="nav-link text-warning fw-bold" id="navLogout" href="#" onclick="event.preventDefault(); logout()">
+      <i class="fas fa-sign-out-alt me-2"></i>登出系統
     </a>
   </li>
 </ul>

@@ -156,7 +156,7 @@
       <div class="container mt-2 text-end">
         <small class="text-muted">
           <i class="fas fa-user-circle"></i> 當前管理員：
-          <?= userEmail ?>
+          <span id="currentUserName"></span>
         </small>
       </div>
     </div>
@@ -166,29 +166,36 @@
 
     <script>
       // 頁面加載完成後的初始化邏輯
-      $(document).ready(function () {
-        checkAuthContext();
-        $('#loading').css('display', 'flex');
+      $(document).ready(function () {        
+        $('#loadingSpin').css('display', 'flex');
         console.log("舒漾長照系統 - Index 頁面載入完成");
-        $('#loading').hide();
         // 檢查如果沒有 userEmail (代表繞過後端載入，雖然機率低)
-        if (!"<?= userEmail ?>") {
-          window.top.location.href = "<?= webAppUrl ?>";
-        }
+        checkLocalStorageAuth();
       });
 
+      function checkLocalStorageAuth() {
+        let loginData;
+        try {
+          // 優先檢查 sessionStorage，再檢查 localStorage (與 Auth.html 邏輯同步，避免無窮迴圈)
+          loginData = JSON.parse(sessionStorage.getItem('Login'));
+          if (!loginData) {
+            loginData = JSON.parse(localStorage.getItem('Login'));
+          }
+        } catch (e) {
+          loginData = null;
+        }
 
-      /**
-       * 檢查 URL 參數，確保與 Google Session 同步
-       */
-      function checkAuthContext() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentAuthUser = urlParams.get('authuser');
-
-        // 如果網址沒有 authuser 參數，可以視需求決定是否補上，
-        // 避免在多帳號環境下跳轉回預設的 0 號帳號
-        if (currentAuthUser === null) {
-          console.log("提示：當前網址未指定 authuser，建議由官方入口進入以確保權限正確。");
+        // 檢查：若 localStorage 無有效登入資料，則拒絕存取
+        if (!loginData || !loginData.User || !loginData.Role) {
+          // 如果沒有 Google 登入資訊，也沒有 localStorage 登入資訊，則導向 Auth.html
+          window.top.location.href = "<?!= getScriptUrl() ?>?page=Auth&error=access_denied";
+        } else if (loginData && loginData.Role) {
+          // 如果有 localStorage 登入資訊，但沒有 Google 登入資訊，則顯示使用者名稱
+          if (loginData.User) {
+            $('#currentUserName').text(loginData.User);
+          }
+          // 驗證通過後才隱藏 Loading，避免畫面閃爍或在跳轉前顯示內容
+          $('#loadingSpin').hide();
         }
       }
 

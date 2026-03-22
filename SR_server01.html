@@ -9,6 +9,10 @@
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <style>
     body {
       background-color: #fff5f5;
@@ -59,6 +63,31 @@
       margin-bottom: 20px;
       color: #dc3545;
     }
+
+    /* 自定義 Select2 紅色主題 (覆寫 Bootstrap 5 主題預設藍色) */
+    .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+    .select2-container--bootstrap-5 .select2-selection:focus {
+      border-color: #dc3545;
+      box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    }
+
+    /* 下拉選單中，滑鼠指到的項目 (Highlighted) */
+    .select2-container--bootstrap-5 .select2-dropdown .select2-results__option--highlighted[aria-selected] {
+      background-color: #dc3545;
+      color: #fff;
+    }
+
+    /* 已被選取的項目 (Selected) */
+    .select2-container--bootstrap-5 .select2-results__option--selected {
+      background-color: #bb2d3b;
+      color: #fff;
+    }
+
+    /* 新增：當其他個案被啟用時的視覺提示 (紅色邊框與陰影) */
+    .highlight-select2+.select2-container .select2-selection {
+      border: 2px solid #dc3545 !important;
+      box-shadow: 0 0 10px rgba(220, 53, 69, 0.2);
+    }
   </style>
 </head>
 
@@ -71,17 +100,6 @@
     <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理(用戶端)</h2>
 
     <div id="searchSection">
-      <div class="mb-3">
-        <label class="form-label">登入 E-mail</label>
-        <div class="input-group">
-          <input type="email" class="form-control" id="currentUserEmail" readonly />
-        </div>
-        <a href="https://accounts.google.com/AccountChooser?continue=<?= getScriptUrl() ?>" target="_top"
-          class="btn btn-outline-danger">
-          更換 Email 登入
-        </a>
-      </div>
-
       <h5 class="section-title">查詢條件</h5>
       <div class="row">
         <div class="col-md-6 mb-3">
@@ -144,6 +162,9 @@
         <button class="btn btn-danger btn-lg" id="btnQuery">
           查詢紀錄
         </button>
+        <button class="btn btn-outline-secondary btn-lg" id="btnLogout">
+          <i class="fas fa-sign-out-alt me-2"></i>更換使用者 / 登出
+        </button>
       </div>
     </div>
 
@@ -158,7 +179,8 @@
       <div class="mb-3">
         <label class="form-label">服務紀錄內容 (SR_REC)</label>
         <textarea class="form-control" id="inputSrRec" rows="4" placeholder="請詳細輸入服務內容..."></textarea>
-        <div class="mt-2 d-flex justify-content-end">
+        <div class="mt-2 d-flex justify-content-between align-items-center">
+          <small id="charCount" class="text-muted fw-bold">字數：0</small>
           <div class="btn-group shadow-sm" role="group">
             <button type="button" class="btn btn-sm btn-outline-secondary"
               onclick="handleClipboard('cut', '#inputSrRec')">
@@ -174,7 +196,8 @@
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary"
               onclick="handleClipboard('addAI', '#inputSrRec')">
-              <i class="fa-solid fa-eraser"></i> AI
+              <i class="fa-solid fa-wand-magic-sparkles"></i> AI
+            </button>
           </div>
         </div>
       </div>
@@ -225,11 +248,12 @@
       ltcCodes: [],   // SYCompany > LTC_Code
       srData: [],
       srDataHeaders: [],
-      currentUser: null,
-      isNewBinding: false
+      currentUser: null
     };
 
     $(document).ready(function () {
+      checkLocalStorageAuth();
+
       $('#loadingSpin').css('display', 'flex').show();
 
       const today = new Date();
@@ -270,10 +294,14 @@
       $("#queryCustN").change(function () {
         if ($(this).val() === "其他") {
           $("#otherCustRow").show();
-          $("#queryCustNOther").prop("disabled", false).focus();
+          $("#queryCustNOther").prop("disabled", false).addClass("highlight-select2");
+          // 自動捲動並開啟下拉選單 (跳轉焦點)
+          $("#otherCustRow")[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          setTimeout(() => { $("#queryCustNOther").select2('open'); }, 100);
         } else {
           $("#otherCustRow").hide();
-          $("#queryCustNOther").prop("disabled", true).val("");
+          // 切換回一般個案時，清空並鎖定其他個案選單，移除視覺提示
+          $("#queryCustNOther").prop("disabled", true).removeClass("highlight-select2").val(null).trigger('change');
           updateSrIdSelect($(this).val());
         }
       });
@@ -283,30 +311,78 @@
       });
 
       $("#btnQuery").click(async function () {
-        $("#loadingSpin").show();
         $('#btnQuery').prop('disabled', true);
-        await handleAction("query");
-        $('#btnQuery').prop('disabled', false);
+        $("#loadingSpin").show();
+        // 取得執行結果，若回傳 false (失敗/未找到) 才重新啟用按鈕
+        const success = await handleAction("query");
+        if (!success) $('#btnQuery').prop('disabled', false);
+      });
+
+      $("#btnLogout").click(function () {
+        Swal.fire({
+          title: '確認登出',
+          text: "是否確定要登出系統並更換使用者？",
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: '登出',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            localStorage.removeItem('Login');
+            sessionStorage.removeItem('Login');
+            window.top.location.href = "<?!= getScriptUrl() ?>?page=Auth&logout=true";
+          }
+        });
       });
 
       $("#btnAdd").click(async function () {
-        $("#loadingSpin").show();
         $('#btnAdd').prop('disabled', true);
-        await handleAction("add");
-        $('#btnAdd').prop('disabled', false);
+        $("#loadingSpin").show();
+        // 新增成功後會切換回查詢頁面，故不需重新啟用按鈕(防止連點)
+        const success = await handleAction("add");
+        if (!success) $('#btnAdd').prop('disabled', false);
       });
 
       $("#btnUpdate").click(async function () {
-        $("#loadingSpin").show();
         $('#btnUpdate').prop('disabled', true);
-        await handleAction("update");
-        $('#btnUpdate').prop('disabled', false);
+        $("#loadingSpin").show();
+        // 更新成功後會切換回查詢頁面，故不需重新啟用按鈕
+        const success = await handleAction("update");
+        if (!success) $('#btnUpdate').prop('disabled', false);
       });
 
       $("#btnBack").click(function () {
         backToSearch();
+        // 返回查詢頁時，重置所有功能按鈕狀態，避免卡死
+        $('#btnAdd, #btnUpdate').prop('disabled', false);
+      });
+
+      // 新增：字數統計功能
+      $('#inputSrRec').on('input', function () {
+        const len = $(this).val().length;
+        const $count = $('#charCount');
+        $count.text(`字數：${len}`);
+        if (len > 100) {
+          $count.removeClass('text-muted').addClass('text-danger');
+        } else {
+          $count.removeClass('text-danger').addClass('text-muted');
+        }
       });
     });
+
+    function checkLocalStorageAuth() {
+      let loginData;
+      try {
+        loginData = JSON.parse(localStorage.getItem('Login'));
+      } catch (e) {
+        loginData = null;
+      }
+
+      if (!loginData || !loginData.User || !loginData.Role) {
+        // 如果沒有 localStorage 登入資訊，則導向 Auth.html
+        window.top.location.href = "<?!= getScriptUrl() ?>";
+      }
+    }
 
     // --- 初始化成功回調 ---
     function initSuccess(data) {
@@ -321,27 +397,41 @@
         GLOBAL_DATA.srData = data.srData.slice(1);
       }
 
-      $("#currentUserEmail").val(data.email);
+      // 設定當前使用者 (從 LocalStorage)
+      const loginData = JSON.parse(localStorage.getItem('Login'));
+      const loggedInUser = loginData ? loginData.User : null;
+      const loggedInRole = loginData ? loginData.Role : null;
 
-      // 需求 4：比對 Email
-      const matchedUser = GLOBAL_DATA.users.find(u => u.email === data.email);
       const $userSelect = $("#queryUserN");
-
-      $userSelect.empty().append('<option value="" disabled selected>請選擇居服員...</option>');
+      $userSelect.empty();
+      $userSelect.append('<option></option>'); // Select2 Placeholder
 
       // 填入所有 User 到下拉選單 (這裡已包含從 Temp 更新過的名單)
       GLOBAL_DATA.users.forEach(u => {
         $userSelect.append(`<option value="${u.name}">${u.name}</option>`);
       });
 
-      if (matchedUser) {
-        GLOBAL_DATA.currentUser = matchedUser;
-        GLOBAL_DATA.isNewBinding = false;
-        $userSelect.val(matchedUser.name).prop("disabled", true);
-        updateCustSelect(matchedUser.name);
+      // 初始化 User Select2
+      $userSelect.select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: '請輸入名字搜尋居服員...',
+        allowClear: true
+      });
+
+      if (loggedInUser) {
+        GLOBAL_DATA.currentUser = GLOBAL_DATA.users.find(u => u.name === loggedInUser);
+        // 使用 trigger('change') 讓 select2 更新介面並觸發 updateCustSelect
+        $userSelect.val(loggedInUser).trigger('change');
+
+        // 如果是 Admin，允許選擇其他居服員；否則鎖定
+        if (loggedInRole === 'Admin') {
+          $userSelect.prop("disabled", false);
+        } else {
+          $userSelect.prop("disabled", true);
+        }
       } else {
         GLOBAL_DATA.currentUser = null;
-        GLOBAL_DATA.isNewBinding = true;
         $userSelect.prop("disabled", false);
       }
     }
@@ -351,27 +441,64 @@
       const $custSelect = $("#queryCustN");
       const $otherSelect = $("#queryCustNOther");
 
-      $custSelect.empty().append('<option value="" disabled selected>請選擇個案...</option>');
-      $otherSelect.empty().append('<option value="" disabled selected>請選擇其他個案...</option>');
+      // 切換居服員時，重置「其他個案」區塊的狀態
+      $("#otherCustRow").hide();
+      $otherSelect.removeClass("highlight-select2").prop("disabled", true);
+
+      $custSelect.empty();
+      $custSelect.append('<option></option>'); // Placeholder
+
+      $otherSelect.empty();
+      $otherSelect.append('<option></option>'); // Placeholder
       $("#querySrId").empty().append('<option value="" disabled selected>請先選擇個案...</option>');
 
       const userObj = GLOBAL_DATA.users.find(u => u.name === userName);
       let favCusts = [];
 
-      if (userObj && userObj.favCustStr) {
-        favCusts = userObj.favCustStr.split(',').map(s => s.trim()).filter(s => s !== "");
+      // 確保 Admin 切換居服員時，帶出該居服員的常用個案 (兼容 favCustStr 與 custStr)
+      const listStr = userObj ? (userObj.favCustStr || userObj.custStr) : "";
+      if (listStr) {
+        favCusts = listStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
 
-      favCusts.forEach(c => {
-        $custSelect.append(`<option value="${c}">${c}</option>`);
-      });
-      $custSelect.append('<option value="其他">其他 (開啟下方清單)</option>');
+      const loginData = JSON.parse(localStorage.getItem('Login'));
 
       const allCustNames = GLOBAL_DATA.custs.map(c => c.name);
-      const otherCusts = allCustNames.filter(name => !favCusts.includes(name)).sort();
 
-      otherCusts.forEach(c => {
-        $otherSelect.append(`<option value="${c}">${c}</option>`);
+      if (favCusts.length === 0) {
+        if (userName) showToast('info', '該居服員未設定常用個案，已載入所有個案');
+        allCustNames.sort().forEach(c => {
+          $custSelect.append(`<option value="${c}">${c}</option>`);
+        });
+      } else {
+        if (loginData && loginData.Role === 'Admin' && userName && loginData.User !== userName) {
+          showToast('info', `已載入 ${userName} 的常用個案`);
+        }
+        favCusts.forEach(c => {
+          $custSelect.append(`<option value="${c}">${c}</option>`);
+        });
+        $custSelect.append('<option value="其他">其他 (開啟下方清單)</option>');
+
+        const otherCusts = allCustNames.filter(name => !favCusts.includes(name)).sort();
+        otherCusts.forEach(c => {
+          $otherSelect.append(`<option value="${c}">${c}</option>`);
+        });
+      }
+
+      // 初始化 Cust Select2
+      $custSelect.select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: '請輸入名字搜尋個案...',
+        allowClear: true
+      });
+
+      // 初始化 Other Cust Select2
+      $otherSelect.select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: '搜尋其他個案...',
+        allowClear: true
       });
     }
 
@@ -433,13 +560,13 @@
         if (!selectedCust) {
           $("#loadingSpin").hide();
           Swal.fire("提示", "請選擇其他個案姓名", "warning");
-          return;
+          return false; // 回傳 false 表示驗證失敗
         }
       }
 
       if (!validateQuery()) {
         $("#loadingSpin").hide();
-        return;
+        return false; // 回傳 false 表示驗證失敗
       }
 
       const formObj = getFormObject(selectedCust);      // 印出 formObj 以供偵錯
@@ -485,6 +612,7 @@
           $("#searchSection").hide();
           $("#btnAdd").hide();
           $("#btnUpdate").show();
+          return true; // 查詢成功，切換畫面，保持按鈕 disabled 狀態(雖然它已被隱藏)
         } else {
           let exSPCONS = await getSPCons(formObj);
           Swal.fire({
@@ -497,7 +625,7 @@
           }).then((result) => {
             if (result.isConfirmed) {
               fillQueryLabel(formObj);
-              setTimeout(function () { $("#inputSrRec").val("").focus(); }, 50);
+              setTimeout(function () { $("#inputSrRec").val("").trigger('input').focus(); }, 50);
               $("#inputLoc").val(exSPCONS.loc || "清醒");
               $("#inputMood").val(exSPCONS.mood || "穩定");
               $("#inputSpcons").val(exSPCONS.spcons || "無");
@@ -507,33 +635,9 @@
               $("#btnAdd").show();
             }
           });
+          return false; // 查詢未果(或取消新增)，回傳 false 以便重新啟用查詢按鈕
         }
-        return;
-      }
-
-      // --- 需求 7：新使用者電話詢問 ---
-      if ((type === "add" || type === "update") && GLOBAL_DATA.isNewBinding) {
-        $("#loadingSpin").hide();
-        const { value: tel } = await Swal.fire({
-          title: "初次綁定資料",
-          text: `系統檢測到此 Email 尚未綁定 "${formObj.userName}"，請輸入您的聯絡電話以完成綁定。`,
-          input: "text",
-          inputLabel: "聯絡電話 (User_Tel)",
-          inputPlaceholder: "例：0912345678",
-          showCancelButton: true,
-          inputValidator: (value) => {
-            if (!value) return "電話號碼不能為空！"
-          },
-        });
-
-        if (tel) {
-          formObj.userTel = "'" + tel;
-          formObj.isNewBinding = true;
-        } else {
-          $("#loadingSpin").hide();
-          return;
-        }
-        $("#loadingSpin").show();
+        return false; // 確保路徑完整
       }
 
       // --- Client-side data manipulation ---
@@ -573,13 +677,6 @@
       // --- Immediate UI Feedback ---
       $("#loadingSpin").hide();
 
-      if (formObj.isNewBinding) {
-        GLOBAL_DATA.isNewBinding = false;
-        $("#queryUserN").prop("disabled", true);
-        let u = GLOBAL_DATA.users.find(u => u.name === formObj.userName);
-        if (u) { u.email = formObj.email; }
-      }
-
       Swal.fire({
         icon: "success",
         title: "成功",
@@ -588,14 +685,17 @@
         showConfirmButton: false,
       }).then(() => {
         backToSearch();
+        // 操作完成並導回搜尋頁後，重新啟用按鈕以供下次使用
+        $('#btnAdd, #btnUpdate').prop('disabled', false);
       });
+
+      return true; // 動作成功執行
     }
 
     function getFormObject(selectedCust) {
       return {
         date: $("#queryDate").val(),
         SRTimes: $("#querySRTimes").val(),
-        email: $("#currentUserEmail").val(),
         userName: $("#queryUserN").val(),
         custName: selectedCust,
         payType: $("#queryPType").val(),
@@ -604,8 +704,7 @@
         loc: $("#inputLoc").val(),
         mood: $("#inputMood").val(),
         spcons: $("#inputSpcons").val(),
-        userTel: "",
-        isNewBinding: GLOBAL_DATA.isNewBinding // 直接從全域變數讀取
+        userTel: ""
       };
     }
 
@@ -621,7 +720,7 @@
     }
 
     function fillDetail(data) {
-      $('#inputSrRec').val(data.srRec || "");
+      $('#inputSrRec').val(data.srRec || "").trigger('input');
       $('#inputLoc').val(data.loc || "清醒");
       $('#inputMood').val(data.mood || "穩定");
       $('#inputSpcons').val(data.spcons || "無");
@@ -635,7 +734,7 @@
         if (action === 'cut') {
           if (!text) return showToast('info', '沒有內容可以剪下');
           await navigator.clipboard.writeText(text);
-          $el.val("");
+          $el.val("").trigger('input');
           showToast('success', '已剪下');
         } else if (action === 'copy') {
           if (!text) return showToast('info', '內容為空，無法複製');
@@ -645,11 +744,11 @@
           const clipboardText = await navigator.clipboard.readText();
           if (!clipboardText) return showToast('info', '剪貼簿中沒有內容');
           const currentVal = $el.val();
-          $el.val(currentVal + clipboardText);
+          $el.val(currentVal + clipboardText).trigger('input');
           showToast('success', '已貼上');
         } else if (action === 'addAI') {
           const currentVal = $el.val();
-          $el.val(`${currentVal}\n修飾以上句子，符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。`);
+          $el.val(`${currentVal}\n修飾以上句子，符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。`).trigger('input');
           showToast('success', '已加入AI助手');
         }
       } catch (err) {
@@ -670,16 +769,27 @@
     }
 
     function getSPCons(formObj) {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         google.script.run
           .withSuccessHandler(function (res) {
-            if (res && res.data) {
-              resolve(res.data);
+            // 修正：增加對回傳資料結構的相容性檢查 (支援 {data: ...} 或直接回傳物件)
+            let resultData = (res && res.data) ? res.data : res;
+
+            // 設定預設值
+            const defaults = { loc: "清醒", mood: "穩定", spcons: "無" };
+
+            if (resultData) {
+              resolve({
+                loc: resultData.loc || defaults.loc,
+                mood: resultData.mood || defaults.mood,
+                spcons: resultData.spcons || defaults.spcons
+              });
             } else {
-              resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
+              resolve(defaults);
             }
           })
           .withFailureHandler(function (err) {
+            console.error("getSPCons backend error:", err);
             resolve({ loc: "清醒", mood: "穩定", spcons: "無" });
           })
           .getSPCONS(formObj);

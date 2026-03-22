@@ -205,7 +205,7 @@
     <div class="container mt-2 text-end">
       <small class="text-muted">
         <i class="fas fa-user-circle"></i> 當前管理員：
-        <?= userEmail ?>
+        <span id="currentUserDisplay"></span>
       </small>
     </div>
 
@@ -220,6 +220,10 @@
       $('#loadingSpin').css('display', 'flex');
       // 頁面載入時，抓取所有初始資料
       loadInitialData();
+
+      // 顯示當前使用者
+      const loginData = JSON.parse(localStorage.getItem('Login'));
+      if (loginData && loginData.User) $('#currentUserDisplay').text(loginData.User);
 
       // ==================== 事件處理 ====================
       $('#inputCustBirth').on('change', function () {

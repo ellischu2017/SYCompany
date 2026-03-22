@@ -113,7 +113,7 @@ function updateCustData(formObj, sheetName = "Cust") {
   }
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const nameColIdx = headers.indexOf("Cust_N");
+  const nameColIdx = getColIndex(headers, "Cust_N");
 
   if (nameColIdx === -1) {
     return { success: false, message: `工作表 ${sheetName} 中找不到 'Cust_N' 欄位。` };
@@ -165,9 +165,11 @@ function deleteCustData(custName, sheetName = "OldCust") {
     return { success: false, message: `找不到工作表: ${sheetName}` };
   }
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const nameColIdx = getColIndex(headers, "Cust_N");
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == custName) {
+    if (data[i][nameColIdx] == custName) {
       sheet.deleteRow(i + 1);
       CacheService.getScriptCache().remove("CustInfoMap");
       CacheService.getScriptCache().remove("CustN_All");

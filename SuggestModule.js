@@ -1,36 +1,4 @@
 /**
- * 根據當前登入者 Email 於 User 分頁查找姓名
- */
-function getUserNameByEmail() {
-  const email = Session.getActiveUser().getEmail();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const userSheet = ss.getSheetByName("User");
-  
-  if (!userSheet) return "查無使用者資料表";
-  
-  const userData = userSheet.getDataRange().getValues();
-  // 假設第一欄是 User_N (姓名), 第二欄是 User_Email
-  for (let i = 1; i < userData.length; i++) {
-    if (userData[i][1] === email) {
-      return { userName: userData[i][0] , userEmail: email};
-    }
-  }
-
-  const managerSheet = ss.getSheetByName("Manager");
-  
-  if (!managerSheet) return "查無使用者資料表";
-  
-  const managerData = managerSheet.getDataRange().getValues();
-  // 假設第一欄是 User_N (姓名), 第二欄是 User_Email
-  for (let i = 1; i < managerData.length; i++) {
-    if (managerData[i][1] === email) {
-      return { userName: managerData[i][0] , userEmail: email};
-    }
-  }
-  return { userName: "訪客", userEmail: email };
-}
-
-/**
  * 將建議存入 SYTemp 檔案中的 Suggest 工作表
  */
 function addSuggestion(formData) {
@@ -56,13 +24,12 @@ function addSuggestion(formData) {
     if (!tempSheet) {
       tempSheet = ss.insertSheet("Suggest");
       // 設定第一列為標題
-      tempSheet.appendRow(["Date","Su_Email","Su_N","Su_Rec","Deal"]);
+      tempSheet.appendRow(["Date","Su_N","Su_Rec","Deal"]);
     }
 
     // 準備資料
     const rowData = [
       formData.date || "",
-      formData.suEmail || "",
       formData.suName || "",
       formData.suRec || ""
     ];

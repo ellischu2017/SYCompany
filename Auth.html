@@ -1,6 +1,587 @@
-<div style='font-family: sans-serif; text-align: center; padding-top: 50px;'>
-  <h3>需要授權以存取系統</h3>
-  <p>請確保您已登入 Google 帳號。如果仍看到此訊息，請點擊下方按鈕進行授權。</p>
-  <a href='<?= scriptUrl ?>' target='_top' 
-    style='padding: 10px 20px; background: #4285f4; color: white; text-decoration: none; border-radius: 5px;'>重新驗證身份</a>
-</div>
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <title>舒漾長照服務紀錄單管理系統 - 登入</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      font-family: "Microsoft JhengHei", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .login-container {
+      max-width: 420px;
+      width: 90%;
+      padding: 2.5rem;
+      margin: auto;
+      background-color: rgba(255, 255, 255, 0.98);
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    /* 美化表單元件 (輸入框與下拉選單) */
+    .form-control,
+    .form-select {
+      border-radius: 12px;
+      padding: 12px 15px;
+      border: 1px solid #e1e4e8;
+      background-color: #f8f9fa;
+      transition: all 0.3s ease;
+      font-size: 1rem;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15);
+      background-color: #fff;
+    }
+
+    .btn-primary {
+      border-radius: 12px;
+      padding: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 5px rgba(13, 110, 253, 0.2);
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    /* 修正 Footer 位置，使其固定在頁面底部 */
+    .footer-section {
+      position: relative;
+      width: 100%;
+      margin-top: auto !important;
+      border-top: 0;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loadingSpin" class="loading-overlay" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+
+  <div id="loginSection" class="login-container" style="display: none;">
+    <h2 class="text-center mb-4">系統登入</h2>
+    <form id="loginForm">
+      <div class="mb-3">
+        <label for="queryUserN" class="form-label"><i class="fas fa-user me-2"></i>使用者</label>
+        <select class="form-select" id="queryUserN">
+          <option value="" disabled selected>系統載入中...</option>
+        </select>
+      </div>
+      <div class="mb-3" id="passwordBlock" style="display: none;">
+        <label for="inputPassword" class="form-label"><i class="fas fa-key me-2"></i>密碼</label>
+        <div class="input-group">
+          <input type="password" class="form-control" id="inputPassword" placeholder="如果需要，請輸入密碼">
+          <button class="btn btn-outline-secondary" type="button" id="togglePassword"><i
+              class="fas fa-eye"></i></button>
+        </div>
+      </div>
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="rememberUser" checked>
+        <label class="form-check-label" for="rememberUser">記住帳號</label>
+      </div>
+      <div class="d-grid gap-2 mt-4">
+        <button class="btn btn-primary btn-lg" id="btnLogin" type="button">
+          <i class="fas fa-sign-in-alt me-2"></i>登入
+        </button>
+        <button class="btn btn-outline-secondary" id="btnLogout" type="button">
+          <i class="fas fa-sign-out-alt me-2"></i>清除暫存 / 重整
+        </button>
+      </div>
+      <div class="text-center mt-3">
+        <a href="#" id="btnChangePwd" class="text-secondary small text-decoration-none">
+          <i class="fas fa-key me-1"></i>修改密碼
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // 提前定義 SCRIPT_URL 以供頁面內的函式使用，避免 ReferenceError
+    const SCRIPT_URL = "<?!= webAppUrl ?>";
+    // 初始化 Toast 提示框設定，讓錯誤訊息以輕量化方式顯示
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
+
+    $(document).ready(function () {
+      // 優先檢查網址是否有 logout 參數
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('logout') === 'true') {
+        localStorage.removeItem('Login');
+        localStorage.removeItem('RememberedUser'); // 同步清除記住的帳號，確保登出行為一致
+        sessionStorage.removeItem('Login'); // 同步清除 Session 中的登入狀態
+        sessionStorage.removeItem('AuthUser');
+
+        Swal.fire({
+          icon: 'success',
+          title: '已登出',
+          text: '您已成功登出系統',
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          // 清除網址參數(選用)並顯示登入畫面
+          if (window.history.replaceState) {
+            const newUrl = window.location.href.split('?')[0] + '?page=Auth';
+            window.history.replaceState(null, null, newUrl);
+          }
+          showLoginPage();
+        });
+      } else if (urlParams.get('error')) {
+        // 防呆機制：若網址含有 error 參數，防止 Session 自動登入後又被導回的無窮迴圈
+        const errCode = urlParams.get('error');
+        let errMsg = '系統偵測到異常，請重新登入。';
+        if (errCode === 'access_denied') errMsg = '您沒有權限訪問該頁面，請重新登入。';
+
+        Swal.fire({
+          icon: 'error',
+          title: '無法登入',
+          text: errMsg,
+          confirmButtonText: '確定',
+          allowOutsideClick: false
+        }).then(() => {
+          // 清除網址參數
+          if (window.history.replaceState) {
+            const newUrl = window.location.href.split('?')[0] + '?page=Auth';
+            window.history.replaceState(null, null, newUrl);
+          }
+          localStorage.removeItem('Login'); // 清除登入狀態
+          sessionStorage.removeItem('Login'); // 清除 Session 狀態
+          showLoginPage(); // 顯示登入表單
+        });
+      } else {
+        checkLocalStorageLogin();
+      }
+    });
+
+    function checkLocalStorageLogin() {
+      $('#loadingSpin').show();
+      let loginData;
+      // 優先檢查 sessionStorage (本次瀏覽器會話)，再檢查 localStorage (長期記憶)
+      try {
+        loginData = JSON.parse(sessionStorage.getItem('Login'));
+        if (!loginData) {
+          loginData = JSON.parse(localStorage.getItem('Login'));
+        }
+      } catch (e) {
+        loginData = null;
+      }
+
+      if (loginData && loginData.User && loginData.Role) {
+        $('#loadingSpin').hide();
+        Swal.fire({
+          title: '快速登入',
+          text: `是否使用 ${loginData.User} 的身分繼續登入本系統？`,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: '是',
+          cancelButtonText: '否，更換帳號'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            redirectToPage(loginData.Role);
+          } else {
+            localStorage.removeItem('Login');
+            sessionStorage.removeItem('Login');
+            showLoginPage();
+          }
+        });
+      } else {
+        showLoginPage();
+      }
+    }
+
+    function showLoginPage() {
+      $('#loadingSpin').show();
+      $('#loginSection').fadeIn();
+      loadAuthData();
+    }
+
+    function loadAuthData() {
+      // Check sessionStorage first
+      const cachedUsers = sessionStorage.getItem('AuthUser');
+      if (cachedUsers) {
+        populateUserDropdown(JSON.parse(cachedUsers));
+        $('#loadingSpin').hide();
+        return;
+      }
+
+      // If not in session, fetch from server
+      google.script.run
+        .withSuccessHandler(function (users) {
+          sessionStorage.setItem('AuthUser', JSON.stringify(users));
+          populateUserDropdown(users);
+          $('#loadingSpin').hide();
+        })
+        .withFailureHandler(function (err) {
+          $('#loadingSpin').hide();
+          Swal.fire('錯誤', '無法載入使用者清單: ' + err.message, 'error');
+        })
+        .getAuthUsers(); // This function needs to be created in Code.gs
+    }
+
+    function populateUserDropdown(users) {
+      const $select = $('#queryUserN');
+      $select.empty();
+      // Select2 需要一個空的 option 來支援 placeholder
+      $select.append('<option></option>');
+
+      if (users && users.length > 0) {
+        users.forEach(function (user) {
+          $select.append(`<option value="${user.User}">${user.User}</option>`);
+        });
+
+        // 初始化 Select2 (搜尋功能)
+        $select.select2({
+          theme: 'bootstrap-5',
+          width: '100%',
+          placeholder: '請輸入名字搜尋...',
+          allowClear: true
+        });
+
+        // 新增：當使用者變更時，檢查是否需要顯示密碼欄位
+        $select.on('change', function () {
+          const selectedUserName = $(this).val();
+          const $passwordBlock = $('#passwordBlock');
+          const $passwordInput = $('#inputPassword');
+
+          if (!selectedUserName) {
+            $passwordBlock.hide();
+            $passwordInput.val('');
+            return;
+          }
+
+          const selectedUser = users.find(u => u.User === selectedUserName);
+          const userPass = selectedUser && selectedUser.Pass ? String(selectedUser.Pass).trim() : '';
+
+          if (userPass !== '') {
+            $passwordBlock.fadeIn(); // 有密碼，顯示輸入框
+          } else {
+            $passwordBlock.fadeOut(); // 無密碼，隱藏輸入框
+            $passwordInput.val(''); // 並清空內容
+          }
+        });
+
+        // 檢查是否有記住的帳號並自動選取
+        const rememberedUser = localStorage.getItem('RememberedUser');
+        if (rememberedUser && users.some(u => u.User === rememberedUser)) {
+          $select.val(rememberedUser).trigger('change');
+          $('#rememberUser').prop('checked', true);
+        }
+      } else {
+        $select.append('<option value="" disabled>無可用使用者</option>');
+      }
+    }
+
+    function redirectToPage(role) {
+      $('#loadingSpin').show();
+      let page = '';
+      if (role === 'Admin') {
+        page = 'Index';
+      } else if (role === 'user') {
+        page = 'SR_server01';
+      }
+
+      if (page) {
+        window.top.location.href = SCRIPT_URL + "?page=" + page;
+      } else {
+        $('#loadingSpin').hide();
+        Swal.fire('錯誤', '角色錯誤，無法導向頁面', 'error');
+      }
+    }
+
+    // 綁定 Enter 鍵觸發登入：當在密碼框按下 Enter 時，自動點擊登入按鈕
+    $('#inputPassword').on('keypress', function (e) {
+      if (e.which === 13) {
+        $('#btnLogin').click();
+      }
+    });
+
+    $('#btnLogin').click(function () {
+      const selectedUserName = $('#queryUserN').val();
+      const password = $('#inputPassword').val();
+
+      if (!selectedUserName) {
+        Toast.fire({ icon: 'warning', title: '請選擇一位使用者' });
+        return;
+      }
+
+      const allUsers = JSON.parse(sessionStorage.getItem('AuthUser')) || [];
+      const selectedUser = allUsers.find(u => u.User === selectedUserName);
+
+      if (!selectedUser) {
+        Toast.fire({ icon: 'error', title: '找不到該使用者資料' });
+        return;
+      }
+
+      // Check if password is required and if it matches
+      // 強制轉型為字串進行比對，避免 Spreadsheet 回傳數值導致與輸入框文字比對失敗
+      const userPass = selectedUser.Pass ? String(selectedUser.Pass).trim() : '';
+
+      if (userPass !== '') {
+        if (!password) {
+          Toast.fire({ icon: 'warning', title: '請輸入密碼' });
+          return;
+        }
+        if (String(password).trim() !== userPass) {
+          Toast.fire({ icon: 'error', title: '密碼不正確' });
+          return;
+        }
+      }
+
+      // Login success
+      const loginData = {
+        User: selectedUser.User,
+        Role: selectedUser.Role
+      };
+
+      // 處理「記住帳號」功能
+      if ($('#rememberUser').is(':checked')) {
+        localStorage.setItem('RememberedUser', selectedUser.User);
+      } else {
+        localStorage.removeItem('RememberedUser');
+      }
+
+      // 取得並顯示上次登入時間
+      const lastLogin = localStorage.getItem('LastLoginTime');
+      let msgHtml = `歡迎，<b>${selectedUser.User}</b>！`;
+      if (lastLogin) {
+        msgHtml += `<br><br><small class="text-muted">上次登入：${lastLogin}</small>`;
+      }
+
+      // 更新本次登入時間 (存入 localStorage 供下次使用)
+      const now = new Date();
+      const timeStr = now.toLocaleString('zh-TW', { hour12: false });
+      localStorage.setItem('LastLoginTime', timeStr);
+
+      localStorage.setItem('Login', JSON.stringify(loginData));
+
+      Swal.fire({
+        icon: 'success',
+        title: '登入成功',
+        html: msgHtml,
+        timer: 2000,
+        showConfirmButton: false
+      }).then(() => {
+        // 根據「記住帳號」勾選狀態決定儲存位置
+        if ($('#rememberUser').is(':checked')) {
+          localStorage.setItem('Login', JSON.stringify(loginData)); // 長期保存
+          sessionStorage.removeItem('Login'); // 避免狀態混淆
+        } else {
+          sessionStorage.setItem('Login', JSON.stringify(loginData)); // 僅本次視窗有效
+          localStorage.removeItem('Login'); // 確保不殘留長期狀態
+        }
+        redirectToPage(selectedUser.Role);
+      });
+    });
+
+    // Toggle Password Visibility
+    $('#togglePassword').click(function () {
+      const passwordInput = $('#inputPassword');
+      const icon = $(this).find('i');
+
+      if (passwordInput.attr('type') === 'password') {
+        passwordInput.attr('type', 'text');
+        icon.removeClass('fa-eye').addClass('fa-eye-slash');
+      } else {
+        passwordInput.attr('type', 'password');
+        icon.removeClass('fa-eye-slash').addClass('fa-eye');
+      }
+    });
+
+    // 新增：清除登入資訊按鈕 (登出/重置)
+    $('#btnLogout').click(function () {
+      localStorage.removeItem('Login');       // 清除登入狀態
+      localStorage.removeItem('RememberedUser'); // 清除記住的帳號
+      sessionStorage.removeItem('Login');     // 清除 Session 狀態
+      sessionStorage.removeItem('AuthUser');  // 清除使用者名單快取
+      Swal.fire({
+        title: '已清除',
+        text: '登入資訊與暫存已清除，頁面將重新整理。',
+        icon: 'info',
+        confirmButtonText: '確定'
+      }).then(() => {
+        // 使用 SCRIPT_URL 重新導向到 Auth 頁面，比 reload 更穩定，避免畫面變白
+        window.top.location.href = SCRIPT_URL + '?page=Auth';
+      });
+    });
+
+    // 新增：修改密碼功能
+    $('#btnChangePwd').click(function (e) {
+      e.preventDefault();
+      const users = JSON.parse(sessionStorage.getItem('AuthUser')) || [];
+      if (users.length === 0) {
+        Toast.fire({ icon: 'error', title: '無法讀取使用者資料，請先重整頁面' });
+        return;
+      }
+
+      const currentVal = $('#queryUserN').val();
+      let optionsHtml = users.map(u =>
+        `<option value="${u.User}" ${u.User === currentVal ? 'selected' : ''}>${u.User}</option>`
+      ).join('');
+
+      Swal.fire({
+        title: '修改密碼',
+        html: `
+          <div class="text-start">
+            <div class="mb-3">
+              <label class="form-label">選擇使用者</label>
+              <select id="swal-input-user" class="form-select">${optionsHtml}</select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">舊密碼</label>
+              <div class="input-group">
+                <input type="password" id="swal-input-old" class="form-control" placeholder="驗證身分用">
+                <button type="button" class="btn btn-outline-secondary" id="btn-toggle-old"><i class="fas fa-eye"></i></button>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">新密碼</label>
+              <div class="input-group">
+                <input type="password" id="swal-input-new" class="form-control" placeholder="請輸入新密碼">
+                <button type="button" class="btn btn-outline-secondary" id="btn-toggle-new"><i class="fas fa-eye"></i></button>
+              </div>
+            </div>
+          </div>
+        `,
+        didOpen: () => {
+          // 綁定顯示密碼按鈕事件
+          ['old', 'new'].forEach(type => {
+            const btn = document.getElementById(`btn-toggle-${type}`);
+            const input = document.getElementById(`swal-input-${type}`);
+            btn.addEventListener('click', () => {
+              if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+              } else {
+                input.type = 'password';
+                btn.innerHTML = '<i class="fas fa-eye"></i>';
+              }
+            });
+          });
+        },
+        showCancelButton: true,
+        confirmButtonText: '確認修改',
+        cancelButtonText: '取消',
+        preConfirm: () => {
+          const user = document.getElementById('swal-input-user').value;
+          const oldPass = document.getElementById('swal-input-old').value;
+          const newPass = document.getElementById('swal-input-new').value;
+
+          if (!oldPass || !newPass) {
+            Swal.showValidationMessage('請輸入舊密碼與新密碼');
+            return false;
+          }
+
+           // 前端驗證：檢查新密碼長度
+          if (newPass.length < 8) {
+            Swal.showValidationMessage('新密碼長度不得少於 8 碼');
+            Swal.showValidationMessage('請輸入舊密碼與新密碼');
+            return false;
+          }
+
+          // 用戶端先驗證舊密碼 (基於已載入的 User 資料)
+          const userData = users.find(u => u.User === user);
+          const truePass = userData && userData.Pass ? String(userData.Pass).trim() : '';
+
+          if (String(oldPass).trim() !== truePass) {
+            Swal.showValidationMessage('舊密碼不正確');
+            return false;
+          }
+
+          return { user: user, newPass: newPass };
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $('#loadingSpin').show();
+          // 呼叫後端 Google Apps Script 函式進行修改
+          google.script.run
+            .withSuccessHandler(function () {
+              $('#loadingSpin').hide();
+
+              // 1. 更新 Session 中的使用者資料，確保前端登入驗證能通過新密碼
+              const authUsers = JSON.parse(sessionStorage.getItem('AuthUser')) || [];
+              const targetUserIdx = authUsers.findIndex(u => u.User === result.value.user);
+              if (targetUserIdx !== -1) {
+                authUsers[targetUserIdx].Pass = result.value.newPass;
+                sessionStorage.setItem('AuthUser', JSON.stringify(authUsers));
+                // 重新渲染下拉選單，確保內部邏輯參照到最新資料
+                populateUserDropdown(authUsers);
+              }
+
+              // 2. 顯示成功訊息並自動執行登入
+              Swal.fire({
+                icon: 'success',
+                title: '修改成功',
+                text: '密碼已更新，正在為您自動登入...',
+                timer: 1500,
+                showConfirmButton: false
+              }).then(() => {
+                // 3. 自動填入並觸發登入按鈕
+                $('#queryUserN').val(result.value.user).trigger('change');
+                $('#inputPassword').val(result.value.newPass);
+                $('#btnLogin').click();
+              });
+            })
+            .withFailureHandler(function (err) {
+              $('#loadingSpin').hide();
+              Swal.fire('錯誤', '修改失敗：' + err.message, 'error');
+            })
+            .changeUserPassword(result.value.user, result.value.newPass); // 需在後端 Code.gs 實作此函式
+        }
+      });
+    });
+
+  </script>
+  <?!= includeFooter(); ?>
+</body>
+
+</html>

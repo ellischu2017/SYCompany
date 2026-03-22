@@ -24,12 +24,18 @@ function getAllRecUrlData() {
   const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const targetFields = ["SY_N", "SY_Url"];
+  const colMap = getColIndicesMap(headers, targetFields);
+  
+  if (colMap["SY_N"] === -1) return [];
+
   const result = [];
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0]) {
+    if (data[i][colMap["SY_N"]]) {
       result.push({
-        SY_N: data[i][0],
-        SY_Url: data[i][1]
+        SY_N: data[i][colMap["SY_N"]],
+        SY_Url: colMap["SY_Url"] !== -1 ? data[i][colMap["SY_Url"]] : ""
       });
     }
   }
@@ -42,14 +48,19 @@ function getAllRecUrlData() {
 function queryRecUrlData(syName) {
   const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const targetFields = ["SY_N", "SY_Url"];
+  const colMap = getColIndicesMap(headers, targetFields);
+  
+  if (colMap["SY_N"] === -1) return { found: false };
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == syName) {
+    if (data[i][colMap["SY_N"]] == syName) {
       return {
         found: true,
         rowResult: {
-          SY_N: data[i][0],
-          SY_Url: data[i][1],
+          SY_N: data[i][colMap["SY_N"]],
+          SY_Url: colMap["SY_Url"] !== -1 ? data[i][colMap["SY_Url"]] : "",
         },
       };
     }
@@ -63,25 +74,33 @@ function queryRecUrlData(syName) {
 function saveRecUrlData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idxName = getColIndex(headers, "SY_N");
+  const idxUrl = getColIndex(headers, "SY_Url");
+
+  if (idxName === -1) return { success: false, message: "錯誤：找不到 SY_N 欄位" };
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == formObj.syName) {
-      sheet.getRange(i + 1, 2).setValue(formObj.recUrl);
+    if (data[i][idxName] == formObj.syName) {
+      if (idxUrl !== -1) sheet.getRange(i + 1, idxUrl + 1).setValue(formObj.recUrl);
       return { success: true, message: "網址更新成功！" };
     }
   }
 
-  sheet.appendRow([formObj.syName, formObj.recUrl]);
-  // 2. 執行排序 (ORDER BY Cust_N A->Z)
-  // getRange(row, column, numRows, numColumns)
-  // 從第 2 列開始排（避開標題列），針對所有已使用的範圍進行排序
+  // 新增
+  const newRow = new Array(headers.length).fill("");
+  newRow[idxName] = formObj.syName;
+  if (idxUrl !== -1) newRow[idxUrl] = formObj.recUrl;
+
+  sheet.appendRow(newRow);
+
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
 
   if (lastRow > 1) {
     sheet
       .getRange(2, 1, lastRow - 1, lastColumn)
-      .sort({ column: 1, ascending: true });
+      .sort({ column: idxName + 1, ascending: true });
   }
   return { success: true, message: "網址新增成功！" };
 }
@@ -92,24 +111,14 @@ function saveRecUrlData(formObj) {
 function deleteRecUrlData(syName) {
   const sheet = MainSpreadsheet.getSheetByName("RecUrl");
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idxName = getColIndex(headers, "SY_N");
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == syName) {
+    if (data[i][idxName] == syName) {
       sheet.deleteRow(i + 1);
       return { success: true, message: "資料已刪除！" };
     }
   }
   return { success: false, message: "刪除失敗。" };
-}
-
-/**
- * 輔助函式：根據 SY_N 取得 RecUrl 內的網址
- */
-function getUrlFromRecUrl(mainSS, syName) {
-  const recSheet = mainSS.getSheetByName("RecUrl");
-  const data = recSheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === syName) return data[i][1];
-  }
-  return null;
 }

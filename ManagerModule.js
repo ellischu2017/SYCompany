@@ -7,21 +7,38 @@
  * 取得所有管理員資料 (用於前端快取)
  */
 function getAllManagerData() {
+  // 1. 嘗試從快取讀取
+  const cache = CacheService.getScriptCache();
+  const cachedData = cache.get("ManagerData");
+  if (cachedData) return JSON.parse(cachedData);
+
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   if (!sheet) return [];
 
   const data = sheet.getDataRange().getValues();
-  const result = [];
+  const headers = data[0];
+  const targetFields = ["Mana_N", "Mana_Email", "Mana_Tel"];
+  const colMap = getColIndicesMap(headers, targetFields);
 
-  // 從第 2 列開始 (索引 1)
+  if (colMap["Mana_N"] === -1) return [];
+
+  const result = [];
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0]) {
+    const row = data[i];
+    if (row[colMap["Mana_N"]]) {
       result.push({
-        Mana_N: data[i][0].toString(),
-        Mana_Email: data[i][1] ? data[i][1].toString() : "",
-        Mana_Tel: data[i][2] ? data[i][2].toString() : ""
+        Mana_N: row[colMap["Mana_N"]].toString(),
+        Mana_Email: colMap["Mana_Email"] !== -1 ? String(row[colMap["Mana_Email"]]) : "",
+        Mana_Tel: colMap["Mana_Tel"] !== -1 ? String(row[colMap["Mana_Tel"]]) : ""
       });
     }
+  }
+
+  // 2. 寫入快取 (設定 30 分鐘)
+  try {
+    cache.put("ManagerData", JSON.stringify(result), 1800);
+  } catch (e) {
+    console.log("快取 ManagerData 失敗: " + e.toString());
   }
   return result;
 }
@@ -55,15 +72,20 @@ function getManaList() {
 function queryManaData(manaName) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const targetFields = ["Mana_N", "Mana_Email", "Mana_Tel"];
+  const colMap = getColIndicesMap(headers, targetFields);
+
+  if (colMap["Mana_N"] === -1) return { found: false };
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == manaName) {
+    if (data[i][colMap["Mana_N"]] == manaName) {
       return {
         found: true,
         rowResult: {
-          Mana_N: data[i][0],
-          Mana_Email: data[i][1],
-          Mana_Tel: data[i][2].toString(),
+          Mana_N: data[i][colMap["Mana_N"]],
+          Mana_Email: colMap["Mana_Email"] !== -1 ? data[i][colMap["Mana_Email"]] : "",
+          Mana_Tel: colMap["Mana_Tel"] !== -1 ? data[i][colMap["Mana_Tel"]].toString() : "",
         },
       };
     }
@@ -76,28 +98,40 @@ function queryManaData(manaName) {
  */
 function addManaData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
-  const list = getManaList();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idxName = getColIndex(headers, "Mana_N");
+  const idxEmail = getColIndex(headers, "Mana_Email");
+  const idxTel = getColIndex(headers, "Mana_Tel");
 
-  if (list.includes(formObj.manaName)) {
-    return { success: false, message: "該管理員姓名已存在！" };
+  if (idxName === -1) return { success: false, message: "錯誤：找不到 Mana_N 欄位" };
+
+  // 檢查重複
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idxName]) === formObj.manaName) {
+      return { success: false, message: "該管理員姓名已存在！" };
+    }
   }
 
-  const newRow = [formObj.manaName, formObj.manaEmail, "'" + formObj.manaTel];
+  // 動態建立新資料列
+  const newRow = new Array(headers.length).fill("");
+  newRow[idxName] = formObj.manaName;
+  if (idxEmail !== -1) newRow[idxEmail] = formObj.manaEmail;
+  if (idxTel !== -1) newRow[idxTel] = "'" + formObj.manaTel;
 
   sheet.appendRow(newRow);
-  // 2. 執行排序 (ORDER BY Cust_N A->Z)
-  // getRange(row, column, numRows, numColumns)
-  // 從第 2 列開始排（避開標題列），針對所有已使用的範圍進行排序
+
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
 
   if (lastRow > 1) {
     sheet
       .getRange(2, 1, lastRow - 1, lastColumn)
-      .sort({ column: 1, ascending: true });
+      .sort({ column: idxName + 1, ascending: true });
   }
   // 清除快取，確保下次讀取到最新名單
   CacheService.getScriptCache().remove("ManaList");
+  CacheService.getScriptCache().remove("ManagerData");
   syncMasterTablePermissions();
   return { success: true, message: "新增成功！" };
 }
@@ -108,14 +142,21 @@ function addManaData(formObj) {
 function updateManaData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idxName = getColIndex(headers, "Mana_N");
+  const idxEmail = getColIndex(headers, "Mana_Email");
+  const idxTel = getColIndex(headers, "Mana_Tel");
+
+  if (idxName === -1) return { success: false, message: "錯誤：找不到 Mana_N 欄位" };
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == formObj.manaName) {
+    if (String(data[i][idxName]) == formObj.manaName) {
       const rowNum = i + 1;
-      sheet.getRange(rowNum, 2).setValue(formObj.manaEmail);
-      sheet.getRange(rowNum, 3).setValue("'" + formObj.manaTel);
+      if (idxEmail !== -1) sheet.getRange(rowNum, idxEmail + 1).setValue(formObj.manaEmail);
+      if (idxTel !== -1) sheet.getRange(rowNum, idxTel + 1).setValue("'" + formObj.manaTel);
       // 清除快取
       CacheService.getScriptCache().remove("ManaList");
+      CacheService.getScriptCache().remove("ManagerData");
       syncMasterTablePermissions();
       return { success: true, message: "資料更新成功！" };
     }
@@ -129,12 +170,17 @@ function updateManaData(formObj) {
 function deleteManaData(manaName) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idxName = getColIndex(headers, "Mana_N");
+
+  if (idxName === -1) return { success: false, message: "錯誤：找不到 Mana_N 欄位" };
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] == manaName) {
+    if (String(data[i][idxName]) == manaName) {
       sheet.deleteRow(i + 1);
       // 清除快取
       CacheService.getScriptCache().remove("ManaList");
+      CacheService.getScriptCache().remove("ManagerData");
       return { success: true, message: "刪除成功！" };
     }
   }

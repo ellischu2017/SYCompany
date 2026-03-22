@@ -119,13 +119,110 @@
 
   }
 
-  const SCRIPT_URL = "<?!= getScriptUrl() ?>";
+  /**
+   * 清除快取功能
+   */
+  function clearCache() {
+    // 1. 關閉導航列
+    var offcanvasElement = document.querySelector('.offcanvas');
+    if (offcanvasElement) {
+      var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+      if (offcanvas) offcanvas.hide();
+    }
+    
+    Swal.fire({
+      title: '清除快取',
+      text: '確定要清除系統快取與前端暫存嗎？頁面將會重新整理。',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '確定清除',
+      cancelButtonText: '取消'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        Swal.fire({
+          title: '處理中...',
+          text: '正在清除伺服器快取與本地暫存...',
+          allowOutsideClick: false,
+          didOpen: () => { Swal.showLoading(); }
+        });
+        
+        google.script.run
+          .withSuccessHandler(function() {
+            sessionStorage.clear(); // 清除前端 SessionStorage
+            Swal.fire({
+              icon: 'success',
+              title: '完成',
+              text: '快取已清除，正在重新整理...',
+              timer: 1000,
+              showConfirmButton: false
+            }).then(() => {
+              window.top.location.href = SCRIPT_URL;
+            });
+          })
+          .withFailureHandler(function(err) {
+            Swal.fire('錯誤', err.message, 'error');
+          })
+          .clearAllCaches();
+      }
+    });
+  }
+
+  // 使用 var 並檢查變數是否存在，以避免在 Auth.html 等頁面中發生重複宣告的錯誤
+  if (typeof SCRIPT_URL === 'undefined') {
+    var SCRIPT_URL = "<?!= getScriptUrl() ?>";
+  }
   function openPageUrl(pageName, target = "_top") {
     //網址
-    if (target === "_self" || target === "_top") {
-      window.top.location.href = SCRIPT_URL + "?page=" + pageName;
-    } else {
+    if (target === "_blank") {
       window.open(SCRIPT_URL + "?page=" + pageName, target);
+    } else {
+      window.top.location.href = SCRIPT_URL + "?page=" + pageName;
     }
   }
+
+  /**
+   * 登出系統，清除本地儲存並導向登入頁
+   */
+  function logout() {
+    // 1. 關閉可能開啟的 Offcanvas 導覽列
+    var offcanvasElement = document.querySelector('.offcanvas');
+    if (offcanvasElement) {
+      var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+      if (offcanvas) offcanvas.hide();
+    }
+
+    // 2. 跳轉到登入頁面，並帶上 logout 參數以觸發清除動作
+    window.top.location.href = SCRIPT_URL + "?page=Auth&logout=true";
+  }
+
+  // 全域權限檢查：限制 Role='user' 只能訪問特定頁面
+  $(document).ready(function() {
+    try {
+      var loginData = JSON.parse(localStorage.getItem('Login'));
+      // 若角色為 user
+      if (loginData && loginData.User && loginData.Role === 'user') {
+        var urlParams = new URLSearchParams(window.location.search);
+        var currentPage = urlParams.get('page');
+        
+        // 白名單：僅允許 SR_server01 和 Auth
+        // 注意：若 currentPage 為 null (通常是首頁)，後端 doGet 會處理，這裡主要攔截明確指定 page 的參數
+        var allowedPages = ['SR_server01', 'Auth'];
+        
+        if (currentPage && allowedPages.indexOf(currentPage) === -1) {
+           Swal.fire({
+             icon: 'warning',
+             title: '權限受限',
+             text: '您的帳號 (User) 僅能存取電子服務紀錄(用戶端)。',
+             confirmButtonText: '前往正確頁面',
+             allowOutsideClick: false,
+             allowEscapeKey: false
+           }).then(function() {
+            openPageUrl('SR_server01','_top');                        
+           });
+        }
+      }
+    } catch (e) {
+      console.error("權限檢查例外:", e);
+    }
+  });
 </script>

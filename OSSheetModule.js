@@ -30,9 +30,16 @@ function getOpenSheetData() {
   const recSheet = ss.getSheetByName("RecUrl");
   if (recSheet) {
     const recData = recSheet.getDataRange().getValues();
-    for (let i = 1; i < recData.length; i++) {
-      if (recData[i][0] && recData[i][1] && recData[i][0] !== "SYSample") {
-        result.rec.push({ name: recData[i][0], url: recData[i][1] });
+    if (recData.length > 1) {
+      const headers = recData[0];
+      const nameIdx = getColIndex(headers, "SY_N");
+      const urlIdx = getColIndex(headers, "SY_Url");
+      for (let i = 1; i < recData.length; i++) {
+        const name = recData[i][nameIdx !== -1 ? nameIdx : 0];
+        const url = recData[i][urlIdx !== -1 ? urlIdx : 1];
+        if (name && url && name !== "SYSample") {
+          result.rec.push({ name, url });
+        }
       }
     }
   }
@@ -41,9 +48,16 @@ function getOpenSheetData() {
   const reportsheet = ss.getSheetByName("ReportsUrl");
   if (reportsheet) {
     const reportData = reportsheet.getDataRange().getValues();
-    for (let i = 1; i < reportData.length; i++) {
-      if (reportData[i][0] && reportData[i][1] && reportData[i][0] !== "RPSample") {
-        result.reports.push({ name: reportData[i][0], url: reportData[i][1] });
+    if (reportData.length > 1) {
+      const headers = reportData[0];
+      const nameIdx = getColIndex(headers, "SY_N");
+      const urlIdx = getColIndex(headers, "SY_Url");
+      for (let i = 1; i < reportData.length; i++) {
+        const name = reportData[i][nameIdx !== -1 ? nameIdx : 0];
+        const url = reportData[i][urlIdx !== -1 ? urlIdx : 1];
+        if (name && url && name !== "RPSample") {
+          result.reports.push({ name, url });
+        }
       }
     }
   }
@@ -52,9 +66,16 @@ function getOpenSheetData() {
   const pdfsheet = ss.getSheetByName("PdfUrl");
   if (pdfsheet) {
     const pdfData = pdfsheet.getDataRange().getValues();
-    for (let i = 1; i < pdfData.length; i++) {
-      if (pdfData[i][0] && pdfData[i][1]) {
-        result.pdfs.push({ name: pdfData[i][0], url: pdfData[i][1] });
+    if (pdfData.length > 1) {
+      const headers = pdfData[0];
+      const nameIdx = getColIndex(headers, "SY_N");
+      const urlIdx = getColIndex(headers, "SY_Url");
+      for (let i = 1; i < pdfData.length; i++) {
+        const name = pdfData[i][nameIdx !== -1 ? nameIdx : 0];
+        const url = pdfData[i][urlIdx !== -1 ? urlIdx : 1];
+        if (name && url) {
+          result.pdfs.push({ name, url });
+        }
       }
     }
   }

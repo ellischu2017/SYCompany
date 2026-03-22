@@ -21,11 +21,25 @@
 // ├── Template : 存放報表模板的資料夾，包含 RPSample、SYSample 等模板試算表
 // ├── SYCompany.gxlsx : 這個腳本綁定的試算表，包含 SYTemp、User、Cust 等工作表
 // ├── SYTemp : 存放臨時資料的工作表，包含 SYSuggest 等設定
-// 
-
+//  * 此檔案匯入所有模組化的 .gs 檔案
+/* 
+ * 模組結構：
+ * - Utilities.gs: 共用工具函式
+ * - Auth.gs: 認證和權限檢查
+ * - Cust.gs: 個案管理
+ * - User.gs: 居服員管理
+ * - Manager.gs: 管理員管理
+ * - LtcCode.gs: 服務編碼管理
+ * - RecUrl.gs: 網址管理
+ * - SRServer.gs: 服務紀錄管理
+ * - Maintenance.gs: 維護和同步任務
+*/
 
 // 全域試算表參考 SYCompany
 const MainSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+// 全域執行時間限制 (分鐘)，比 Apps Script 的 6 分鐘限制少一點以策安全
+const EXECUTION_TIMEOUT_MINUTES = 5;
 
 
 /**
@@ -35,7 +49,7 @@ function includeFooter() {
   let suggestUrl = "";
   const cache = CacheService.getScriptCache();
   const cacheKey = "SYSuggestUrl";
-  
+
   // 1. 嘗試從快取讀取，如果有就直接使用
   suggestUrl = cache.get(cacheKey);
 
@@ -44,12 +58,21 @@ function includeFooter() {
       const sheet = MainSpreadsheet.getSheetByName("SYTemp");
       if (sheet) {
         const data = sheet.getDataRange().getValues();
-        for (let i = 1; i < data.length; i++) {
-          if (data[i][0] === "SYSuggest") {
-            suggestUrl = data[i][1];
-            // 2. 寫入快取，設定 6 小時 (21600秒) 後過期
-            cache.put(cacheKey, suggestUrl, 21600);
-            break;
+        if (data.length > 1) {
+          const headers = data[0];
+          // 嘗試偵測欄位，若無則使用預設索引 0, 1
+          let idxKey = getColIndex(headers, "Setting_Name");
+          if (idxKey === -1) idxKey = 0;
+          let idxVal = getColIndex(headers, "Setting_Value");
+          if (idxVal === -1) idxVal = 1;
+
+          for (let i = 1; i < data.length; i++) {
+            if (data[i][idxKey] === "SYSuggest") {
+              suggestUrl = data[i][idxVal];
+              // 2. 寫入快取，設定 6 小時 (21600秒) 後過期
+              cache.put(cacheKey, suggestUrl, 21600);
+              break;
+            }
           }
         }
       }
@@ -69,12 +92,12 @@ function includeFooter() {
 function includeNav() {
   // 加入快取機制，避免每次都重新讀取檔案
   var cache = CacheService.getScriptCache();
-  var cachedNav = cache.get("NavHTML");
+  var cachedNav = cache.get("NavHTML_v2");
   if (cachedNav) return cachedNav;
 
   var template = HtmlService.createTemplateFromFile("Nav");
   var content = template.evaluate().getContent();
-  cache.put("NavHTML", content, 21600); // 快取 6 小時
+  cache.put("NavHTML_v2", content, 21600); // 快取 6 小時
   return content;
 }
 
@@ -84,6 +107,36 @@ function includeNav() {
  */
 function getScriptUrl() {
   return ScriptApp.getService().getUrl();
+}
+
+/**
+ * 輔助函式：自動建立報表資料夾結構
+ * 規則：
+ * 1. 若 targetName 為 RPyyyy (長度6)，父資料夾為 SYCompany
+ * 2. 若 targetName 為 RPyyyyMM (長度>6)，父資料夾為 RPyyyy
+ * @param {string} targetName 目標資料夾名稱 (e.g., "RP2024" or "RP202401")
+ * @returns {string} 新建立資料夾的 URL
+ */
+function createReportFolder(targetName) {
+  const sheet = MainSpreadsheet.getSheetByName("FolderUrl");
+  const year = targetName.substring(2, 6);
+  const upfolderName = "RP" + year;
+  let upfolder;
+
+  if (targetName.length === 6) {
+    // 建立年份資料夾 (e.g., RP2024)，父資料夾為 SYCompany
+    upfolder = getTargetDir("FolderUrl", "SYCompany").folder;
+  } else {
+    // 建立月份資料夾 (e.g., RP202401)，父資料夾為 RP2024
+    // 注意：這裡遞迴呼叫 getTargetDir，若 RP2024 不存在會自動建立
+    upfolder = getTargetDir("FolderUrl", upfolderName).folder;
+  }
+
+  const folder = upfolder.createFolder(targetName);
+  const res = folder.getUrl();
+  sheet.appendRow([targetName, res]);
+
+  return res;
 }
 
 /**
@@ -98,20 +151,7 @@ function getTargetDir(sheetName, targetName) {
   var res = getTarget(sheetName, targetName);
 
   if (!res && targetName.substring(0, 2) === "RP") {
-    var sheet = MainSpreadsheet.getSheetByName("FolderUrl");
-    var year = targetName.substring(2, 6);
-    var upfolderName = "RP" + year;
-    var upfolder;
-    // var month = targetName.substring(6, 8);
-
-    if (targetName.length === 6) {
-      upfolder = getTargetDir("FolderUrl", "SYCompany").folder;
-    } else {
-      upfolder = getTargetDir("FolderUrl", upfolderName).folder; // RP 的上層資料夾
-    }
-    var folder = upfolder.createFolder(targetName);
-    res = folder.getUrl();
-    sheet.appendRow([targetName, res]);
+    res = createReportFolder(targetName);
   }
 
   var folderId = getIdFromUrl(res);
@@ -136,46 +176,54 @@ function getTargetDir(sheetName, targetName) {
   }
 }
 
+/**
+ * 輔助函式：從模板複製並建立新的試算表，並在註冊表中登記
+ * @param {string} registrySheetName 註冊表名稱 (e.g., "ReportsUrl")
+ * @param {string} newFileName 新檔案的名稱 (e.g., "RP202401")
+ * @param {string} templateName 模板檔案在註冊表中的名稱 (e.g., "RPSample")
+ * @param {Folder} destinationFolder 目標資料夾物件
+ * @returns {string} 新建立檔案的 URL
+ */
+function createSheetFromTemplate(registrySheetName, newFileName, templateName, destinationFolder) {
+  // 1. 取得模板檔案
+  const templateFile = DriveApp.getFileById(getTargetsheet(registrySheetName, templateName).id);
+
+  // 2. 複製模板
+  const newFile = templateFile.makeCopy(newFileName, destinationFolder);
+  const newUrl = newFile.getUrl();
+
+  // 3. 在註冊表中登記新檔案
+  const registrySheet = MainSpreadsheet.getSheetByName(registrySheetName);
+  registrySheet.appendRow([newFileName, newUrl]);
+
+  return newUrl;
+}
+
 function getTargetsheet(sheetName, targetName) {
   var res = getTarget(sheetName, targetName);
 
-  if (!res && sheetName === "ReportsUrl") {
-    // 如果沒有，拷貝 Template
-    var templateFile = DriveApp.getFileById(getTargetsheet("ReportsUrl", "RPSample").id);
-    var destinationFolder = getTargetDir("FolderUrl", targetName).folder;
-    var newFile = templateFile.makeCopy(targetName, destinationFolder);
-    var sheet = MainSpreadsheet.getSheetByName("ReportsUrl");
-
-    res = newFile.getUrl();
-    // 把名稱及網址存到 SYCompany 的 ReportsUrl 工作表中
-    sheet.appendRow([targetName, res]);
-  }
-
-  if (!res && sheetName === "RecUrl") {
-    // 如果沒有，拷貝 Template
-    var templateFile = DriveApp.getFileById(getTargetsheet("RecUrl", "SYSample").id);
-    var destinationFolder = getTargetDir("FolderUrl", "LTCRecord").folder;
-    var newFile = templateFile.makeCopy(targetName, destinationFolder);
-    var sheet = MainSpreadsheet.getSheetByName("RecUrl");
-
-    res = newFile.getUrl();
-    // 把名稱及網址存到 SYCompany 的 RecUrl 工作表中
-    sheet.appendRow([targetName, res]);
+  if (!res) {
+    if (sheetName === "ReportsUrl") {
+      const destinationFolder = getTargetDir("FolderUrl", targetName).folder;
+      res = createSheetFromTemplate(sheetName, targetName, "RPSample", destinationFolder);
+    } else if (sheetName === "RecUrl") {
+      const destinationFolder = getTargetDir("FolderUrl", "LTCRecord").folder;
+      res = createSheetFromTemplate(sheetName, targetName, "SYSample", destinationFolder);
+    }
   }
 
   if (!res) {
     console.log(
       "無法在" + sheetName + "工作表中找到名稱為" + targetName + "的對應網址",
     );
-    return url;
+    return;
   }
 
   var fileId = getIdFromUrl(res);
   if (!fileId || typeof fileId !== 'string') {
     throw new Error("無法從 URL 解析出有效的 ID: " + res);
   }
-  var file = DriveApp.getFileById(fileId);
-  var spreadsheet = SpreadsheetApp.open(file);
+  var spreadsheet = SpreadsheetApp.openById(fileId);
   return {
     url: res,
     id: fileId,
@@ -197,10 +245,21 @@ function getTarget(sheetName, targetName) {
 
   var data = sheet.getDataRange().getValues();
   var url = "";
+  if (data.length < 2) return url;
+
+  var headers = data[0];
+  // 嘗試偵測欄位 (支援 RecUrl 的 SY_N/SY_Url 或通用 Name/Url)
+  var idxKey = getColIndex(headers, "SY_N");
+  if (idxKey === -1) idxKey = getColIndex(headers, "Name");
+  if (idxKey === -1) idxKey = 0; // 防呆預設
+
+  var idxUrl = getColIndex(headers, "SY_Url");
+  if (idxUrl === -1) idxUrl = getColIndex(headers, "Url");
+  if (idxUrl === -1) idxUrl = 1; // 防呆預設
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === targetName) {
-      url = data[i][1];
+    if (data[i][idxKey] === targetName) {
+      url = data[i][idxUrl];
       break;
     }
   }
@@ -212,24 +271,39 @@ function setTargetUrl(sheetName, targetName, url) {
   var sheet = MainSpreadsheet.getSheetByName(sheetName);
   if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName + "工作表");
   var data = sheet.getDataRange().getValues();// 讀取整個資料範圍，包含標題列
+  var headers = data[0];
+
+  // 動態偵測欄位
+  var idxKey = getColIndex(headers, "SY_N");
+  if (idxKey === -1) idxKey = getColIndex(headers, "Name");
+  if (idxKey === -1) idxKey = 0;
+
+  var idxUrl = getColIndex(headers, "SY_Url");
+  if (idxUrl === -1) idxUrl = getColIndex(headers, "Url");
+  if (idxUrl === -1) idxUrl = 1;
+
   var found = false;
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === targetName) {
-      data[i][1] = url;
+    if (data[i][idxKey] === targetName) {
+      data[i][idxUrl] = url;
       found = true;
       break;
     }
   }
   // 如果沒找到，就新增一列
   if (!found) {
-    data.push([targetName, url]);
+    // 確保新增的列長度與標題一致，避免 jagged array 問題
+    var newRow = new Array(headers.length).fill("");
+    newRow[idxKey] = targetName;
+    newRow[idxUrl] = url;
+    data.push(newRow);
   }
   // 寫回整個資料範圍，包含標題列
   sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
-  //以第一欄排序
-  sheet.getRange(2, 1, data.length - 1, data[0].length).sort({ column: 1, ascending: true });
-} 
+  // 以 Key 欄排序
+  sheet.getRange(2, 1, data.length - 1, data[0].length).sort({ column: idxKey + 1, ascending: true });
+}
 
 
 /**
@@ -252,7 +326,7 @@ function removeSRDuplicates(sheet) {
   const targetFields = ["Date", "SRTimes", "CUST_N", "USER_N", "SR_ID"];
 
   // 自動尋找標題對應的索引位置
-  const indices = targetFields.map((field) => headers.indexOf(field));
+  const indices = targetFields.map((field) => getColIndex(headers, field));
 
   // 檢查是否所有欄位都存在
   if (indices.includes(-1)) {
@@ -284,16 +358,18 @@ function removeSRDuplicates(sheet) {
 
 // 在 Utilities.js 加入
 var startTime = new Date().getTime();
-
-/** 檢查是否快要超時 (設定為 5 分鐘以確保安全) */
+ 
+/** 
+ * 檢查執行時間是否接近超時限制
+ */
 function isNearTimeout() {
-  return new Date().getTime() - startTime > 20 * 1000;
+  return new Date().getTime() - startTime > EXECUTION_TIMEOUT_MINUTES * 60 * 1000;
 }
 
 /** 儲存/讀取進度 (PropertiesService 會存在雲端專案屬性中)
  * @param {Object} data 進度物件，會被序列化成 JSON 字串存儲
  */
-function saveProgress(propname,data) {
+function saveProgress(propname, data) {
   PropertiesService.getScriptProperties().setProperty(
     propname,
     JSON.stringify(data),
@@ -321,7 +397,7 @@ function clearProgress(propname) {
 function sortSheetsDesc(ss) {
   var sheets = ss.getSheets();
   sheets.sort(function (a, b) {
-    return b.getName().localeCompare(a.getName());
+    return b.getName().localeCompare(a.getName(), undefined, { numeric: true });
   });
   for (var i = 0; i < sheets.length; i++) {
     ss.setActiveSheet(sheets[i]);
@@ -338,7 +414,7 @@ function sortSheetsAsc(ss) {
 
   // 關鍵修改：使用 a 對比 b 達成升冪
   sheets.sort(function (a, b) {
-    return a.getName().localeCompare(b.getName());
+    return a.getName().localeCompare(a.getName(), undefined, { numeric: true });
   });
 
   // 重新排列分頁位置
@@ -355,22 +431,51 @@ function sortSheetsAsc(ss) {
  * @return {number} 欄位索引，找不到則回傳 -1 
  */
 function getColIndex(headers, name) {
-  var idx = headers.indexOf(name);
-  if (idx !== -1) return idx;
-  idx = headers.indexOf(name.toUpperCase());
-  if (idx !== -1) return idx;
-  idx = headers.indexOf(name.toLowerCase());
-  if (idx !== -1) return idx;
-  // 特別處理 Cust_N 與 CUST_N 等可能的情形
-  for (var i = 0; i < headers.length; i++) {
-    if (
-      headers[i].toString().replace("_", "").toUpperCase() ===
-      name.replace("_", "").toUpperCase()
-    ) {
+  // 1. 優先進行最快、最精確的比對 (大小寫完全相符)
+  const exactIndex = headers.indexOf(name);
+  if (exactIndex !== -1) {
+    return exactIndex;
+  }
+
+  // 2. 若找不到，則進行標準化比對 (忽略大小寫、空格、底線)
+  const cleanName = name.toString().replace(/[_ ]/g, "").toLowerCase();
+  for (let i = 0; i < headers.length; i++) {
+    // 確保 header[i] 是字串，避免因空儲存格導致錯誤
+    const cleanHeader = (headers[i] || "").toString().replace(/[_ ]/g, "").toLowerCase();
+    if (cleanHeader === cleanName) {
       return i;
     }
   }
+
   return -1;
+}
+
+/**
+ * 批次取得欄位索引映射表
+ * @param {Array} headers 標題列陣列
+ * @param {Array} targetFields 目標欄位名稱陣列
+ * @returns {Object} { "Date": 0, "Name": 1, ... }
+ */
+function getColIndicesMap(headers, targetFields) {
+  var map = {};
+  targetFields.forEach(function(field) {
+    map[field] = getColIndex(headers, field);
+  });
+  return map;
+}
+
+/**
+ * 根據欄位索引映射表將資料列標準化 (擷取指定欄位)
+ * @param {Array} row 原始資料列
+ * @param {Object} colIndicesMap getColIndicesMap 回傳的索引物件
+ * @param {Array} targetFields 目標欄位順序
+ * @returns {Array} 標準化後的資料陣列
+ */
+function normalizeRow(row, colIndicesMap, targetFields) {
+  return targetFields.map(function(field) {
+    var idx = colIndicesMap[field];
+    return (idx !== -1 && row[idx] !== undefined) ? row[idx] : "";
+  });
 }
 
 /**
@@ -379,12 +484,42 @@ function getColIndex(headers, name) {
  * @return {string} 試算表 ID
  */
 function getIdFromUrl(url) {
-  var id = "";
-  var parts = url.match(/[-\w]{25,}(?!.*[-\w]{25,})/);
-  if (parts) {
-    id = parts[0];
+  if (!url || typeof url !== 'string') return "";
+
+  // 優先匹配 /d/ID, /folders/ID, 或 id=ID 的格式
+  const match = url.match(/(?:d|folders)\/([-\w]{25,})|id=([-\w]{25,})/);
+
+  if (match) {
+    // 回傳第一個或第二個捕獲組的內容 (match[1] 或 match[2])
+    return match[1] || match[2] || "";
   }
-  return id;
+  return "";
+}
+
+/**
+ * 格式化 LTC Code 字串
+ * 處理步驟：分割、清理、排序、去重、合併
+ * @param {string} rawStr - 原始的 LTC Code 字串 (e.g., " BA01, BA02a-1, 無效碼, BA01 ")
+ * @returns {string} - 格式化後的字串 (e.g., "BA01,BA02a-1")
+ */
+function formatLtcCodeString(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') return "";
+
+  const items = rawStr.split(",");
+
+  const processedArr = items
+    .map((item) => {
+      // 1. 去除空白並提取有效部分
+      const match = item.trim().match(/^[a-zA-Z0-9-]+/);
+      return match ? match[0] : null;
+    })
+    .filter((val) => val !== null); // 2. 移除不符合規則的項目
+
+  // 3. 去重並排序
+  const uniqueSortedArr = [...new Set(processedArr)].sort();
+
+  // 4. 結合
+  return uniqueSortedArr.join(",");
 }
 
 /**
@@ -407,8 +542,8 @@ function processCustLTCCodes() {
   const headers = data[0];
 
   // 找出目標欄位的索引 (Index)
-  const srcIdx = headers.indexOf("Cust_LTC_Code");
-  const tarIdx = headers.indexOf("LTC_Code");
+  const srcIdx = getColIndex(headers, "Cust_LTC_Code");
+  const tarIdx = getColIndex(headers, "LTC_Code");
 
   if (srcIdx === -1 || tarIdx === -1) {
     SpreadsheetApp.getUi().alert("找不到指定的欄位名稱！");
@@ -419,27 +554,10 @@ function processCustLTCCodes() {
   // const updates = [];
   for (let i = 1; i < data.length; i++) {
     let rawStr = data[i][srcIdx] ? data[i][srcIdx].toString() : "";
-    if (rawStr) {
-      let items = rawStr.split(",");
-
-      let processedArr = items
-        .map((item) => {
-          // 1. 去除空白
-          let trimmed = item.trim();
-          // 2. 提取開頭符合 [英、數、-] 的部分
-          // ^[a-zA-Z0-9-]+ 代表從頭開始匹配多個符合的字元
-          let match = trimmed.match(/^[a-zA-Z0-9-]+/);
-          return match ? match[0] : null;
-        })
-        .filter((val) => val !== null); // 移除不符合規則的項目
-
-      // 3. 排序 (Array.sort() 預設為字母/數字排序)
-      processedArr.sort();
-
-      // 4. 去重 (選用，避免重複項目)
-      processedArr = [...new Set(processedArr)];
-      // 5. 結合並存入 LTC_Code 欄位
-      sCust.getRange(i + 1, tarIdx + 1).setValue(processedArr.join(","));
+    // 只有在原始字串包含有效內容時才處理
+    if (rawStr.trim()) {
+      const formattedCodes = formatLtcCodeString(rawStr);
+      sCust.getRange(i + 1, tarIdx + 1).setValue(formattedCodes);
     }
   }
   CacheService.getScriptCache().remove("SRServer01_InitData");
@@ -469,11 +587,12 @@ function UpdateUserCustName() {
   const processData = (sheet) => {
     const values = sheet.getDataRange().getValues();
     const headers = values.shift();
-    const uIdx = getColIndex(headers, "USER_N");
-    const cIdx = getColIndex(headers, "CUST_N");
+    const colMap = getColIndicesMap(headers, ["USER_N", "CUST_N"]);
+    const uIdx = colMap["USER_N"];
+    const cIdx = colMap["CUST_N"];
     values.forEach(row => {
-      const u = String(row[uIdx] || "").trim();
-      const c = String(row[cIdx] || "").trim();
+      const u = (uIdx !== -1) ? String(row[uIdx] || "").trim() : "";
+      const c = (cIdx !== -1) ? String(row[cIdx] || "").trim() : "";
       if (u && c) {
         if (!userMap.has(u)) userMap.set(u, new Set());
         userMap.get(u).add(c);
@@ -489,8 +608,9 @@ function UpdateUserCustName() {
   const tarHeaders = tarData[0];
 
   // 動態獲取目標表的欄位索引
-  const tarUserIdx = getColIndex(tarHeaders, "User_N");
-  const tarCustIdx = getColIndex(tarHeaders, "Cust_N");
+  const tarColMap = getColIndicesMap(tarHeaders, ["User_N", "Cust_N"]);
+  const tarUserIdx = tarColMap["User_N"];
+  const tarCustIdx = tarColMap["Cust_N"];
 
   if (tarUserIdx === -1 || tarCustIdx === -1) {
     throw new Error("找不到目標欄位 User_N 或 Cust_N，請檢查標題名稱是否完全一致");
@@ -530,4 +650,49 @@ function UpdateUserCustName() {
 
   console.log("資料更新完成！");
   CacheService.getScriptCache().remove("SRServer01_InitData");
+}
+
+/**
+ * 格式化日期物件或字串
+ * @param {Date|string} date - 日期物件或可被 new Date() 解析的字串
+ * @param {string} [format='yyyy-MM-dd'] - (選填) 日期格式，預設為 'yyyy-MM-dd'
+ * @param {string} [timezone='Asia/Taipei'] - (選填) 時區，預設為 'Asia/Taipei'
+ * @returns {string} 格式化後的日期字串，若輸入無效則回傳原始字串
+ */
+function formatDate(date, format = 'yyyy-MM-dd', timezone = 'Asia/Taipei') {
+  if (!date) return "";
+  try {
+    const d = new Date(date);
+    // 檢查日期是否有效
+    if (isNaN(d.getTime())) {
+      return String(date); // 如果是無效日期，直接回傳原始字串
+    }
+    return Utilities.formatDate(d, timezone, format);
+  } catch (e) {
+    // 發生錯誤時，回傳原始字串以利除錯
+    return String(date);
+  }
+}
+
+/**
+ * 手動清除所有系統快取
+ * 包含導航列、下拉選單快取、以及各模組的資料快取
+ */
+function clearAllCaches() {
+  var userEmail = Session.getActiveUser().getEmail();
+  console.log(`[System] 開始手動清除快取... 觸發者: ${userEmail || 'Unknown'}，時間: ${new Date().toISOString()}`);
+
+  const cache = CacheService.getScriptCache();
+  const keysToRemove = [
+    "NavHTML_v2",
+    "SYSuggestUrl",
+    "ManagerData",
+    "ManaList",
+    "UserData",
+    "CustInfoMap",
+    "CustN_All",
+    "SRServer01_InitData"
+  ];
+  cache.removeAll(keysToRemove);
+  console.log(`[System] 快取清除完成。已移除以下鍵值: ${keysToRemove.join(', ')}`);
 }
