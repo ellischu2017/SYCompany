@@ -29,7 +29,7 @@
       margin: auto;
     }
 
-    .loading {
+    #loadingSpin {
       position: fixed;
       top: 0;
       left: 0;
@@ -39,7 +39,7 @@
       display: none;
       justify-content: center;
       align-items: center;
-      z-index: 999;
+      z-index: 9999;
     }
 
     .label-value {
@@ -250,6 +250,7 @@
       srDataHeaders: [],
       currentUser: null
     };
+    const CACHE_KEY = "SRServer01_InitData";
 
     $(document).ready(function () {
       checkLocalStorageAuth();
@@ -276,17 +277,27 @@
       $("#queryDate").attr("min", formatDate(minDate));
       $("#queryDate").attr("max", formatDate(today));
 
-      // 初始化：一次抓取所有資料
-      google.script.run
-        .withSuccessHandler(initSuccess)
-        .withFailureHandler(function (err) {
-          $("#loadingSpin").hide();
-          Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
-        })
-        .getSRServer01InitData();
+      // 初始化：優先檢查 Session Storage 快取
+      const cachedData = sessionStorage.getItem(CACHE_KEY);
+      if (cachedData) {
+        console.log("從 sessionStorage 載入資料");
+        initSuccess(JSON.parse(cachedData));
+      } else {
+        google.script.run
+          .withSuccessHandler(function (data) {
+            try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) { console.error("Cache write failed", e); }
+            initSuccess(data);
+          })
+          .withFailureHandler(function (err) {
+            $("#loadingSpin").hide();
+            Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
+          })
+          .getSRServer01InitData();
+      }
 
       // --- 綁定事件監聽 ---
-      $("#queryUserN").change(function () {
+      // 改用 select2:select 與 change 雙重監聽，確保各種操作都能觸發
+      $("#queryUserN").on('select2:select change', function () {
         const selectedUserName = $(this).val();
         updateCustSelect(selectedUserName);
       });
@@ -311,11 +322,9 @@
       });
 
       $("#btnQuery").click(async function () {
-        $('#btnQuery').prop('disabled', true);
-        $("#loadingSpin").show();
-        // 取得執行結果，若回傳 false (失敗/未找到) 才重新啟用按鈕
+        $("#loadingSpin").css('display', 'flex');
+        // 移除 disabled 邏輯，改由 loadingSpin 遮罩阻擋重複點擊，避免手機版按鈕卡死
         const success = await handleAction("query");
-        if (!success) $('#btnQuery').prop('disabled', false);
       });
 
       $("#btnLogout").click(function () {
@@ -330,6 +339,7 @@
           if (result.isConfirmed) {
             localStorage.removeItem('Login');
             sessionStorage.removeItem('Login');
+            sessionStorage.removeItem(CACHE_KEY);
             window.top.location.href = "<?!= getScriptUrl() ?>?page=Auth&logout=true";
           }
         });
@@ -337,7 +347,7 @@
 
       $("#btnAdd").click(async function () {
         $('#btnAdd').prop('disabled', true);
-        $("#loadingSpin").show();
+        $("#loadingSpin").css('display', 'flex');
         // 新增成功後會切換回查詢頁面，故不需重新啟用按鈕(防止連點)
         const success = await handleAction("add");
         if (!success) $('#btnAdd').prop('disabled', false);
@@ -345,7 +355,7 @@
 
       $("#btnUpdate").click(async function () {
         $('#btnUpdate').prop('disabled', true);
-        $("#loadingSpin").show();
+        $("#loadingSpin").css('display', 'flex');
         // 更新成功後會切換回查詢頁面，故不需重新啟用按鈕
         const success = await handleAction("update");
         if (!success) $('#btnUpdate').prop('disabled', false);
@@ -353,8 +363,6 @@
 
       $("#btnBack").click(function () {
         backToSearch();
-        // 返回查詢頁時，重置所有功能按鈕狀態，避免卡死
-        $('#btnAdd, #btnUpdate').prop('disabled', false);
       });
 
       // 新增：字數統計功能
@@ -421,8 +429,10 @@
 
       if (loggedInUser) {
         GLOBAL_DATA.currentUser = GLOBAL_DATA.users.find(u => u.name === loggedInUser);
-        // 使用 trigger('change') 讓 select2 更新介面並觸發 updateCustSelect
-        $userSelect.val(loggedInUser).trigger('change');
+        // 設定值並通知 Select2 更新 UI (使用 change.select2 避免觸發一般 change 事件導致重複執行)
+        $userSelect.val(loggedInUser).trigger('change.select2');
+        // 強制執行關聯選單更新，確保在頁面載入時必定載入個案名單，不依賴事件觸發
+        updateCustSelect(loggedInUser);
 
         // 如果是 Admin，允許選擇其他居服員；否則鎖定
         if (loggedInRole === 'Admin') {
@@ -440,6 +450,14 @@
     function updateCustSelect(userName) {
       const $custSelect = $("#queryCustN");
       const $otherSelect = $("#queryCustNOther");
+
+      // 修正：重新填充下拉選單前，先銷毀舊的 Select2 實例，避免重整頁面時因快取導致無法選擇
+      if ($custSelect.hasClass("select2-hidden-accessible")) {
+        $custSelect.select2('destroy');
+      }
+      if ($otherSelect.hasClass("select2-hidden-accessible")) {
+        $otherSelect.select2('destroy');
+      }
 
       // 切換居服員時，重置「其他個案」區塊的狀態
       $("#otherCustRow").hide();
@@ -570,7 +588,7 @@
       }
 
       const formObj = getFormObject(selectedCust);      // 印出 formObj 以供偵錯
-      console.log("formObj for debugging:", formObj);
+      // console.log("formObj for debugging:", formObj);
 
 
       if (type === 'query') {
@@ -585,7 +603,7 @@
           srId: getColIndex('SR_ID')
         };
         // 印出 srData 以供偵錯
-        console.log("GLOBAL_DATA.srData for debugging:", GLOBAL_DATA.srData);
+        // console.log("GLOBAL_DATA.srData for debugging:", GLOBAL_DATA.srData);
 
         const foundRow = GLOBAL_DATA.srData.find(row =>
           String(row[idx.date]).trim() === formObj.date.trim() &&
@@ -596,9 +614,9 @@
           String(row[idx.srId]).trim() === formObj.srId.trim()
         );
 
-        $("#loadingSpin").hide();
-
         if (foundRow) {
+          $("#loadingSpin").hide();
+          triggerVibrate('success'); // 查詢成功震動
           const data = {
             srRec: foundRow[getColIndex('SR_REC')],
             loc: foundRow[getColIndex('LOC')],
@@ -615,6 +633,8 @@
           return true; // 查詢成功，切換畫面，保持按鈕 disabled 狀態(雖然它已被隱藏)
         } else {
           let exSPCONS = await getSPCons(formObj);
+          $("#loadingSpin").hide();
+          triggerVibrate('error'); // 查無資料震動
           Swal.fire({
             title: "查無此紀錄，是否要新增一筆紀錄並開始編輯？",
             icon: "warning",
@@ -649,6 +669,7 @@
 
       if (type === 'add') {
         GLOBAL_DATA.srData.push(rowData);
+        updateSessionCache();
       } else if (type === 'update') {
         const idx = { date: getColIndex('Date'), srTimes: getColIndex('SRTimes'), custN: getColIndex('CUST_N'), userN: getColIndex('USER_N'), payType: getColIndex('Pay_Type'), srId: getColIndex('SR_ID') };
         const rowIndex = GLOBAL_DATA.srData.findIndex(row =>
@@ -664,6 +685,7 @@
         } else {
           GLOBAL_DATA.srData.push(rowData);
         }
+        updateSessionCache();
       }
 
       // --- Asynchronous server update (Fire and Forget) ---
@@ -676,6 +698,7 @@
 
       // --- Immediate UI Feedback ---
       $("#loadingSpin").hide();
+      triggerVibrate('success'); // 新增/更新成功震動
 
       Swal.fire({
         icon: "success",
@@ -710,8 +733,44 @@
 
 
     function backToSearch() {
+      // 1. 優先重置按鈕狀態 (在顯示之前執行，確保屬性已移除)
+      // 同時移除 disabled 屬性與 Bootstrap 的 disabled 樣式類別
+      $('#btnQuery, .container button').prop('disabled', false).removeAttr('disabled').removeClass('disabled');
+
+      // 2. 切換區塊顯示
       $("#detailSection").hide();
       $("#searchSection").show();
+
+      // 3. 雙重保險：稍微延遲後再次強制啟用 (針對部分頑強的 Android 瀏覽器快取)
+      setTimeout(function() {
+        $('#btnQuery').prop('disabled', false).removeAttr('disabled');
+      }, 100);
+    }
+
+    function updateSessionCache() {
+      // 重組資料結構以符合 initSuccess 的預期 (將 Header 放回陣列第一筆)
+      const dataToCache = {
+        users: GLOBAL_DATA.users,
+        custs: GLOBAL_DATA.custs,
+        ltcCodes: GLOBAL_DATA.ltcCodes,
+        srData: [GLOBAL_DATA.srDataHeaders, ...GLOBAL_DATA.srData]
+      };
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+      } catch (e) {
+        console.error("更新 sessionStorage 失敗 (可能容量不足):", e);
+      }
+    }
+
+    function triggerVibrate(mode) {
+      // 檢查瀏覽器是否支援震動 API
+      if (navigator.vibrate) {
+        if (mode === 'success') {
+          navigator.vibrate(100); // 成功：短震動
+        } else if (mode === 'error') {
+          navigator.vibrate([100, 50, 100]); // 失敗/警告：雙短震動
+        }
+      }
     }
 
     function fillQueryLabel(formObj) {
@@ -758,6 +817,7 @@
     }
 
     function showToast(icon, title) {
+      triggerVibrate(icon === 'success' ? 'success' : 'error'); // Toast 提示時震動
       Swal.fire({
         icon: icon,
         title: title,

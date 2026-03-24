@@ -19,7 +19,10 @@ function getSRServerInitData() {
       const userColMap = getColIndicesMap(headers, userFields);
 
       const idxName = userColMap["User_N"];
-      const idxEmail = userColMap["User_Email"] !== -1 ? userColMap["User_Email"] : userColMap["Email"];
+      const idxEmail =
+        userColMap["User_Email"] !== -1
+          ? userColMap["User_Email"]
+          : userColMap["Email"];
       const idxCust = userColMap["Cust_N"];
 
       if (idxName !== -1) {
@@ -29,7 +32,7 @@ function getSRServerInitData() {
             userData.push({
               name: row[idxName].toString(),
               email: idxEmail !== -1 ? row[idxEmail].toString() : "",
-              custStr: idxCust !== -1 ? row[idxCust].toString() : ""
+              custStr: idxCust !== -1 ? row[idxCust].toString() : "",
             });
           }
         }
@@ -55,7 +58,7 @@ function getSRServerInitData() {
           if (row[idxCName]) {
             custData.push({
               name: row[idxCName].toString(),
-              ltcStr: idxCLTC !== -1 ? row[idxCLTC].toString() : ""
+              ltcStr: idxCLTC !== -1 ? row[idxCLTC].toString() : "",
             });
           }
         }
@@ -91,7 +94,7 @@ function getSRServerInitData() {
   return {
     users: userData,
     custs: custData,
-    ltcCodes: ltcIds
+    ltcCodes: ltcIds,
   };
 }
 
@@ -143,7 +146,9 @@ function processUserSync01() {
 
     if (tempEmailIdx !== -1) {
       for (let j = 1; j < tempValues.length; j++) {
-        const tempEmail = tempValues[j][tempEmailIdx] ? String(tempValues[j][tempEmailIdx]).trim().toLowerCase() : "";
+        const tempEmail = tempValues[j][tempEmailIdx]
+          ? String(tempValues[j][tempEmailIdx]).trim().toLowerCase()
+          : "";
         if (tempEmail !== "" && !existingEmails.has(tempEmail)) {
           rowsToSync.push(tempValues[j]);
           existingEmails.add(tempEmail); // 確保在同一次執行中不會重複加入
@@ -266,7 +271,7 @@ function processSRData(formObj, actionType) {
 
     if (actionType === "add") {
       targetSheet.appendRow(rowData);
-      UpdateRawResponse(formObj)
+      UpdateRawResponse(formObj);
       // 清除對應月份的案主列表快取
       if (yearmonth) {
         CacheService.getScriptCache().remove("CustN_" + yearmonth);
@@ -288,7 +293,18 @@ function processSRData(formObj, actionType) {
 
     // 先只讀取標題列以取得欄位索引
     var headers = targetSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    const targetFields = ["Date", "SRTimes", "CUST_N", "USER_N", "Pay_Type", "SR_ID", "SR_REC", "LOC", "MOOD", "SPCONS"];
+    const targetFields = [
+      "Date",
+      "SRTimes",
+      "CUST_N",
+      "USER_N",
+      "Pay_Type",
+      "SR_ID",
+      "SR_REC",
+      "LOC",
+      "MOOD",
+      "SPCONS",
+    ];
     const colMap = getColIndicesMap(headers, targetFields);
 
     // 準備候選列號列表 (Candidate Rows)
@@ -296,9 +312,17 @@ function processSRData(formObj, actionType) {
 
     // 若 CUST_N 欄位存在，使用 TextFinder 快速篩選
     if (colMap["CUST_N"] !== -1) {
-      var searchRange = targetSheet.getRange(2, colMap["CUST_N"] + 1, lastRow - 1, 1);
+      var searchRange = targetSheet.getRange(
+        2,
+        colMap["CUST_N"] + 1,
+        lastRow - 1,
+        1,
+      );
       // matchEntireCell(true) 確保完全匹配，避免部分字串誤判
-      var ranges = searchRange.createTextFinder(formObj.custName).matchEntireCell(true).findAll();
+      var ranges = searchRange
+        .createTextFinder(formObj.custName)
+        .matchEntireCell(true)
+        .findAll();
 
       // 將搜尋結果倒序放入候選清單 (模擬從新到舊的邏輯)
       for (var k = ranges.length - 1; k >= 0; k--) {
@@ -317,15 +341,17 @@ function processSRData(formObj, actionType) {
       // 這裡權衡了 API 呼叫次數與資料傳輸量，針對「特定個案」查詢，這種方式通常快很多
       var row = targetSheet.getRange(rIdx, 1, 1, lastCol).getValues()[0];
 
-
       // 優化 3: 避免在迴圈內使用 Utilities.formatDate，改用原生 Date 比對
       let rawDate = row[colMap["Date"]];
       let isDateMatch = false;
       if (rawDate instanceof Date) {
         // 比對年月日 (注意 getMonth 從 0 開始)
         let d = rawDate;
-        let dateStr = d.getFullYear() + "-" +
-          ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
+        let dateStr =
+          d.getFullYear() +
+          "-" +
+          ("0" + (d.getMonth() + 1)).slice(-2) +
+          "-" +
           ("0" + d.getDate()).slice(-2);
         if (dateStr === formObj.date) isDateMatch = true;
       } else {
@@ -336,10 +362,13 @@ function processSRData(formObj, actionType) {
 
       // 比對其他關鍵欄位 (CUST_N 已由 TextFinder 篩選，但保留比對邏輯也無妨)
       if (
-        String(row[colMap["SRTimes"]]).trim() === formObj.SRTimes.toString().trim() &&
+        String(row[colMap["SRTimes"]]).trim() ===
+          formObj.SRTimes.toString().trim() &&
         // String(row[colMap["CUST_N"]]).trim() === formObj.custName.toString().trim() && // TextFinder 已精確匹配
-        String(row[colMap["USER_N"]]).trim() === formObj.userName.toString().trim() &&
-        String(row[colMap["Pay_Type"]]).trim() === formObj.payType.toString().trim() &&
+        String(row[colMap["USER_N"]]).trim() ===
+          formObj.userName.toString().trim() &&
+        String(row[colMap["Pay_Type"]]).trim() ===
+          formObj.payType.toString().trim() &&
         String(row[colMap["SR_ID"]]).trim() === formObj.srId.toString().trim()
       ) {
         if (actionType === "query") {
@@ -363,7 +392,11 @@ function processSRData(formObj, actionType) {
           // 寫入快取 (需重新產生 cacheKey 或確保變數作用域可及，此處簡單重組 key)
           try {
             let cacheKey = `SRDataQuery_${formObj.date}_${formObj.SRTimes}_${formObj.custName}_${formObj.userName}_${formObj.payType}_${formObj.srId}`;
-            CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); // 快取 5 分鐘
+            CacheService.getScriptCache().put(
+              cacheKey,
+              JSON.stringify(result),
+              300,
+            ); // 快取 5 分鐘
           } catch (e) {
             console.error("快取 SRDataQuery 失敗: " + e.toString());
           }
@@ -385,9 +418,11 @@ function processSRData(formObj, actionType) {
             // 同步清除報表資料來源快取
             CacheService.getScriptCache().remove("DataMap_" + yearmonth);
           }
-          return { success: true, message: "資料已於 " + sheetName + " 更新完成。", };
+          return {
+            success: true,
+            message: "資料已於 " + sheetName + " 更新完成。",
+          };
         } else if (actionType === "delete") {
-
           targetSheet.deleteRow(rIdx);
           // 清除對應月份的案主列表快取
           // 清除對應月份的案主列表快取
@@ -405,7 +440,10 @@ function processSRData(formObj, actionType) {
     return {
       success: false,
       found: false,
-      message: actionType === "delete" ? "刪除失敗：找不到該筆資料，可能已被刪除或日期不符。" : "在此區間找不到符合條件的紀錄。"
+      message:
+        actionType === "delete"
+          ? "刪除失敗：找不到該筆資料，可能已被刪除或日期不符。"
+          : "在此區間找不到符合條件的紀錄。",
     };
   } catch (e) {
     console.error("processSRData 發生錯誤: " + e.toString());

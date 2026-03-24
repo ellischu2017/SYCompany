@@ -1,18 +1,8 @@
 /**
  * 初始化 SR_server01 頁面所需的所有資料
  * 修改點：同時讀取 SYCompany (主表) 與 SYTemp (更新表) 的 User 資料
- * 優化：增加快取機制，並減少 getTargetsheet 呼叫次數
  */
 function getSRServer01InitData() {
-  // 1. 增加快取機制，避免重複讀取 (快取 30 分鐘)
-  const cache = CacheService.getScriptCache();
-  const cacheKey = "SRServer01_InitData";
-  const cachedData = cache.get(cacheKey);
-  if (cachedData) {
-    return JSON.parse(cachedData);
-  }
-
-  // --- 如果快取中沒有資料，則從試算表讀取 ---
   var userMap = new Map(); // 使用 Map 以便用 Name 進行合併
   let data;
 
@@ -169,13 +159,6 @@ function getSRServer01InitData() {
       srData: srData,
     };
 
-    // 寫入快取
-    try {
-      cache.put(cacheKey, JSON.stringify(data), 1800); // 快取 30 分鐘
-    } catch (e) {
-      console.error("快取 SRServer01_InitData 失敗: " + e.toString());
-    }
-  
   return data;
 }
 
@@ -238,7 +221,6 @@ function processSR01Data(formObj, actionType) {
           newRow[tTelIdx] = formObj.userTel;
           tempUserSheet.appendRow(newRow);
         }
-        CacheService.getScriptCache().remove("SRServer01_InitData");
       }
 
       // --- 以下為標準 SR_Data 處理邏輯 ---
