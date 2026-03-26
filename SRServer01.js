@@ -1,8 +1,9 @@
 /**
  * 初始化 SR_server01 頁面所需的所有資料
  * 修改點：同時讀取 SYCompany (主表) 與 SYTemp (更新表) 的 User 資料
+ * @param {string} userName 當前登入的使用者名稱，用來過濾服務紀錄
  */
-function getSRServer01InitData() {
+function getSRServer01InitData(userName) {
   var userMap = new Map(); // 使用 Map 以便用 Name 進行合併
   let data;
 
@@ -132,26 +133,10 @@ function getSRServer01InitData() {
       }
     }
 
-    // 5. 取得 SYTemp > SR_Data
-    var srDataSheet = tempSS ? tempSS.getSheetByName("SR_Data") : null;
-    var srData = [];
-    if (srDataSheet) {
-      var rawSrData = srDataSheet.getDataRange().getValues();
-      if (rawSrData.length > 0) {
-        var srHeaders = rawSrData[0];
-        var dateColIdx = getColIndex(srHeaders, "Date");
+    // 5. 取得該使用者的服務紀錄 (優化：僅抓取相關資料)
+    // 若無傳入 userName (例如初次載入異常)，則回傳空陣列
+    var srData = userName ? getSRDataByUser(userName) : [];
 
-        // Convert date objects to string to be able to JSON.stringify them for cache.
-        // Also, we need headers on the client side.
-        srData = rawSrData.map(function (row, index) {
-          if (index === 0) return row; // keep headers
-          if (dateColIdx > -1 && row[dateColIdx] instanceof Date) {
-            row[dateColIdx] = Utilities.formatDate(row[dateColIdx], Session.getScriptTimeZone(), "yyyy-MM-dd");
-          }
-          return row;
-        });
-      }
-    }
     data = {
       users: userData,
       custs: custData,
@@ -160,6 +145,46 @@ function getSRServer01InitData() {
     };
 
   return data;
+}
+
+/**
+ * 根據居服員姓名抓取 SYTemp > SR_Data 中的紀錄
+ * @param {string} userName 居服員姓名
+ * @return {Array[]} 包含標頭的二維陣列
+ */
+function getSRDataByUser(userName) {
+  try {
+    var tempSS = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
+    var srSheet = tempSS.getSheetByName("SR_Data");
+    if (!srSheet) return [];
+
+    var allValues = srSheet.getDataRange().getValues();
+    if (allValues.length < 1) return [];
+
+    var headers = allValues[0];
+    var userNIdx = getColIndex(headers, "USER_N");
+    var dateColIdx = getColIndex(headers, "Date");
+
+    if (userNIdx === -1) return allValues; // 找不到欄位則回傳全部(防呆)
+
+    // 過濾資料：保留標頭，並篩選符合 userName 的列
+    var filteredData = [headers];
+    for (var i = 1; i < allValues.length; i++) {
+      var row = allValues[i];
+      if (String(row[userNIdx]).trim() === String(userName).trim()) {
+        // 格式化日期為字串，確保 JSON 傳輸穩定
+        if (dateColIdx > -1 && row[dateColIdx] instanceof Date) {
+          row[dateColIdx] = Utilities.formatDate(row[dateColIdx], Session.getScriptTimeZone(), "yyyy-MM-dd");
+        }
+        filteredData.push(row);
+      }
+    }
+    
+    return filteredData;
+  } catch (e) {
+    console.error("getSRDataByUser 發生錯誤: " + e.toString());
+    return [];
+  }
 }
 
 /**

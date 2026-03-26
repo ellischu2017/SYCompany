@@ -30,28 +30,10 @@
       color: #6c757d;
       padding: 5px 0;
     }
-
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
   </style>
 </head>
 
 <body>
-
-  <div id="loading" class="loading-overlay">
-    <div class="spinner-border text-secondary" role="status"></div>
-  </div>
-
   <nav class="navbar navbar-dark bg-secondary sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas"
@@ -82,9 +64,9 @@
           </select>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
-          <button class="btn btn-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
-          <button class="btn btn-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
+          <button class="btn btn-outline-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
+          <button class="btn btn-outline-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
+          <button class="btn btn-outline-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -103,9 +85,9 @@
             <textarea class="form-control" id="inputRecUrl" rows="4" placeholder="請貼上 Google 表單或紀錄單連結"></textarea>
           </div>
           <div class="d-flex gap-3 justify-content-center mt-2">
-            <button type="button" class="btn btn-secondary flex-grow-1" id="btnSave"><i class="fas fa-save"></i>
+            <button type="button" class="btn btn-outline-secondary flex-grow-1" id="btnSave"><i class="fas fa-save"></i>
               儲存資料</button>
-            <button type="button" class="btn btn-danger flex-grow-1" id="btnDelete"><i class="fas fa-trash"></i>
+            <button type="button" class="btn btn-outline-danger flex-grow-1" id="btnDelete"><i class="fas fa-trash"></i>
               刪除</button>
             <button type="button" class="btn btn-outline-dark flex-grow-1" id="btnBack" onclick="backToSearch()"><i
                 class="fas fa-undo-alt"></i> 返回搜尋</button>
@@ -127,7 +109,7 @@
 
   <script>
     $(document).ready(function () {
-      $('#loading').css('display', 'flex');
+      showPageLoading('讀取網址', '正在載入紀錄單連結資訊...');
       // 顯示當前使用者
       const loginData = JSON.parse(localStorage.getItem('Login'));
       if (loginData && loginData.User) $('#currentUserDisplay').text(loginData.User);
@@ -243,9 +225,9 @@
       google.script.run.withSuccessHandler(function (data) {
         sessionStorage.setItem('recUrlData', JSON.stringify(data));
         populateDropdown();
-        $('#loading').hide();
+        Swal.close();
       }).withFailureHandler(function(err){
-        $('#loading').hide();
+        Swal.close();
         Swal.fire('載入失敗', err.message, 'error');
       }).getAllRecUrlData();
     }

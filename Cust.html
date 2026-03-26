@@ -32,30 +32,10 @@
       color: #0d6efd;
       padding: 5px 0;
     }
-
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
   </style>
 </head>
 
 <body>
-
-  <div id="loadingSpin" class="loading-overlay">
-    <div class="spinner-border text-primary" role="status">
-      <span class="visually-hidden">Loading...</span>
-    </div>
-  </div>
-
   <nav class="navbar navbar-dark bg-primary sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light text-primary" type="button" data-bs-toggle="offcanvas"
@@ -87,9 +67,9 @@
           </select>
         </div>
         <div class="d-flex gap-3">
-          <button class="btn btn-primary" id="btnQuery" type="button"> <i class="fas fa-user-edit"></i> 修改</button>
-          <button class="btn btn-secondary" id="btnArchive" type="button"> <i class="fas fa-lock"></i> 結案</button>
-          <button class="btn btn-danger" id="btnAddInit" type="button"> <i class="fas fa-user-plus"></i> 新增</button>
+          <button class="btn btn-outline-primary" id="btnQuery" type="button"> <i class="fas fa-user-edit"></i> 修改</button>
+          <button class="btn btn-outline-secondary" id="btnArchive" type="button"> <i class="fas fa-lock"></i> 結案</button>
+          <button class="btn btn-outline-danger" id="btnAddInit" type="button"> <i class="fas fa-user-plus"></i> 新增</button>
         </div>
       </div>
       <div class="card-body">
@@ -100,10 +80,10 @@
           </select>
         </div>
         <div class="d-flex gap-3">
-          <button class="btn btn-primary" id="btnQueryOld" type="button"> <i class="fas fa-user-edit"></i> 修改</button>
-          <button class="btn btn-secondary" id="btnUnarchive" type="button"> <i class="fas fa-lock-open"></i>
+          <button class="btn btn-outline-primary" id="btnQueryOld" type="button"> <i class="fas fa-user-edit"></i> 修改</button>
+          <button class="btn btn-outline-secondary" id="btnUnarchive" type="button"> <i class="fas fa-lock-open"></i>
             重啟</button>
-          <button class="btn btn-danger" id="btnDelete" type="button"> <i class="fas fa-user-minus"></i> 刪除</button>
+          <button class="btn btn-outline-danger" id="btnDelete" type="button"> <i class="fas fa-user-minus"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -192,10 +172,10 @@
           </div>
 
           <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
-            <button class="btn btn-primary" id="btnSave" type="button" style="display: none;"> <i class="fas fa-save"></i> 儲存</button>
-            <button class="btn btn-secondary" id="btnDetailArchive" type="button" style="display: none;"> <i class="fas fa-lock"></i> 封存</button>
-            <button class="btn btn-info" id="btnDetailUnarchive" type="button" style="display: none;"> <i class="fas fa-lock-open"></i> 解封</button>
-            <button class="btn btn-danger" id="btnDetailDelete" type="button" style="display: none;"> <i class="fas fa-user-minus"></i> 刪除</button>
+            <button class="btn btn-outline-primary" id="btnSave" type="button" style="display: none;"> <i class="fas fa-save"></i> 儲存</button>
+            <button class="btn btn-outline-secondary" id="btnDetailArchive" type="button" style="display: none;"> <i class="fas fa-lock"></i> 封存</button>
+            <button class="btn btn-outline-info" id="btnDetailUnarchive" type="button" style="display: none;"> <i class="fas fa-lock-open"></i> 解封</button>
+            <button class="btn btn-outline-danger" id="btnDetailDelete" type="button" style="display: none;"> <i class="fas fa-user-minus"></i> 刪除</button>
             <button class="btn btn-outline-dark" id="btnBack" type="button"> <i class="fas fa-undo-alt"></i> 返回搜尋</button>
           </div>
         </form>
@@ -217,7 +197,7 @@
 
   <script>
     $(document).ready(function () {
-      $('#loadingSpin').css('display', 'flex');
+      showPageLoading('讀取個案', '正在獲取執行中與封存名單...');
       // 頁面載入時，抓取所有初始資料
       loadInitialData();
 
@@ -569,16 +549,16 @@
 
     // 載入所有初始資料到 sessionStorage
     function loadInitialData() {
-      $('#loadingSpin').show();
+      // 已由 ready 處呼叫 showPageLoading
       google.script.run
         .withSuccessHandler(function (data) {
           sessionStorage.setItem('custData', JSON.stringify(data.active));
           sessionStorage.setItem('oldCustData', JSON.stringify(data.archived));
           populateDropdowns();
-          $('#loadingSpin').hide();
+          Swal.close();
         })
         .withFailureHandler(function (error) {
-          $('#loadingSpin').hide();
+          Swal.close();
           Swal.fire('載入失敗', '無法取得個案清單：' + error.message, 'error');
           $('#selectCustName').empty().append('<option value="" disabled selected>載入失敗</option>');
           $('#selectOldCustName').empty().append('<option value="" disabled selected>載入失敗</option>');

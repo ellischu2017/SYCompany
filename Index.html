@@ -93,63 +93,67 @@
     <div class="row g-4">
 
       <div class="col-12">
-        <a id="pageCust" onclick="openPageUrl('Cust','_self');" class="btn btn-primary w-100 menu-btn rounded-pill">
+        <a id="pageCust" onclick="openPageUrl('Cust','_self');" class="btn btn-outline-primary w-100 menu-btn ">
           <i class="fas fa-user-injured me-2"></i> 個案管理系統
         </a>
       </div>
 
-      <div class="col-12 col-md-6">
-        <a id="pageUser" onclick="openPageUrl('User');" class="btn btn-success w-100 menu-btn rounded-pill">
+      <div class="col-6">
+        <a id="pageUser" onclick="openPageUrl('User');" class="btn btn-outline-success w-100 menu-btn rounded-pill">
           <i class="fas fa-user-nurse me-2"></i> 居服員管理系統
         </a>
       </div>
 
-      <div class="col-12 col-md-6">
-        <a id="pageManager" onclick="openPageUrl('Manager');" class="btn btn-success w-100 menu-btn rounded-pill">
+      <div class="col-6">
+        <a id="pageManager" onclick="openPageUrl('Manager');"
+          class="btn btn-outline-success w-100 menu-btn rounded-pill">
           <i class="fas fa-user-nurse me-2"></i> 管理員管理系統
         </a>
       </div>
 
       <div class="col-6">
-        <a id="pageLTC_Code" onclick="openPageUrl('LTC_Code');" class="btn btn-info text-white w-100 menu-btn rounded-pill">
-          <i class="fas fa-list-ol me-2"></i> 長照編碼
-        </a>
-      </div>
-
-      <div class="col-6">
-        <a id="pageRecUrl" onclick="openPageUrl('RecUrl');" class="btn btn-info text-white w-100 menu-btn rounded-pill">
-          <i class="fas fa-link me-2"></i> 網址管理
-        </a>
-      </div>
-
-      <div class="col-6">
-        <a id="SR_server" onclick="openPageUrl('SR_server');" class="btn btn-warning text-dark w-100 menu-btn rounded-pill">
+        <a id="SR_server" onclick="openPageUrl('SR_server');"
+          class="btn btn-outline-warning w-100 menu-btn rounded-pill">
           <i class="fas fa-file-medical me-2"></i> 舒漾電子服務紀錄(管理端)
         </a>
       </div>
       <div class="col-6">
         <a id="SR_server01" onclick="openPageUrl('SR_server01','_blank');"
-          class="btn btn-danger text-white w-100 menu-btn rounded-pill">
+          class="btn btn-outline-danger  w-100 menu-btn rounded-pill">
           <i class="fas fa-file-medical me-2"></i> 舒漾電子服務紀錄(用戶端)
         </a>
       </div>
-      <hr>
       <div class="col-6">
-        <a id="TranferResponse" onclick="openPageUrl('TranferResponse')"
-          class="btn btn-secondary text-white w-100 menu-btn rounded-pill">
+        <a id="TransferResponse" onclick="openPageUrl('TransferResponse')"
+          class="btn btn-outline-secondary w-100 menu-btn rounded-pill">
           <i class="fas fa-truck-moving me-2"></i> 資料轉換系統
         </a>
       </div>
 
       <div class="col-6">
         <a id="pageMonthlyReport" onclick="openPageUrl('MonthlyReport')"
-          class="btn btn-secondary text-white w-100 menu-btn rounded-pill">
+          class="btn btn-outline-secondary w-100 menu-btn rounded-pill">
           <i class="fas fa-server me-2"></i> 月報表查詢系統
         </a>
       </div>
+
       <hr class="my-4">
+
+      <div class="col-6">
+        <a id="pageLTC_Code" onclick="openPageUrl('LTC_Code');"
+          class="btn btn-outline-info w-100 menu-btn rounded-pill">
+          <i class="fas fa-list-ol me-2"></i> 長照編碼
+        </a>
+      </div>
+
+      <div class="col-6">
+        <a id="pageRecUrl" onclick="openPageUrl('RecUrl');" class="btn btn-outline-info w-100 menu-btn rounded-pill">
+          <i class="fas fa-link me-2"></i> 網址管理
+        </a>
+      </div>
+
       <div class="col-12">
-        <a onclick="openPageUrl('OpenSpreadSheet');" class="btn btn-outline-dark w-100 menu-btn rounded-pill">
+        <a onclick="openPageUrl('OpenSpreadSheet');" class="btn btn-outline-dark menu-btn ">
           <i class="fas fa-file-excel me-2"></i> 開啟試算表
         </a>
       </div>
@@ -161,13 +165,16 @@
       </div>
     </div>
 
-
-
-
     <script>
       // 頁面加載完成後的初始化邏輯
-      $(document).ready(function () {        
-        $('#loadingSpin').css('display', 'flex');
+      $(document).ready(function () {
+        // 1. 立刻顯示與前一頁相同的載入視窗 (因為 Footer 在最下方，若報錯代表 Footer 還沒載入，改用 native Swal)
+        if (typeof showPageLoading === 'function') {
+          showPageLoading('系統初始化', '正在驗證身分並準備選單...');
+        } else {
+          Swal.fire({ title: '載入中', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        }
+
         console.log("舒漾長照系統 - Index 頁面載入完成");
         // 檢查如果沒有 userEmail (代表繞過後端載入，雖然機率低)
         checkLocalStorageAuth();
@@ -187,15 +194,21 @@
 
         // 檢查：若 localStorage 無有效登入資料，則拒絕存取
         if (!loginData || !loginData.User || !loginData.Role) {
-          // 如果沒有 Google 登入資訊，也沒有 localStorage 登入資訊，則導向 Auth.html
-          window.top.location.href = "<?!= getScriptUrl() ?>?page=Auth&error=access_denied";
+          // 如果 buildUrl 還沒載入（雖然機率低），提供備援邏輯
+          if (typeof buildUrl === 'function') {
+            window.top.location.href = buildUrl('Auth', 'error=access_denied');
+          } else {
+            const baseUrl = "<?!= getScriptUrl() ?>";
+            const sep = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+            window.top.location.href = baseUrl + sep + "page=Auth&error=access_denied";
+          }
         } else if (loginData && loginData.Role) {
           // 如果有 localStorage 登入資訊，但沒有 Google 登入資訊，則顯示使用者名稱
           if (loginData.User) {
             $('#currentUserName').text(loginData.User);
           }
           // 驗證通過後才隱藏 Loading，避免畫面閃爍或在跳轉前顯示內容
-          $('#loadingSpin').hide();
+          Swal.close();
         }
       }
 

@@ -159,7 +159,7 @@
       </div>
 
       <div class="d-grid gap-2 mt-3">
-        <button class="btn btn-danger btn-lg" id="btnQuery">
+        <button class="btn btn-outline-danger btn-lg" id="btnQuery">
           查詢紀錄
         </button>
         <button class="btn btn-outline-secondary btn-lg" id="btnLogout">
@@ -225,13 +225,13 @@
         </div>
       </div>
       <div class="d-grid gap-2">
-        <button class="btn btn-primary btn-lg" id="btnUpdate">
+        <button class="btn btn-outline-primary btn-lg" id="btnUpdate">
           更新紀錄
         </button>
-        <button class="btn btn-success btn-lg" id="btnAdd">
+        <button class="btn btn-outline-success btn-lg" id="btnAdd">
           確認存檔
         </button>
-        <button class="btn btn-secondary btn-lg" id="btnBack">
+        <button class="btn btn-outline-secondary btn-lg" id="btnBack">
           返回查詢
         </button>
       </div>
@@ -248,14 +248,25 @@
       ltcCodes: [],   // SYCompany > LTC_Code
       srData: [],
       srDataHeaders: [],
-      currentUser: null
+      currentUser: null,
+      loadedUserN: null // 追蹤目前載入的是哪位居服員的紀錄
     };
-    const CACHE_KEY = "SRServer01_InitData";
+    // 快取名稱改為包含使用者名稱，確保不同帳號間資料不混淆
+    const getCacheKey = (user) => "SRServer01_InitData_" + (user || "guest");
 
     $(document).ready(function () {
-      checkLocalStorageAuth();
+      const loginData = JSON.parse(localStorage.getItem('Login'));
+      if (!loginData || !loginData.User) {
+        // 使用 buildUrl 導向登入頁，防止網址參數丟失或解析失敗
+        if (typeof buildUrl === 'function') return window.top.location.href = buildUrl('Auth');
+        return window.top.location.href = "<?!= getScriptUrl() ?>?page=Auth";
+      }
+      const loggedInUser = loginData.User;
 
-      $('#loadingSpin').css('display', 'flex').show();
+      // 使用統一的 Swal 載入視窗
+      if (typeof showPageLoading === 'function') {
+        showPageLoading('同步資料中', '正在獲取居服員與個案最新資訊...');
+      }
 
       const today = new Date();
       const dayOfMonth = today.getDate();
@@ -278,21 +289,24 @@
       $("#queryDate").attr("max", formatDate(today));
 
       // 初始化：優先檢查 Session Storage 快取
-      const cachedData = sessionStorage.getItem(CACHE_KEY);
+      const cacheKey = getCacheKey(loggedInUser);
+      const cachedData = sessionStorage.getItem(cacheKey);
       if (cachedData) {
         console.log("從 sessionStorage 載入資料");
         initSuccess(JSON.parse(cachedData));
+        Swal.close(); // 資料初始化完畢後關閉
       } else {
         google.script.run
           .withSuccessHandler(function (data) {
-            try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) { console.error("Cache write failed", e); }
+            try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) { console.error("Cache write failed", e); }
             initSuccess(data);
+            Swal.close(); // 資料獲取完畢後關閉
           })
           .withFailureHandler(function (err) {
-            $("#loadingSpin").hide();
+            Swal.close();
             Swal.fire("系統錯誤", "初始化失敗：" + err.message, "error");
           })
-          .getSRServer01InitData();
+          .getSRServer01InitData(loggedInUser); // 傳入當前使用者，僅抓取相關資料
       }
 
       // --- 綁定事件監聽 ---
@@ -339,8 +353,8 @@
           if (result.isConfirmed) {
             localStorage.removeItem('Login');
             sessionStorage.removeItem('Login');
-            sessionStorage.removeItem(CACHE_KEY);
-            window.top.location.href = "<?!= getScriptUrl() ?>?page=Auth&logout=true";
+          sessionStorage.clear(); // 登出時清空所有快取
+          window.top.location.href = buildUrl('Auth', 'logout=true');
           }
         });
       });
@@ -388,7 +402,7 @@
 
       if (!loginData || !loginData.User || !loginData.Role) {
         // 如果沒有 localStorage 登入資訊，則導向 Auth.html
-        window.top.location.href = "<?!= getScriptUrl() ?>";
+        window.top.location.href = buildUrl('Auth');
       }
     }
 
@@ -402,7 +416,10 @@
       if (data.srData && data.srData.length > 0) {
         GLOBAL_DATA.srDataHeaders = data.srData[0];
         // The rest is data.
-        GLOBAL_DATA.srData = data.srData.slice(1);
+        GLOBAL_DATA.srData = data.srData.slice(1)        ;
+        // 初始化時記錄已載入的 User
+        const loginData = JSON.parse(localStorage.getItem('Login'));
+        if (loginData) GLOBAL_DATA.loadedUserN = loginData.User;      
       }
 
       // 設定當前使用者 (從 LocalStorage)
@@ -450,6 +467,27 @@
     function updateCustSelect(userName) {
       const $custSelect = $("#queryCustN");
       const $otherSelect = $("#queryCustNOther");
+
+      // --- 優化：若切換的使用者與目前載入的紀錄不同，則向後端請求該員紀錄 ---
+      if (userName && userName !== GLOBAL_DATA.loadedUserN) {
+        $("#loadingSpin").css('display', 'flex').show();
+        google.script.run
+          .withSuccessHandler(function(res) {
+            $("#loadingSpin").hide();
+            if (res && res.length > 0) {
+              GLOBAL_DATA.srDataHeaders = res[0];
+              GLOBAL_DATA.srData = res.slice(1);
+              GLOBAL_DATA.loadedUserN = userName;
+              // 更新快取
+              updateSessionCache();
+            }
+          })
+          .withFailureHandler(function(err) {
+            $("#loadingSpin").hide();
+            console.error("切換居服員抓取資料失敗:", err);
+          })
+          .getSRDataByUser(userName); // 呼叫後端僅抓取該員紀錄的函式
+      }
 
       // 修正：重新填充下拉選單前，先銷毀舊的 Select2 實例，避免重整頁面時因快取導致無法選擇
       if ($custSelect.hasClass("select2-hidden-accessible")) {
@@ -755,8 +793,10 @@
         ltcCodes: GLOBAL_DATA.ltcCodes,
         srData: [GLOBAL_DATA.srDataHeaders, ...GLOBAL_DATA.srData]
       };
+      const loginData = JSON.parse(localStorage.getItem('Login'));
+      const cacheKey = getCacheKey(loginData ? loginData.User : null);
       try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+        sessionStorage.setItem(cacheKey, JSON.stringify(dataToCache));
       } catch (e) {
         console.error("更新 sessionStorage 失敗 (可能容量不足):", e);
       }

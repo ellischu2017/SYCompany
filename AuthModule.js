@@ -187,3 +187,22 @@ function changeUserPassword(username, newPass) {
     throw new Error("使用者不存在或無法更新密碼");
   }
 }
+
+/**
+ * 取得 Web App 的部署網址
+ */
+function getScriptUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
+/**
+ * SPA 模式核心：取得特定頁面的 HTML 片段
+ * @param {string} pageName 頁面檔案名稱 (不含 .html)
+ * @return {string} 經過評估後的 HTML 內容字串
+ */
+function getPagePart(pageName) {
+  const template = HtmlService.createTemplateFromFile(pageName);
+  // 注入變數給模板評估時使用，確保子頁面中的 <?!= getScriptUrl() ?> 或變數引用不會報錯
+  template.webAppUrl = getScriptUrl();
+  return template.evaluate().getContent();
+}

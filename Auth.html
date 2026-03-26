@@ -69,19 +69,6 @@
       box-shadow: 0 2px 5px rgba(13, 110, 253, 0.2);
     }
 
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.8);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-
     /* 修正 Footer 位置，使其固定在頁面底部 */
     .footer-section {
       position: relative;
@@ -94,12 +81,6 @@
 </head>
 
 <body>
-  <div id="loadingSpin" class="loading-overlay" style="display: none;">
-    <div class="spinner-border text-primary" role="status">
-      <span class="visually-hidden">Loading...</span>
-    </div>
-  </div>
-
   <div id="loginSection" class="login-container" style="display: none;">
     <h2 class="text-center mb-4">系統登入</h2>
     <form id="loginForm">
@@ -139,7 +120,7 @@
 
   <script>
     // 提前定義 SCRIPT_URL 以供頁面內的函式使用，避免 ReferenceError
-    const SCRIPT_URL = "<?!= webAppUrl ?>";
+    var SCRIPT_URL = "<?!= getScriptUrl() ?>";
     // 初始化 Toast 提示框設定，讓錯誤訊息以輕量化方式顯示
     const Toast = Swal.mixin({
       toast: true,
@@ -152,6 +133,32 @@
         toast.addEventListener('mouseleave', Swal.resumeTimer)
       }
     });
+
+    // 在 Auth.html 內也定義 buildUrl 以防 Footer 尚未載入
+    function buildUrl(pageName, extraParams = "") {
+      const separator = SCRIPT_URL.indexOf('?') !== -1 ? '&' : '?';
+      if(!window.APP_VERSION) window.APP_VERSION = '2.1.0';
+      const cacheBuster = "v=" + window.APP_VERSION;
+      let url = SCRIPT_URL + separator + "page=" + pageName + "&" + cacheBuster;
+      if (extraParams) {
+        url += (extraParams.startsWith('&') ? '' : '&') + extraParams;
+      }
+      return url;
+    }
+
+    // 內部 showLoading 封裝，確保 Auth 頁面在 Footer 載入前也能運作
+    function authLoading(title, text) {
+      if (typeof showPageLoading === 'function') {
+        showPageLoading(title, text);
+      } else {
+        Swal.fire({
+          title: title,
+          text: text,
+          allowOutsideClick: false,
+          didOpen: () => { Swal.showLoading(); }
+        });
+      }
+    }
 
     $(document).ready(function () {
       // 優先檢查網址是否有 logout 參數
@@ -171,7 +178,7 @@
         }).then(() => {
           // 清除網址參數(選用)並顯示登入畫面
           if (window.history.replaceState) {
-            const newUrl = window.location.href.split('?')[0] + '?page=Auth';
+            const newUrl = buildUrl('Auth');
             window.history.replaceState(null, null, newUrl);
           }
           showLoginPage();
@@ -191,7 +198,7 @@
         }).then(() => {
           // 清除網址參數
           if (window.history.replaceState) {
-            const newUrl = window.location.href.split('?')[0] + '?page=Auth';
+            const newUrl = buildUrl('Auth');
             window.history.replaceState(null, null, newUrl);
           }
           localStorage.removeItem('Login'); // 清除登入狀態
@@ -204,7 +211,7 @@
     });
 
     function checkLocalStorageLogin() {
-      $('#loadingSpin').show();
+      authLoading('自動登入中', '正在確認您的憑證...');
       let loginData;
       // 優先檢查 sessionStorage (本次瀏覽器會話)，再檢查 localStorage (長期記憶)
       try {
@@ -217,14 +224,15 @@
       }
 
       if (loginData && loginData.User && loginData.Role) {
-        $('#loadingSpin').hide();
+        // 直接使用新的 Swal 覆蓋讀取中視窗，避免關閉再開啟產生的閃爍
         Swal.fire({
           title: '快速登入',
           text: `是否使用 ${loginData.User} 的身分繼續登入本系統？`,
           icon: 'question',
           showCancelButton: true,
           confirmButtonText: '是',
-          cancelButtonText: '否，更換帳號'
+          cancelButtonText: '否，更換帳號',
+          allowOutsideClick: false
         }).then((result) => {
           if (result.isConfirmed) {
             redirectToPage(loginData.Role);
@@ -240,7 +248,7 @@
     }
 
     function showLoginPage() {
-      $('#loadingSpin').show();
+      authLoading('載入登入畫面', '正在準備使用者清單...');
       $('#loginSection').fadeIn();
       loadAuthData();
     }
@@ -250,7 +258,7 @@
       const cachedUsers = sessionStorage.getItem('AuthUser');
       if (cachedUsers) {
         populateUserDropdown(JSON.parse(cachedUsers));
-        $('#loadingSpin').hide();
+        Swal.close();
         return;
       }
 
@@ -259,10 +267,10 @@
         .withSuccessHandler(function (users) {
           sessionStorage.setItem('AuthUser', JSON.stringify(users));
           populateUserDropdown(users);
-          $('#loadingSpin').hide();
+          Swal.close();
         })
         .withFailureHandler(function (err) {
-          $('#loadingSpin').hide();
+          Swal.close();
           Swal.fire('錯誤', '無法載入使用者清單: ' + err.message, 'error');
         })
         .getAuthUsers(); // This function needs to be created in Code.gs
@@ -322,7 +330,7 @@
     }
 
     function redirectToPage(role) {
-      $('#loadingSpin').show();
+      authLoading('跳轉中', '正在導向您的工作區...');
       let page = '';
       if (role === 'Admin') {
         page = 'Index';
@@ -331,9 +339,9 @@
       }
 
       if (page) {
-        window.top.location.href = SCRIPT_URL + "?page=" + page;
+        window.top.location.href = buildUrl(page);
       } else {
-        $('#loadingSpin').hide();
+        Swal.close();
         Swal.fire('錯誤', '角色錯誤，無法導向頁面', 'error');
       }
     }
@@ -450,7 +458,7 @@
         confirmButtonText: '確定'
       }).then(() => {
         // 使用 SCRIPT_URL 重新導向到 Auth 頁面，比 reload 更穩定，避免畫面變白
-        window.top.location.href = SCRIPT_URL + '?page=Auth';
+        window.top.location.href = buildUrl('Auth');
       });
     });
 
@@ -541,11 +549,11 @@
         }
       }).then((result) => {
         if (result.isConfirmed) {
-          $('#loadingSpin').show();
+          authLoading('修改中', '正在更新密碼...');
           // 呼叫後端 Google Apps Script 函式進行修改
           google.script.run
             .withSuccessHandler(function () {
-              $('#loadingSpin').hide();
+              Swal.close();
 
               // 1. 更新 Session 中的使用者資料，確保前端登入驗證能通過新密碼
               const authUsers = JSON.parse(sessionStorage.getItem('AuthUser')) || [];
@@ -572,7 +580,7 @@
               });
             })
             .withFailureHandler(function (err) {
-              $('#loadingSpin').hide();
+              Swal.close();
               Swal.fire('錯誤', '修改失敗：' + err.message, 'error');
             })
             .changeUserPassword(result.value.user, result.value.newPass); // 需在後端 Code.gs 實作此函式

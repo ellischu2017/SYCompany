@@ -56,27 +56,10 @@
     .form-group {
       margin-bottom: 20px;
     }
-
-    .loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
   </style>
 </head>
 
 <body>
-  <div id="loadingSpin" class="loading">
-    <div class="spinner-border text-danger" role="status"></div>
-  </div>
-
   <nav class="navbar navbar-dark bg-secondary sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas"
@@ -134,13 +117,13 @@
         
         <div class="row g-4">
           <div class="d-grid gap-2 col-6">
-            <button id="btnReport" type="button" class="btn btn-primary btn-lg shadow-sm">
+            <button id="btnReport" type="button" class="btn btn-outline-primary btn-lg shadow-sm">
               <i class="fas fa-search me-2"></i>1.查詢 / 產生報表
             </button>
           </div>
 
           <div class="d-grid gap-2 col-6">
-            <button id="btnGenPdf" type="button" class="btn btn-info btn-lg text-dark shadow-sm">
+            <button id="btnGenPdf" type="button" class="btn btn-outline-info btn-lg shadow-sm">
               <i class="fas fa-file-pdf me-2"></i>2.查詢 / 產生Pdf
             </button>
           </div>
@@ -264,7 +247,7 @@
     }
 
     function initMonthSelect() {
-      $("#loadingSpin").css("display", "flex").show();
+      showPageLoading('初始化', '正在準備月份選單...');
       var startYear = 2026;
       var startMonth = 1;
       var now = new Date();
@@ -296,11 +279,11 @@
       }
       // 在完成載入後，預選第一個
       $select.find("option").first().prop("selected", true);
-      $("#loadingSpin").hide();
+      Swal.close();
     }
 
     function initCustSelect() {
-      $("#loadingSpin").show();
+      showPageLoading('載入名單', '正在讀取個案清單...');
       var yearmonth = $("#qrymonth").val();
       if (!yearmonth) return;
 
@@ -314,7 +297,7 @@
           '<option value="" disabled selected>請選擇個案名稱</option>',
         );
         populateCustSelect(JSON.parse(sessionCust)); // 接著填入從 Session 來的資料
-        $("#loadingSpin").hide();
+        Swal.close();
       } else {
         // 讀取中狀態
         $select.empty();
@@ -330,12 +313,12 @@
               '<option value="" disabled selected>請選擇個案名稱</option>',
             );
             populateCustSelect(list);
-            $("#loadingSpin").hide();
+            Swal.close();
           })
           .withFailureHandler(function (err) {
             $select.html("<option disabled selected>讀取失敗</option>");
             Swal.fire("錯誤", "無法讀取個案清單: " + err.message, "error");
-            $("#loadingSpin").hide();
+            Swal.close();
           })
           .getCustN(yearmonth);
       }

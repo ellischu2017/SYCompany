@@ -30,28 +30,10 @@
       color: #198754;
       padding: 5px 0;
     }
-
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
   </style>
 </head>
 
 <body>
-
-  <div id="loading" class="loading-overlay">
-    <div class="spinner-border text-success" role="status"></div>
-  </div>
-
   <nav class="navbar navbar-dark bg-success sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light text-success" type="button" data-bs-toggle="offcanvas"
@@ -82,9 +64,9 @@
           </select>
         </div>
         <div class="d-flex gap-3">
-          <button class="btn btn-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
-          <button class="btn btn-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
-          <button class="btn btn-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
+          <button class="btn btn-outline-primary flex-grow-1" id="btnQuery"><i class="fas fa-edit"></i> 修改</button>
+          <button class="btn btn-outline-success flex-grow-1" id="btnAddInit"><i class="fas fa-plus"></i> 新增</button>
+          <button class="btn btn-outline-danger flex-grow-1" id="btnDeleteFromSearch"><i class="fas fa-trash"></i> 刪除</button>
         </div>
       </div>
     </div>
@@ -129,7 +111,7 @@
 
   <script>
     $(document).ready(function () {
-      $('#loading').css('display', 'flex');
+      showPageLoading('讀取清單', '正在載入居服員名單...');
       // 顯示當前使用者
       const loginData = JSON.parse(localStorage.getItem('Login'));
       if (loginData && loginData.User) $('#currentUserDisplay').text(loginData.User);
@@ -273,9 +255,9 @@
       google.script.run.withSuccessHandler(function (data) {
         sessionStorage.setItem('userData', JSON.stringify(data));
         populateDropdown();
-        $('#loading').hide();
+        Swal.close();
       }).withFailureHandler(function(err){
-        $('#loading').hide();
+        Swal.close();
         Swal.fire('載入失敗', err.message, 'error');
       }).getAllUserData();
     }

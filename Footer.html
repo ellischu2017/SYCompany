@@ -16,6 +16,75 @@
   .footer-section a:hover {
     text-decoration: underline;
   }
+
+  /* 全域 SweetAlert2 背景毛玻璃效果 */
+  .swal2-container {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px); /* 相容 Safari 瀏覽器 */
+    background-color: rgba(0, 0, 0, 0.4) !important; /* 調整背景遮罩的深淺度 */
+  }
+
+  /* 視窗緩慢縮放登場動畫 */
+  .swal2-popup.swal2-show {
+    animation: swalCustomZoomIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    will-change: transform, opacity;
+  }
+
+  @keyframes swalCustomZoomIn {
+    0% { opacity: 0; transform: scale(0.7); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* 視窗平滑縮小消失動畫 */
+  .swal2-popup.swal2-hide {
+    animation: swalCustomZoomOut 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  @keyframes swalCustomZoomOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.7); }
+  }
+
+  /* 載入圈圈延遲登場動畫 */
+  .swal2-loading {
+    opacity: 0; /* 初始隱藏 */
+    animation: swalSpinnerFadeIn 0.4s ease-out 0.8s forwards; /* 0.8s 延遲 */
+  }
+
+  @keyframes swalSpinnerFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* 載入圈圈關閉前先一步消失 */
+  .swal2-popup.swal2-hide .swal2-loading {
+    animation: swalSpinnerFadeOut 0.2s ease-in forwards !important;
+  }
+
+  @keyframes swalSpinnerFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  /* 文字訊息延遲登場動畫 (標題與內容) */
+  .swal2-title, .swal2-html-container {
+    animation: swalTextFadeIn 0.8s ease-out 0.4s both !important;
+    will-change: transform, opacity;
+  }
+
+  @keyframes swalTextFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Logo 淡入動畫定義 */
+  .swal-logo-animation {
+    animation: logoFadeIn 1.2s ease-out forwards;
+  }
+
+  @keyframes logoFadeIn {
+    from { opacity: 0; transform: translateY(-5px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
 </style>
 
 <footer class="footer-section">
@@ -52,6 +121,12 @@
       title: '同步權限中',
       text: '正在更新所有試算表權限，並清理名單，請稍候...',
       allowOutsideClick: false,
+      // 自定義背景顏色
+      background: '#f0f8ff', // 淺藍色背景，您可以替換為您的公司品牌色
+      // 加入公司 Logo 或自定義圖示
+      imageUrl: 'https://www.suyang.tw/images/layout05-1/common/logo.png', // 請替換為您的 Logo 圖片網址
+      imageWidth: 150, // 圖片寬度
+      customClass: { image: 'swal-logo-animation' },
       showConfirmButton: false,
       didOpen: () => {
         Swal.showLoading();
@@ -89,6 +164,12 @@
       title: '資料處理中',
       text: '正在遷移過期紀錄並同步 User 名單...',
       allowOutsideClick: false,
+      // 自定義背景顏色
+      background: '#f0f8ff', // 淺藍色背景
+      // 加入公司 Logo 或自定義圖示
+      imageUrl: 'https://www.suyang.tw/images/layout05-1/common/logo.png', // 請替換為您的 Logo 圖片網址
+      imageWidth: 150, // 圖片寬度
+      customClass: { image: 'swal-logo-animation' },
       didOpen: () => { Swal.showLoading(); }
     });
 
@@ -114,6 +195,12 @@
       title: '轉換中',
       text: '頁面正在轉換中，請稍候...',
       allowOutsideClick: false,
+      // 自定義背景顏色
+      background: '#f0f8ff', // 淺藍色背景
+      // 加入公司 Logo 或自定義圖示
+      imageUrl: 'https://www.suyang.tw/images/layout05-1/common/logo.png', // 請替換為您的 Logo 圖片網址
+      imageWidth: 150, // 圖片寬度
+      customClass: { image: 'swal-logo-animation' },
       didOpen: () => { Swal.showLoading(); }
     });
 
@@ -142,6 +229,12 @@
         Swal.fire({
           title: '處理中...',
           text: '正在清除伺服器快取與本地暫存...',
+          // 自定義背景顏色
+          background: '#f0f8ff', // 淺藍色背景
+          // 加入公司 Logo 或自定義圖示
+          imageUrl: 'https://your-company.com/path/to/your/logo.png', // 請替換為您的 Logo 圖片網址
+          imageWidth: 150, // 圖片寬度
+          customClass: { image: 'swal-logo-animation' },
           allowOutsideClick: false,
           didOpen: () => { Swal.showLoading(); }
         });
@@ -156,7 +249,7 @@
               timer: 1000,
               showConfirmButton: false
             }).then(() => {
-              window.top.location.href = SCRIPT_URL;
+              window.top.location.href = buildUrl('Index');
             });
           })
           .withFailureHandler(function(err) {
@@ -171,12 +264,71 @@
   if (typeof SCRIPT_URL === 'undefined') {
     var SCRIPT_URL = "<?!= getScriptUrl() ?>";
   }
-  function openPageUrl(pageName, target = "_top") {
-    //網址
+
+  /**
+   * 全域網址建構函式
+   * @param {string} pageName 頁面名稱 (例如 'Index')
+   * @param {string} extraParams 額外參數 (例如 'error=denied')，不需帶開頭的 ? 或 &
+   */
+  function buildUrl(pageName, extraParams = "") {
+    const separator = SCRIPT_URL.indexOf('?') !== -1 ? '&' : '?';
+    // 建議：將 Date.now() 改為固定版本號，或是在 script 載入時只生成一次
+    // 頻繁變動的 Date.now() 會導致瀏覽器完全無法快取 HTML 與相關資源
+    if(!window.APP_VERSION) window.APP_VERSION = '2.1.0'; 
+    const cacheBuster = "v=" + window.APP_VERSION;
+    
+    let url = SCRIPT_URL + separator + "page=" + pageName + "&" + cacheBuster;
+    if (extraParams) {
+      url += (extraParams.startsWith('&') ? '' : '&') + extraParams;
+    }
+    return url;
+  }
+
+  /**
+   * 統一的全域載入動畫設定
+   */
+  function showPageLoading(title = '頁面跳轉中', text = '正在載入，請稍候...') {
+    if (typeof Swal === 'undefined') return;
+    return Swal.fire({
+      title: title,
+      text: text,
+      background: '#f0f8ff',
+      imageUrl: 'https://www.suyang.tw/images/layout05-1/common/logo.png',
+      imageWidth: 150,
+      customClass: { image: 'swal-logo-animation' },
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+  }
+
+  /**
+   * 跳轉頁面函式
+   * @param {string} pageName 頁面名稱
+   * @param {string} target 跳轉目標 (_top, _self, _blank)
+   * @param {string} extraParams 額外參數 (例如 'v=123')
+   */
+  function openPageUrl(pageName, target = "_top", extraParams = "") {
+    const url = buildUrl(pageName, extraParams);
     if (target === "_blank") {
-      window.open(SCRIPT_URL + "?page=" + pageName, target);
+      window.open(url, target);
     } else {
-      window.top.location.href = SCRIPT_URL + "?page=" + pageName;
+      // 1. 關閉導航列 (Offcanvas)
+      var offcanvasElement = document.querySelector('.offcanvas');
+      if (offcanvasElement) {
+        var bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+        if (bsOffcanvas) bsOffcanvas.hide();
+      }
+
+      // 2. 顯示統一動畫
+      showPageLoading();
+
+      // 3. 延遲執行跳轉 (給予動畫至少 600ms 的展示時間)
+      setTimeout(() => {
+        window.top.location.href = url;
+      }, 600);
     }
   }
 
@@ -187,12 +339,32 @@
     // 1. 關閉可能開啟的 Offcanvas 導覽列
     var offcanvasElement = document.querySelector('.offcanvas');
     if (offcanvasElement) {
-      var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
-      if (offcanvas) offcanvas.hide();
+      var bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvasElement);
+      if (bsOffcanvas) bsOffcanvas.hide();
     }
 
-    // 2. 跳轉到登入頁面，並帶上 logout 參數以觸發清除動作
-    window.top.location.href = SCRIPT_URL + "?page=Auth&logout=true";
+    // 顯示登出動畫
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: '正在登出系統',
+        // 自定義背景顏色
+        background: '#f0f8ff', // 淺藍色背景
+        // 加入公司 Logo 或自定義圖示
+        imageUrl: 'https://www.suyang.tw/images/layout05-1/common/logo.png', // 請替換為您的 Logo 圖片網址
+        imageWidth: 150, // 圖片寬度
+        customClass: { image: 'swal-logo-animation' },
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+    }
+
+    // 2. 延遲跳轉至登入頁
+    setTimeout(() => {
+      window.top.location.href = buildUrl('Auth', 'logout=true');
+    }, 600);
   }
 
   // 全域權限檢查：限制 Role='user' 只能訪問特定頁面

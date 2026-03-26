@@ -13,7 +13,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <style>
-    /* 保持與 Index.html 一致的樣式 */
     body {
       background-color: #f8f9fa;
       font-family: "Microsoft JhengHei", Arial, sans-serif;
@@ -21,7 +20,6 @@
 
     .main-container {
       max-width: 800px;
-      /* 稍微加寬以適應表單 */
       margin: 20px auto;
       padding: 15px;
       background-color: white;
@@ -44,13 +42,11 @@
       padding: 10px;
       background-color: #f8f9fa;
       display: none;
-      /* 初始隱藏 */
     }
   </style>
 </head>
 
 <body>
-
   <nav class="navbar navbar-dark bg-secondary sticky-top">
     <div class="container-fluid">
       <button class="btn btn-light text-secondary" type="button" data-bs-toggle="offcanvas"
@@ -61,27 +57,30 @@
     </div>
   </nav>
 
-  <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar" aria-labelledby="offcanvasNavbarLabel">
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar">
     <div class="offcanvas-header">
-      <h5 class="offcanvas-title" id="offcanvasNavbarLabel">系統導航</h5>
-      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      <h5 class="offcanvas-title">系統導航</h5>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
     </div>
-
     <div class="offcanvas-body">
       <?!= includeNav(); ?>
     </div>
-
   </div>
 
   <div class="container main-container">
     <form id="transferForm">
       <div class="mb-3">
-        <label for="selCustName" class="form-label" id="lblCustName">選擇案主 (Customer Name)</label>
+        <label for="selCustName" class="form-label">選擇案主 (Customer Name)</label>
         <select class="form-select" id="selCustName" required>
           <option value="" selected disabled>資料讀取中...</option>
         </select>
       </div>
      
+      <div class="mb-3">
+        <label for="inputFormUrl" class="form-label">舊表單網址 (Form_Url)</label>
+        <input type="text" class="form-control" id="inputFormUrl" placeholder="請輸入舊表單網址">
+      </div>
+
       <div class="form-group mb-4">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="chkUpdate" style="cursor: pointer" checked />
@@ -97,106 +96,60 @@
         </button>
       </div>
     </form>
-
     <div id="divResult"></div>
     <div class="container mt-2 text-end">
-      <small class="text-muted">
-        <i class="fas fa-user-circle"></i> 當前管理員：
-        <span id="currentUserDisplay"></span>
-      </small>
+      <small class="text-muted">當前管理員：<span id="currentUserDisplay"></span></small>
     </div>
-
   </div>
 
-
-
+  <?!= includeFooter() ?>
   <script>
     $(document).ready(function () {
-      // 顯示當前使用者
       const loginData = JSON.parse(localStorage.getItem('Login'));
       if (loginData && loginData.User) $('#currentUserDisplay').text(loginData.User);
-      // 頁面載入時，獲取案主名單
       loadCustomerNames();
-
-      // 綁定按鈕點擊事件
       $('#btnTransfer').on('click', runTransfer);
     });
 
-    // 獲取案主名單
     function loadCustomerNames() {
+      // 使用 Footer.html 定義的全域動畫
+      showPageLoading('系統載入中', '正在獲取案主名單...');
+
       google.script.run
         .withSuccessHandler(function (names) {
-          var select = $('#selCustName');
-          select.empty();
-          select.append('<option value="" selected disabled>請選擇案主...</option>');
-
-          // --- 新增部分 ---
+          Swal.close();
+          var select = $('#selCustName').empty().append('<option value="" selected disabled>請選擇案主...</option>');
           select.append('<option value="all" style="font-weight:bold; color:blue;">全部更新 (Update All)</option>');
-          // ----------------
-
           if (names && names.length > 0) {
-            excepname = ["Raw Responses","表單回覆 171"];
-            names = names.filter(function (name) {
-              return !excepname.includes(name);
-            }); 
-            names.forEach(function (name) {
-              if (name != "Raw Responses") select.append($('<option></option>').val(name).text(name));
-            });
-          } else {
-            select.append('<option value="" disabled>無可用的案主資料</option>');
+            const excepname = ["Raw Responses", "表單回覆 171"];
+            names.filter(n => !excepname.includes(n)).forEach(n => select.append($('<option></option>').val(n).text(n)));
           }
         })
         .withFailureHandler(function (err) {
+          Swal.close();
           Swal.fire('讀取錯誤', '無法載入案主名單: ' + err.message, 'error');
         })
         .getRawResponseSheetNames();
     }
 
-    // 執行轉換邏輯
     function runTransfer() {
       const custName = $('#selCustName').val();
       const isUpdateOnly = $('#chkUpdate').is(':checked');
+      if (!custName) return Swal.fire('提示', '請先選擇一位案主', 'warning');
 
-      if (!custName) {
-        Swal.fire('提示', '請先選擇一位案主', 'warning');
-        return;
-      }
-
-      // 根據是否為 "all" 設定顯示文字
-      let titleHtml = '';
-      if (custName === 'all') {
-        titleHtml = `正在處理：<b>全部案主</b><br>這可能需要一點時間，請勿關閉視窗...`;
-      } else {
-        titleHtml = `正在處理案主：<b>${custName}</b>`;
-      }
-
-      // 顯示 Loading
       Swal.fire({
         title: '資料轉換中',
-        html: `正在處理案主：<b>${custName}</b><br>模式：${isUpdateOnly ? '僅更新新資料' : '處理歷史資料'}`,
-        allowOutsideClick: true,
-        didOpen: () => {
-          Swal.showLoading();
-        }
+        html: `正在處理：<b>${custName === 'all' ? '全部案主' : custName}</b><br>模式：${isUpdateOnly ? '僅更新新資料' : '處理歷史資料'}`,
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
       });
 
-      // 呼叫後端
       google.script.run
         .withSuccessHandler(function (result) {
           Swal.close();
-
-          // 顯示結果摘要
           if (result.success) {
-            Swal.fire({
-              icon: 'success',
-              title: '轉換完成',
-              text: `成功寫入 ${result.count} 筆紀錄。`,
-            });
-
-            // 在下方顯示詳細 Log
-            const $resultDiv = $('#divResult');
-            $resultDiv.html(`<strong>處理結果 (${new Date().toLocaleTimeString()}):</strong><br>` + result.log.replace(/\n/g, '<br>'));
-            $resultDiv.show();
+            Swal.fire({ icon: 'success', title: '轉換完成', text: `成功寫入 ${result.count} 筆紀錄。` });
+            $('#divResult').html(`<strong>處理結果 (${new Date().toLocaleTimeString()}):</strong><br>` + result.log.replace(/\n/g, '<br>')).show();
           } else {
             Swal.fire('轉換失敗', result.message, 'error');
           }
@@ -207,9 +160,6 @@
         })
         .processTransferData(custName, isUpdateOnly);
     }
-
   </script>
 </body>
-<?!= includeFooter() ?>
-
 </html>
