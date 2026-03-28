@@ -29,19 +29,6 @@
       margin: auto;
     }
 
-    #loadingSpin {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-
     .label-value {
       font-weight: bold;
       color: #d63384;
@@ -88,14 +75,39 @@
       border: 2px solid #dc3545 !important;
       box-shadow: 0 0 10px rgba(220, 53, 69, 0.2);
     }
+
+    /* --- 手機版點擊範圍優化 (Touch Target Optimization) --- */
+
+    /* 1. 增加選擇框本體高度與字體大小 */
+    .select2-container--bootstrap-5 .select2-selection {
+      min-height: 50px !important;
+      display: flex;
+      align-items: center;
+      border-radius: 10px !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+      line-height: 50px !important;
+      padding-left: 12px !important;
+      font-size: 1.1rem; /* 增大字體 */
+    }
+
+    /* 2. 優化下拉選單中的搜尋框 */
+    .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+      padding: 12px !important;
+      font-size: 1rem;
+    }
+
+    /* 3. 增加下拉選項的高度與間距 */
+    .select2-container--bootstrap-5 .select2-results__option {
+      padding: 12px 15px !important;
+      font-size: 1.1rem;
+      border-bottom: 1px solid #f8f9fa; /* 增加細微分隔線防止誤觸 */
+    }
   </style>
 </head>
 
 <body>
-  <div id="loadingSpin" class="loading">
-    <div class="spinner-border text-danger"></div>
-  </div>
-
   <div class="container">
     <h2 class="text-center text-danger mb-4">舒漾電子服務紀錄管理(用戶端)</h2>
 
@@ -336,7 +348,7 @@
       });
 
       $("#btnQuery").click(async function () {
-        $("#loadingSpin").css('display', 'flex');
+        showPageLoading('查詢中', '正在比對服務紀錄...');
         // 移除 disabled 邏輯，改由 loadingSpin 遮罩阻擋重複點擊，避免手機版按鈕卡死
         const success = await handleAction("query");
       });
@@ -361,7 +373,7 @@
 
       $("#btnAdd").click(async function () {
         $('#btnAdd').prop('disabled', true);
-        $("#loadingSpin").css('display', 'flex');
+        showPageLoading('儲存中', '正在新增服務紀錄...');
         // 新增成功後會切換回查詢頁面，故不需重新啟用按鈕(防止連點)
         const success = await handleAction("add");
         if (!success) $('#btnAdd').prop('disabled', false);
@@ -369,7 +381,7 @@
 
       $("#btnUpdate").click(async function () {
         $('#btnUpdate').prop('disabled', true);
-        $("#loadingSpin").css('display', 'flex');
+        showPageLoading('更新中', '正在同步修改內容...');
         // 更新成功後會切換回查詢頁面，故不需重新啟用按鈕
         const success = await handleAction("update");
         if (!success) $('#btnUpdate').prop('disabled', false);
@@ -391,6 +403,44 @@
         }
       });
     });
+
+    /**
+     * 輔助函式：實作 Select2 本地分頁 (Infinite Scroll)
+     * 透過攔截 transport，手動對本地陣列進行過濾與分頁，提升手機渲染效能
+     */
+    function createLocalPaginator(sourceArray, pageSize = 20) {
+      return {
+        transport: function (params, success, failure) {
+          const page = params.data.page || 1;
+          const term = params.data.q ? params.data.q.toLowerCase() : "";
+
+          // 1. 執行關鍵字過濾
+          const filtered = sourceArray.filter(item => {
+            const text = (item.text || item.name || item.id || String(item)).toLowerCase();
+            const id = (item.id || "").toLowerCase();
+            return text.includes(term) || id.includes(term);
+          });
+
+          // 2. 計算分頁範圍
+          const start = (page - 1) * pageSize;
+          const end = page * pageSize;
+          const results = filtered.slice(start, end).map(item => {
+            // 統一轉換成 Select2 要求的格式 {id, text}
+            if (typeof item === 'string') return { id: item, text: item };
+            return {
+              id: item.id || item.name,
+              text: item.text || (item.id ? `${item.id} ${item.cont || ""}` : item.name)
+            };
+          });
+
+          // 3. 回傳給 Select2 (包含 pagination.more 旗標)
+          success({
+            results: results,
+            pagination: { more: end < filtered.length }
+          });
+        }
+      };
+    }
 
     function checkLocalStorageAuth() {
       let loginData;
@@ -442,6 +492,14 @@
         width: '100%',
         placeholder: '請輸入名字搜尋居服員...',
         allowClear: true
+      }).on('select2:open', function() {
+        // 確保展開時捲動到已選取項目
+        setTimeout(() => {
+          const selectedItem = document.querySelector('.select2-results__option--selected');
+          if (selectedItem) {
+            selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }, 50);
       });
 
       if (loggedInUser) {
@@ -470,10 +528,10 @@
 
       // --- 優化：若切換的使用者與目前載入的紀錄不同，則向後端請求該員紀錄 ---
       if (userName && userName !== GLOBAL_DATA.loadedUserN) {
-        $("#loadingSpin").css('display', 'flex').show();
+        showPageLoading('切換人員', `正在讀取 ${userName} 的相關紀錄...`);
         google.script.run
           .withSuccessHandler(function(res) {
-            $("#loadingSpin").hide();
+            Swal.close();
             if (res && res.length > 0) {
               GLOBAL_DATA.srDataHeaders = res[0];
               GLOBAL_DATA.srData = res.slice(1);
@@ -483,7 +541,7 @@
             }
           })
           .withFailureHandler(function(err) {
-            $("#loadingSpin").hide();
+            Swal.close();
             console.error("切換居服員抓取資料失敗:", err);
           })
           .getSRDataByUser(userName); // 呼叫後端僅抓取該員紀錄的函式
@@ -501,11 +559,8 @@
       $("#otherCustRow").hide();
       $otherSelect.removeClass("highlight-select2").prop("disabled", true);
 
-      $custSelect.empty();
-      $custSelect.append('<option></option>'); // Placeholder
-
-      $otherSelect.empty();
-      $otherSelect.append('<option></option>'); // Placeholder
+      $custSelect.empty().append('<option></option>');
+      $otherSelect.empty().append('<option></option>');
       $("#querySrId").empty().append('<option value="" disabled selected>請先選擇個案...</option>');
 
       const userObj = GLOBAL_DATA.users.find(u => u.name === userName);
@@ -535,9 +590,14 @@
         });
         $custSelect.append('<option value="其他">其他 (開啟下方清單)</option>');
 
+        // --- 優化：其他個案改用 Infinite Scroll ---
         const otherCusts = allCustNames.filter(name => !favCusts.includes(name)).sort();
-        otherCusts.forEach(c => {
-          $otherSelect.append(`<option value="${c}">${c}</option>`);
+        $otherSelect.select2({
+          theme: 'bootstrap-5',
+          width: '100%',
+          placeholder: '搜尋其他個案...',
+          allowClear: true,
+          ajax: { delay: 250, ...createLocalPaginator(otherCusts) }
         });
       }
 
@@ -547,14 +607,13 @@
         width: '100%',
         placeholder: '請輸入名字搜尋個案...',
         allowClear: true
-      });
-
-      // 初始化 Other Cust Select2
-      $otherSelect.select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        placeholder: '搜尋其他個案...',
-        allowClear: true
+      }).on('select2:open', function() {
+        setTimeout(() => {
+          const selectedItem = document.querySelector('.select2-results__option--selected');
+          if (selectedItem) {
+            selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }, 50);
       });
     }
 
@@ -563,7 +622,10 @@
       if (!custName) return;
 
       const $srSelect = $("#querySrId");
-      $srSelect.empty().append('<option value="" disabled selected>請選擇服務編碼...</option>');
+      if ($srSelect.hasClass("select2-hidden-accessible")) {
+        $srSelect.select2('destroy');
+      }
+      $srSelect.empty().append('<option></option>');
 
       const custObj = GLOBAL_DATA.custs.find(c => c.name === custName);
       let favCodes = [];
@@ -572,20 +634,18 @@
         favCodes = custObj.ltcCodeStr.split(',').map(s => s.trim()).filter(s => s !== "");
       }
 
-      const favCodesSet = GLOBAL_DATA.ltcCodes.filter(srcode => favCodes.includes(srcode.id)).sort();
-      const otherCodes = GLOBAL_DATA.ltcCodes.filter(srcode => !favCodes.includes(srcode.id)).sort();
+      // 將常用編碼排在前面，其餘排後面，並依 ID 排序
+      const favCodesSet = GLOBAL_DATA.ltcCodes.filter(c => favCodes.includes(c.id)).sort((a,b) => a.id.localeCompare(b.id));
+      const otherCodes = GLOBAL_DATA.ltcCodes.filter(c => !favCodes.includes(c.id)).sort((a,b) => a.id.localeCompare(b.id));
+      const combinedCodes = [...favCodesSet, ...otherCodes];
 
-      favCodesSet.forEach(srcode => {
-        $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
-      });
-
-
-      if (otherCodes.length > 0 && favCodes.length > 0) {
-        $srSelect.append('<option disabled>──────────</option>');
-      }
-
-      otherCodes.forEach(srcode => {
-        $srSelect.append(`<option value="${srcode.id}">${srcode.id}${srcode.cont}</option>`);
+      // 將 SR_ID 也轉換為 Select2 並啟用 Infinite Scroll
+      $srSelect.select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: '請選擇或搜尋服務編碼...',
+        allowClear: true,
+        ajax: { delay: 250, ...createLocalPaginator(combinedCodes) }
       });
     }
 
@@ -630,8 +690,6 @@
 
 
       if (type === 'query') {
-
-        // Client-side search
         const idx = {
           date: getColIndex('Date'),
           srTimes: getColIndex('SRTimes'),
@@ -653,7 +711,7 @@
         );
 
         if (foundRow) {
-          $("#loadingSpin").hide();
+          Swal.close();
           triggerVibrate('success'); // 查詢成功震動
           const data = {
             srRec: foundRow[getColIndex('SR_REC')],
@@ -671,7 +729,7 @@
           return true; // 查詢成功，切換畫面，保持按鈕 disabled 狀態(雖然它已被隱藏)
         } else {
           let exSPCONS = await getSPCons(formObj);
-          $("#loadingSpin").hide();
+          Swal.close();
           triggerVibrate('error'); // 查無資料震動
           Swal.fire({
             title: "查無此紀錄，是否要新增一筆紀錄並開始編輯？",

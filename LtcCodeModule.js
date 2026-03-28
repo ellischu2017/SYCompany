@@ -19,7 +19,8 @@ function getAllLtcCodeData() {
 
   const idxId = colMap["SR_ID"];
   // 支援 SR_Name 或 SR_Cont (Service Content) 作為名稱欄位
-  const idxName = colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
+  const idxName =
+    colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
   const idxDetail = colMap["SR_Detail"];
 
   if (idxId === -1) return [];
@@ -27,11 +28,12 @@ function getAllLtcCodeData() {
   const result = [];
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (row[idxId]) { // SR_ID 不為空
+    if (row[idxId]) {
+      // SR_ID 不為空
       result.push({
         SR_ID: row[idxId],
         SR_Name: idxName !== -1 ? row[idxName] : "",
-        SR_Detail: idxDetail !== -1 ? row[idxDetail] : ""
+        SR_Detail: idxDetail !== -1 ? row[idxDetail] : "",
       });
     }
   }
@@ -52,7 +54,7 @@ function getLtcCodeList() {
   const lastCol = sheet.getLastColumn();
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   const idxId = getColIndex(headers, "SR_ID");
-  
+
   if (idxId === -1) return [];
 
   const data = sheet.getRange(2, idxId + 1, lastRow - 1, 1).getValues();
@@ -70,7 +72,8 @@ function queryLtcCodeData(srId) {
   const colMap = getColIndicesMap(headers, targetFields);
 
   const idxId = colMap["SR_ID"];
-  const idxName = colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
+  const idxName =
+    colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
   const idxDetail = colMap["SR_Detail"];
 
   if (idxId === -1) return { found: false };
@@ -105,12 +108,14 @@ function addLtcCodeData(formObj) {
   const headers = data[0];
   const targetFields = ["SR_ID", "SR_Name", "SR_Detail", "SR_Cont"];
   const colMap = getColIndicesMap(headers, targetFields);
-  
+
   const idxId = colMap["SR_ID"];
-  const idxName = colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
+  const idxName =
+    colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
   const idxDetail = colMap["SR_Detail"];
 
-  if (idxId === -1) return { success: false, message: "錯誤：找不到 SR_ID 欄位" };
+  if (idxId === -1)
+    return { success: false, message: "錯誤：找不到 SR_ID 欄位" };
 
   const newRow = new Array(headers.length).fill("");
   newRow[idxId] = formObj.srId;
@@ -142,18 +147,22 @@ function updateLtcCodeData(formObj) {
   const headers = data[0];
   const targetFields = ["SR_ID", "SR_Name", "SR_Detail", "SR_Cont"];
   const colMap = getColIndicesMap(headers, targetFields);
-  
+
   const idxId = colMap["SR_ID"];
-  const idxName = colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
+  const idxName =
+    colMap["SR_Name"] !== -1 ? colMap["SR_Name"] : colMap["SR_Cont"];
   const idxDetail = colMap["SR_Detail"];
 
-  if (idxId === -1) return { success: false, message: "錯誤：找不到 SR_ID 欄位" };
+  if (idxId === -1)
+    return { success: false, message: "錯誤：找不到 SR_ID 欄位" };
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][idxId]) == formObj.srId) {
       const rowNum = i + 1;
-      if (idxName !== -1) sheet.getRange(rowNum, idxName + 1).setValue(formObj.srName);
-      if (idxDetail !== -1) sheet.getRange(rowNum, idxDetail + 1).setValue(formObj.srDetail);
+      if (idxName !== -1)
+        sheet.getRange(rowNum, idxName + 1).setValue(formObj.srName);
+      if (idxDetail !== -1)
+        sheet.getRange(rowNum, idxDetail + 1).setValue(formObj.srDetail);
       CacheService.getScriptCache().remove("SRServer01_InitData");
       return { success: true, message: "編碼資料更新成功！" };
     }
@@ -170,7 +179,8 @@ function deleteLtcCodeData(srId) {
   const headers = data[0];
   const idxId = getColIndex(headers, "SR_ID");
 
-  if (idxId === -1) return { success: false, message: "錯誤：找不到 SR_ID 欄位" };
+  if (idxId === -1)
+    return { success: false, message: "錯誤：找不到 SR_ID 欄位" };
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][idxId]) == srId) {
