@@ -343,6 +343,12 @@
       if (bsOffcanvas) bsOffcanvas.hide();
     }
 
+    // 立即清除本地登入資訊與使用者名單快取，防止重新載入時觸發「快速登入」
+    localStorage.removeItem('Login');
+    localStorage.removeItem('RememberedUser');
+    sessionStorage.removeItem('Login');
+    sessionStorage.removeItem('AuthUser');
+
     // 顯示登出動畫
     if (typeof Swal !== 'undefined') {
       Swal.fire({

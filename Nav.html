@@ -91,7 +91,13 @@
 
   <hr class="my-2" />
   <li class="nav-item">
-    <a class="nav-link text-warning fw-bold" id="navLogout" href="#" onclick="event.preventDefault(); logout()">
+    <a class="nav-link text-warning fw-bold" id="navLogout" href="#" onclick="
+        event.preventDefault(); 
+        localStorage.removeItem('Login'); 
+        sessionStorage.removeItem('Login'); 
+        sessionStorage.removeItem('AuthUser');
+        logout();
+      ">
       <i class="fas fa-sign-out-alt me-2"></i>登出系統
     </a>
   </li>

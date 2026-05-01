@@ -162,7 +162,9 @@
 
     $(document).ready(function () {
       // 優先檢查網址是否有 logout 參數
-      const urlParams = new URLSearchParams(window.location.search);
+      // 修正：在某些瀏覽器環境下，需要從 window.location.href 解析參數以確保準確
+      const queryString = window.location.href.split('?')[1] || '';
+      const urlParams = new URLSearchParams(queryString);
       if (urlParams.get('logout') === 'true') {
         localStorage.removeItem('Login');
         localStorage.removeItem('RememberedUser'); // 同步清除記住的帳號，確保登出行為一致

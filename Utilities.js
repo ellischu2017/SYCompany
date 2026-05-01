@@ -696,3 +696,67 @@ function clearAllCaches() {
   cache.removeAll(keysToRemove);
   console.log(`[System] 快取清除完成。已移除以下鍵值: ${keysToRemove.join(', ')}`);
 }
+
+/**
+ * 從 Setting 工作表取得設定值
+ * @param {string} settingName 設定名稱
+ * @returns {string} 設定值
+ */
+function getSettingValue(settingName) {
+  const sheet = MainSpreadsheet.getSheetByName("Setting");
+  if (!sheet) return "";
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return "";
+  const headers = data[0];
+  const nameIdx = getColIndex(headers, "Key");
+  const valIdx = getColIndex(headers, "Value");
+  if (nameIdx === -1 || valIdx === -1) return "";
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][nameIdx] === settingName) {
+      return data[i][valIdx];
+    }
+  }
+  return "";
+}
+
+/**
+ * 呼叫 Gemini API 進行 AI 生成
+ * @param {string} userPrompt 使用者輸入的 Prompt
+ * @returns {string} AI 生成結果
+ */
+function generateAIServiceRecord(userPrompt) {
+  const apiKey = getSettingValue("Genimi_API_KEY");
+  if (!apiKey) throw new Error("系統設定中找不到 Genimi_API_KEY");
+
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey;
+
+  const payload = {
+    "contents": [{
+      "parts": [{ "text": userPrompt }]
+    }],
+    "system_instruction": {
+      "parts": [{ "text": "你是一位專業的長照個管師，回答時請保持專業且邏輯嚴謹，並使用繁體中文。" }]
+    }
+  };
+
+  const options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true
+  };
+
+  const response = UrlFetchApp.fetch(url, options);
+  const resJson = JSON.parse(response.getContentText());
+  
+  if (response.getResponseCode() !== 200) {
+    throw new Error("Gemini API 請求失敗: " + (resJson.error ? resJson.error.message : response.getContentText()));
+  }
+
+  if (resJson.candidates && resJson.candidates[0].content && resJson.candidates[0].content.parts) {
+    return resJson.candidates[0].content.parts[0].text.trim();
+  } else {
+    throw new Error("AI 回傳格式不正確");
+  }
+}

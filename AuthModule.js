@@ -4,14 +4,6 @@
  */
 
 /**
- * 處理 HTTP GET 請求
- * 根據參數 'page' 決定顯示哪個 HTML 檔案
- * @e 
- */
-
-
-
-/**
  * 檢查 Email 是否存在於 Manager 工作表的 Mana_Email 欄位
  * @email : 
  */

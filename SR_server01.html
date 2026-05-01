@@ -104,6 +104,26 @@
       font-size: 1.1rem;
       border-bottom: 1px solid #f8f9fa; /* 增加細微分隔線防止誤觸 */
     }
+
+    /* --- 徹底修正 Toast 遮擋問題 --- */
+    body.swal2-toast-shown .swal2-container {
+      backdrop-filter: none !important;       /* 移除毛玻璃 */
+      -webkit-backdrop-filter: none !important;
+      background-color: transparent !important; /* 移除深色背景 */
+      pointer-events: none !important;        /* 讓滑鼠/手指點擊可以穿透遮罩 */
+    }
+
+    body.swal2-toast-shown .swal2-popup.swal2-toast {
+      pointer-events: auto !important;         /* 恢復 Toast 本身的點擊功能 */
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important; /* 增加陰影使其明顯 */
+    }
+
+    /* 防止手機 iOS 在點擊搜尋框時自動縮放畫面 */
+    .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+      font-size: 16px !important; 
+      padding: 10px !important;
+      border-radius: 8px !important;
+    }
   </style>
 </head>
 
@@ -173,6 +193,9 @@
       <div class="d-grid gap-2 mt-3">
         <button class="btn btn-outline-danger btn-lg" id="btnQuery">
           查詢紀錄
+        </button>
+        <button class="btn btn-outline-info btn-lg" id="btnRefresh">
+          <i class="fas fa-sync-alt me-2"></i>手動更新快取資料
         </button>
         <button class="btn btn-outline-secondary btn-lg" id="btnLogout">
           <i class="fas fa-sign-out-alt me-2"></i>更換使用者 / 登出
@@ -281,7 +304,6 @@
       }
 
       const today = new Date();
-      const dayOfMonth = today.getDate();
 
       const formatDate = (date) => {
         const year = date.getFullYear();
@@ -291,12 +313,10 @@
       };
       $("#queryDate").val(formatDate(today));
 
-      let minDate;
-      if (dayOfMonth <= 10) {
-        minDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      } else {
-        minDate = new Date(today.getFullYear(), today.getMonth(), 1);
-      }
+      // 設定可選擇日期為往前 7 天
+      const minDate = new Date();
+      minDate.setDate(today.getDate() - 7);
+
       $("#queryDate").attr("min", formatDate(minDate));
       $("#queryDate").attr("max", formatDate(today));
 
@@ -351,6 +371,29 @@
         showPageLoading('查詢中', '正在比對服務紀錄...');
         // 移除 disabled 邏輯，改由 loadingSpin 遮罩阻擋重複點擊，避免手機版按鈕卡死
         const success = await handleAction("query");
+      });
+
+      $("#btnRefresh").click(function () {
+        const loginData = JSON.parse(localStorage.getItem('Login'));
+        const cacheKey = getCacheKey(loginData.User);
+        sessionStorage.removeItem(cacheKey);
+        
+        if (typeof showPageLoading === 'function') {
+          showPageLoading('更新資料', '正在從伺服器同步最新資訊...');
+        }
+        
+        google.script.run
+          .withSuccessHandler(function (data) {
+            try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) { console.error("Cache write failed", e); }
+            initSuccess(data);
+            Swal.close();
+            showToast('success', '快取資料已更新');
+          })
+          .withFailureHandler(function (err) {
+            Swal.close();
+            Swal.fire("系統錯誤", "更新失敗：" + err.message, "error");
+          })
+          .getSRServer01InitData(loginData.User);
       });
 
       $("#btnLogout").click(function () {
@@ -416,9 +459,18 @@
 
           // 1. 執行關鍵字過濾
           const filtered = sourceArray.filter(item => {
-            const text = (item.text || item.name || item.id || String(item)).toLowerCase();
-            const id = (item.id || "").toLowerCase();
-            return text.includes(term) || id.includes(term);
+            // 如果是分隔線 (以物件形式存在且 disabled 為 true)，則不參與關鍵字過濾，固定顯示
+            if (item && typeof item === 'object' && item.disabled === true) return true;
+
+            // 取得所有可能包含關鍵字的欄位並轉為小寫
+            const id = (item.id || "").toString().toLowerCase();
+            const name = (item.name || "").toString().toLowerCase();
+            const text = (item.text || "").toString().toLowerCase();
+            const cont = (item.cont || "").toString().toLowerCase(); // 詳細內容欄位
+            const raw = (typeof item === 'string' ? item : "").toLowerCase();
+
+            // 只要其中一個欄位包含搜尋字串，就保留該選項
+            return id.includes(term) || name.includes(term) || text.includes(term) || cont.includes(term) || raw.includes(term);
           });
 
           // 2. 計算分頁範圍
@@ -429,7 +481,8 @@
             if (typeof item === 'string') return { id: item, text: item };
             return {
               id: item.id || item.name,
-              text: item.text || (item.id ? `${item.id} ${item.cont || ""}` : item.name)
+              text: item.text || (item.id ? `${item.id} ${item.cont || ""}` : item.name),
+              disabled: item.disabled || false
             };
           });
 
@@ -491,7 +544,10 @@
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: '請輸入名字搜尋居服員...',
-        allowClear: true
+        allowClear: true,
+        dropdownParent: $('#searchSection'), // 明確指定父層，增加定位穩定度
+        selectOnClose: false,
+        closeOnSelect: true
       }).on('select2:open', function() {
         // 確保展開時捲動到已選取項目
         setTimeout(() => {
@@ -597,6 +653,9 @@
           width: '100%',
           placeholder: '搜尋其他個案...',
           allowClear: true,
+          dropdownParent: $('#searchSection'),
+          selectOnClose: false,
+          closeOnSelect: true,
           ajax: { delay: 250, ...createLocalPaginator(otherCusts) }
         });
       }
@@ -606,7 +665,10 @@
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: '請輸入名字搜尋個案...',
-        allowClear: true
+        allowClear: true,
+        dropdownParent: $('#searchSection'),
+        selectOnClose: false,
+        closeOnSelect: true
       }).on('select2:open', function() {
         setTimeout(() => {
           const selectedItem = document.querySelector('.select2-results__option--selected');
@@ -637,7 +699,12 @@
       // 將常用編碼排在前面，其餘排後面，並依 ID 排序
       const favCodesSet = GLOBAL_DATA.ltcCodes.filter(c => favCodes.includes(c.id)).sort((a,b) => a.id.localeCompare(b.id));
       const otherCodes = GLOBAL_DATA.ltcCodes.filter(c => !favCodes.includes(c.id)).sort((a,b) => a.id.localeCompare(b.id));
-      const combinedCodes = [...favCodesSet, ...otherCodes];
+      
+      let combinedCodes = [...favCodesSet];
+      if (favCodesSet.length > 0 && otherCodes.length > 0) {
+        combinedCodes.push({ id: 'separator', text: '──────────', disabled: true });
+      }
+      combinedCodes = combinedCodes.concat(otherCodes);
 
       // 將 SR_ID 也轉換為 Select2 並啟用 Infinite Scroll
       $srSelect.select2({
@@ -645,6 +712,9 @@
         width: '100%',
         placeholder: '請選擇或搜尋服務編碼...',
         allowClear: true,
+        dropdownParent: $('#searchSection'),
+        selectOnClose: false,
+        closeOnSelect: true,
         ajax: { delay: 250, ...createLocalPaginator(combinedCodes) }
       });
     }
@@ -872,7 +942,9 @@
     }
 
     function fillQueryLabel(formObj) {
-      const labelText = `${formObj.date}| ${formObj.SRTimes} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${formObj.srId}`;
+     const codeObj = GLOBAL_DATA.ltcCodes.find(c => String(c.id) === String(formObj.srId));
+      const srIdText = codeObj ? `${formObj.srId} ${codeObj.cont || ""}` : formObj.srId;
+      const labelText = `${formObj.date}| ${formObj.SRTimes} | ${formObj.userName} | ${formObj.custName} | ${formObj.payType} | ${srIdText}`;
       $('#labQuery').text(labelText);
     }
 
@@ -905,8 +977,23 @@
           showToast('success', '已貼上');
         } else if (action === 'addAI') {
           const currentVal = $el.val();
-          $el.val(`${currentVal}\n修飾以上句子，符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，50個字以內，內容不包含長照編碼。`).trigger('input');
-          showToast('success', '已加入AI助手');
+          if (!currentVal) return showToast('info', '請先輸入內容再使用 AI');
+          
+          const prompt = `請將以下服務紀錄內容：「${currentVal}」，優化為符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，並限制在50個字以內。請直接輸出優化後的內容，不包含任何額外說明、開頭語句或結尾語句，且內容不包含長照編碼。`;
+          
+          showPageLoading('AI 處理中', '正在為您優化服務紀錄...');
+          
+          google.script.run
+            .withSuccessHandler(function(aiResult) {
+              $el.val(aiResult).trigger('input');
+              Swal.close();
+              showToast('success', 'AI 優化完成');
+            })
+            .withFailureHandler(function(err) {
+              Swal.close();
+              Swal.fire('AI 執行失敗', err.message, 'error');
+            })
+            .generateAIServiceRecord(prompt);
         }
       } catch (err) {
         console.error('剪貼簿操作失敗:', err);
