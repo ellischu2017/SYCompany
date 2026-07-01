@@ -10,7 +10,12 @@ Entrypoint: `Code.js` → `doGet()` renders HTML templates via `HtmlService.crea
 ```bash
 npm run push:gas    # clasp push
 npm run pull:gas    # clasp pull
-npm run deploy:gas  # clasp deploy — deploys as a new GAS version
+npm run deploy:gas  # clasp deploy → 自動加入版本號說明 (v{version})
+```
+
+**注意**：公司網路可能阻擋 `oauth2.googleapis.com`，所有 clasp 指令已透過 `clasp-fix.js` 繞過 SSL 驗證。若需手動執行 clasp，請先設：
+```bash
+$env:NODE_OPTIONS='-r E:\MyProg\GAS\SYCompany\Code\clasp-fix.js'
 ```
 
 There are **no** test, lint, build, or typecheck scripts.

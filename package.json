@@ -1,8 +1,8 @@
 {
   "scripts": {
-    "push:gas": "clasp push",
-    "pull:gas": "clasp pull",
-    "deploy:gas": "clasp deploy"
+    "push:gas": "node -r ./clasp-fix.js \"%USERPROFILE%\\AppData\\Roaming\\npm\\node_modules\\@google\\clasp\\build\\src\\index.js\" push",
+    "pull:gas": "node -r ./clasp-fix.js \"%USERPROFILE%\\AppData\\Roaming\\npm\\node_modules\\@google\\clasp\\build\\src\\index.js\" pull",
+    "deploy:gas": "powershell -File deploy.ps1"
   },
   "devDependencies": {
     "@types/google-apps-script": "^2.0.8",
