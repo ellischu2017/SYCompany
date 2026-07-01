@@ -272,12 +272,17 @@
    */
   function buildUrl(pageName, extraParams = "") {
     const separator = SCRIPT_URL.indexOf('?') !== -1 ? '&' : '?';
-    // 建議：將 Date.now() 改為固定版本號，或是在 script 載入時只生成一次
-    // 頻繁變動的 Date.now() 會導致瀏覽器完全無法快取 HTML 與相關資源
-    if(!window.APP_VERSION) window.APP_VERSION = '2.1.0'; 
+    
+    // 安全檢查：若 SCRIPT_URL 為空，嘗試從當前網址取得基礎路徑
+    let baseUrl = SCRIPT_URL;
+    if (!baseUrl || baseUrl === "null" || baseUrl === "") {
+      baseUrl = window.location.href.split('?')[0].split('#')[0];
+    }
+
+    if(!window.APP_VERSION) window.APP_VERSION = '2.2.0'; 
     const cacheBuster = "v=" + window.APP_VERSION;
     
-    let url = SCRIPT_URL + separator + "page=" + pageName + "&" + cacheBuster;
+    let url = baseUrl + separator + "page=" + pageName + "&" + cacheBuster;
     if (extraParams) {
       url += (extraParams.startsWith('&') ? '' : '&') + extraParams;
     }

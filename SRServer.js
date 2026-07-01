@@ -15,14 +15,10 @@ function getSRServerInitData() {
     const rawUsers = userSheet.getDataRange().getValues();
     if (rawUsers.length > 0) {
       const headers = rawUsers[0];
-      const userFields = ["User_N", "User_Email", "Email", "Cust_N"];
+      const userFields = ["User_N", "Cust_N"];
       const userColMap = getColIndicesMap(headers, userFields);
 
       const idxName = userColMap["User_N"];
-      const idxEmail =
-        userColMap["User_Email"] !== -1
-          ? userColMap["User_Email"]
-          : userColMap["Email"];
       const idxCust = userColMap["Cust_N"];
 
       if (idxName !== -1) {
@@ -31,7 +27,6 @@ function getSRServerInitData() {
           if (row[idxName]) {
             userData.push({
               name: row[idxName].toString(),
-              email: idxEmail !== -1 ? row[idxEmail].toString() : "",
               custStr: idxCust !== -1 ? row[idxCust].toString() : "",
             });
           }
@@ -107,13 +102,13 @@ function processUserSync01() {
     var ssTemp = getTargetsheet("SYTemp", "SYTemp").Spreadsheet;
     var tempUserSheet = ssTemp.getSheetByName("User");
     if (!tempUserSheet) {
-      console.log("SYTemp 中不存在 User 工作表，無法同步。");
+      logSystemActivity('INFO', 'processUserSync01', "SYTemp 中不存在 User 工作表，無法同步。");
       return;
     }
 
     var tempValues = tempUserSheet.getDataRange().getValues();
     if (tempValues.length <= 1) {
-      console.log("SYTemp 的 User 表無資料可同步。");
+      logSystemActivity('INFO', 'processUserSync01', "SYTemp 的 User 表無資料可同步。");
       return;
     }
 
@@ -166,9 +161,9 @@ function processUserSync01() {
           rowsToSync[0].length,
         )
         .setValues(rowsToSync);
-      console.log("同步成功，新增了 " + rowsToSync.length + " 筆資料。");
+      logSystemActivity('INFO', 'processUserSync01', "同步成功，新增了 " + rowsToSync.length + " 筆資料。");
     } else {
-      console.log("無新資料需要同步。");
+      logSystemActivity('INFO', 'processUserSync01', "無新資料需要同步。");
     }
 
     // 清空 SYTemp
@@ -176,7 +171,7 @@ function processUserSync01() {
       tempUserSheet.deleteRows(2, tempValues.length - 1);
     }
   } catch (e) {
-    console.log("processUserSync01 執行出錯: " + e.toString());
+    logSystemActivity('ERROR', 'processUserSync01', "processUserSync01 執行出錯: " + e.toString());
   }
 }
 
@@ -186,23 +181,7 @@ function processUserSync01() {
  * 2. > 7天 ：SY+yyyy > yyyyMM (工作表名稱)
  */
 function processSRData(formObj, actionType) {
-  // 根據日期預先產生快取 key，以便後續清除
-  let yearmonth = "";
-  if (formObj && formObj.date) {
-    const d = new Date(formObj.date);
-    yearmonth = Utilities.formatDate(d, "Asia/Taipei", "yyyyMM");
-  }
-
-  // 優化 1: 查詢請求先檢查快取，避免讀取試算表 (Cache First)
-  if (actionType === "query") {
-    let cacheKey = `SRDataQuery_${formObj.date}_${formObj.SRTimes}_${formObj.custName}_${formObj.userName}_${formObj.payType}_${formObj.srId}`;
-    let cache = CacheService.getScriptCache();
-    let cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      console.log(`processSRData query 從快取讀取, key: ${cacheKey}`);
-      return JSON.parse(cachedData);
-    }
-  }
+  // 移除快取邏輯，確保多試算表環境下資料的即時性
 
   try {
     // --- 1. 計算日期與判斷目標 ---
@@ -272,10 +251,6 @@ function processSRData(formObj, actionType) {
     if (actionType === "add") {
       targetSheet.appendRow(rowData);
       UpdateRawResponse(formObj);
-      // 清除對應月份的案主列表快取
-      if (yearmonth) {
-        CacheService.getScriptCache().remove("CustN_" + yearmonth);
-      }
       return {
         success: true,
         message: "資料已成功存入 " + targetSS.getName() + " > " + sheetName,
@@ -362,17 +337,15 @@ function processSRData(formObj, actionType) {
 
       // 比對其他關鍵欄位 (CUST_N 已由 TextFinder 篩選，但保留比對邏輯也無妨)
       if (
-        String(row[colMap["SRTimes"]]).trim() ===
-          formObj.SRTimes.toString().trim() &&
+        String(row[colMap["SRTimes"]]).trim() === formObj.SRTimes.toString().trim() &&
         // String(row[colMap["CUST_N"]]).trim() === formObj.custName.toString().trim() && // TextFinder 已精確匹配
-        String(row[colMap["USER_N"]]).trim() ===
-          formObj.userName.toString().trim() &&
+        String(row[colMap["USER_N"]]).replace(/[\s,]/g, "") === String(formObj.userName).replace(/[\s,]/g, "") &&
         String(row[colMap["Pay_Type"]]).trim() ===
           formObj.payType.toString().trim() &&
         String(row[colMap["SR_ID"]]).trim() === formObj.srId.toString().trim()
       ) {
         if (actionType === "query") {
-          let result = {
+          return {
             found: true,
             success: true,
             data: {
@@ -388,47 +361,22 @@ function processSRData(formObj, actionType) {
               spcons: row[colMap["SPCONS"]],
             },
           };
-
-          // 寫入快取 (需重新產生 cacheKey 或確保變數作用域可及，此處簡單重組 key)
-          try {
-            let cacheKey = `SRDataQuery_${formObj.date}_${formObj.SRTimes}_${formObj.custName}_${formObj.userName}_${formObj.payType}_${formObj.srId}`;
-            CacheService.getScriptCache().put(
-              cacheKey,
-              JSON.stringify(result),
-              300,
-            ); // 快取 5 分鐘
-          } catch (e) {
-            console.error("快取 SRDataQuery 失敗: " + e.toString());
-          }
-
-          return result;
         } else if (actionType === "update") {
-          // 使用欄位映射進行穩健更新
+          // 使用欄位映射進行穩健更新 (修正原先未定義的 i 變數 Bug)
           targetFields.forEach((field, idx) => {
             let colIdx = colMap[field];
             if (colIdx !== -1) {
-              targetSheet.getRange(i + 1, colIdx + 1).setValue(rowData[idx]);
+              targetSheet.getRange(rIdx, colIdx + 1).setValue(rowData[idx]);
             }
           });
 
           UpdateRawResponse(formObj);
-          // 清除對應月份的案主列表快取
-          if (yearmonth) {
-            CacheService.getScriptCache().remove("CustN_" + yearmonth);
-            // 同步清除報表資料來源快取
-            CacheService.getScriptCache().remove("DataMap_" + yearmonth);
-          }
           return {
             success: true,
             message: "資料已於 " + sheetName + " 更新完成。",
           };
         } else if (actionType === "delete") {
           targetSheet.deleteRow(rIdx);
-          // 清除對應月份的案主列表快取
-          // 清除對應月份的案主列表快取
-          if (yearmonth) {
-            CacheService.getScriptCache().remove("CustN_" + yearmonth);
-          }
           return {
             success: true,
             message: "資料已從 " + sheetName + " 刪除。",
@@ -446,7 +394,7 @@ function processSRData(formObj, actionType) {
           : "在此區間找不到符合條件的紀錄。",
     };
   } catch (e) {
-    console.error("processSRData 發生錯誤: " + e.toString());
+    logSystemActivity('ERROR', 'processSRData', "processSRData 發生錯誤: " + e.toString());
     return { success: false, message: "錯誤: " + e.toString() };
   }
 }

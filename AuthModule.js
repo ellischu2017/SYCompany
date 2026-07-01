@@ -28,7 +28,7 @@ function checkManagerPrivilege(email) {
       }
     }
   } catch (f) {
-    console.log("驗證過程出錯: " + f.toString());
+    logSystemActivity('ERROR', 'checkManagerPrivilege', "驗證過程出錯: " + f.toString());
   }
   return false;
 }
@@ -146,12 +146,12 @@ function changeUserPassword(username, newPass) {
         const isAdmin = checkManagerPrivilege(userEmail);
 
         if (!isSelf && !isAdmin) {
-          console.warn(`[Security] ${userEmail} 嘗試修改 ${username} 的密碼但權限不足！`);
+          logSystemActivity('WARN', 'changeUserPassword', `[Security] ${userEmail} 嘗試修改 ${username} 的密碼但權限不足！`);
           throw new Error("您沒有權限修改其他使用者的密碼。");
         }
 
         // 記錄：在修改密碼前加入日誌
-        console.log(`[Security] 使用者 ${userEmail} 正在修改 ${username} 的密碼。`);
+        logSystemActivity('INFO', 'changeUserPassword', `[Security] 使用者 ${userEmail} 正在修改 ${username} 的密碼。`);
 
         // 密碼安全：檢查新密碼強度 (長度至少 8 碼)
         if (!newPass || newPass.length < 8) {

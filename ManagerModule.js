@@ -17,7 +17,7 @@ function getAllManagerData() {
 
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const targetFields = ["Mana_N", "Mana_Email", "Mana_Tel"];
+  const targetFields = ["Mana_N", "Mana_Email", "Mana_Tel", "Pass", "Role"];
   const colMap = getColIndicesMap(headers, targetFields);
 
   if (colMap["Mana_N"] === -1) return [];
@@ -29,7 +29,9 @@ function getAllManagerData() {
       result.push({
         Mana_N: row[colMap["Mana_N"]].toString(),
         Mana_Email: colMap["Mana_Email"] !== -1 ? String(row[colMap["Mana_Email"]]) : "",
-        Mana_Tel: colMap["Mana_Tel"] !== -1 ? String(row[colMap["Mana_Tel"]]) : ""
+        Mana_Tel: colMap["Mana_Tel"] !== -1 ? String(row[colMap["Mana_Tel"]]) : "",
+        Pass: colMap["Pass"] !== -1 ? String(row[colMap["Pass"]]) : "",
+        Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "Admin"
       });
     }
   }
@@ -38,7 +40,7 @@ function getAllManagerData() {
   try {
     cache.put("ManagerData", JSON.stringify(result), 1800);
   } catch (e) {
-    console.log("快取 ManagerData 失敗: " + e.toString());
+    logSystemActivity('WARN', 'getAllManagerData', "快取 ManagerData 失敗: " + e.toString());
   }
   return result;
 }
@@ -73,7 +75,7 @@ function queryManaData(manaName) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const targetFields = ["Mana_N", "Mana_Email", "Mana_Tel"];
+  const targetFields = ["Mana_N", "Mana_Email", "Mana_Tel", "Pass", "Role"];
   const colMap = getColIndicesMap(headers, targetFields);
 
   if (colMap["Mana_N"] === -1) return { found: false };
@@ -86,6 +88,8 @@ function queryManaData(manaName) {
           Mana_N: data[i][colMap["Mana_N"]],
           Mana_Email: colMap["Mana_Email"] !== -1 ? data[i][colMap["Mana_Email"]] : "",
           Mana_Tel: colMap["Mana_Tel"] !== -1 ? data[i][colMap["Mana_Tel"]].toString() : "",
+          Pass: colMap["Pass"] !== -1 ? String(data[i][colMap["Pass"]]) : "",
+          Role: colMap["Role"] !== -1 ? String(data[i][colMap["Role"]]) : "Admin",
         },
       };
     }
@@ -99,10 +103,21 @@ function queryManaData(manaName) {
 function addManaData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  let headers = data[0];
+
+  // 自動確保 Pass 和 Role 欄位存在
+  if (getColIndex(headers, "Pass") === -1 || getColIndex(headers, "Role") === -1) {
+    const lastCol = sheet.getLastColumn();
+    if (getColIndex(headers, "Pass") === -1) sheet.getRange(1, lastCol + 1).setValue("Pass");
+    if (getColIndex(headers, "Role") === -1) sheet.getRange(1, sheet.getLastColumn() + 1).setValue("Role");
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
   const idxName = getColIndex(headers, "Mana_N");
   const idxEmail = getColIndex(headers, "Mana_Email");
   const idxTel = getColIndex(headers, "Mana_Tel");
+  const idxPass = getColIndex(headers, "Pass");
+  const idxRole = getColIndex(headers, "Role");
 
   if (idxName === -1) return { success: false, message: "錯誤：找不到 Mana_N 欄位" };
 
@@ -118,6 +133,8 @@ function addManaData(formObj) {
   newRow[idxName] = formObj.manaName;
   if (idxEmail !== -1) newRow[idxEmail] = formObj.manaEmail;
   if (idxTel !== -1) newRow[idxTel] = "'" + formObj.manaTel;
+  if (idxPass !== -1) newRow[idxPass] = "'" + (formObj.manaPass || "123");
+  if (idxRole !== -1) newRow[idxRole] = formObj.manaRole || "Admin";
 
   sheet.appendRow(newRow);
 
@@ -142,10 +159,21 @@ function addManaData(formObj) {
 function updateManaData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("Manager");
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  let headers = data[0];
+
+  // 自動確保 Pass 和 Role 欄位存在
+  if (getColIndex(headers, "Pass") === -1 || getColIndex(headers, "Role") === -1) {
+    const lastCol = sheet.getLastColumn();
+    if (getColIndex(headers, "Pass") === -1) sheet.getRange(1, lastCol + 1).setValue("Pass");
+    if (getColIndex(headers, "Role") === -1) sheet.getRange(1, sheet.getLastColumn() + 1).setValue("Role");
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
   const idxName = getColIndex(headers, "Mana_N");
   const idxEmail = getColIndex(headers, "Mana_Email");
   const idxTel = getColIndex(headers, "Mana_Tel");
+  const idxPass = getColIndex(headers, "Pass");
+  const idxRole = getColIndex(headers, "Role");
 
   if (idxName === -1) return { success: false, message: "錯誤：找不到 Mana_N 欄位" };
 
@@ -154,6 +182,8 @@ function updateManaData(formObj) {
       const rowNum = i + 1;
       if (idxEmail !== -1) sheet.getRange(rowNum, idxEmail + 1).setValue(formObj.manaEmail);
       if (idxTel !== -1) sheet.getRange(rowNum, idxTel + 1).setValue("'" + formObj.manaTel);
+      if (idxPass !== -1) sheet.getRange(rowNum, idxPass + 1).setNumberFormat("@").setValue(formObj.manaPass);
+      if (idxRole !== -1) sheet.getRange(rowNum, idxRole + 1).setValue(formObj.manaRole);
       // 清除快取
       CacheService.getScriptCache().remove("ManaList");
       CacheService.getScriptCache().remove("ManagerData");

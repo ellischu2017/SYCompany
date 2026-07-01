@@ -34,7 +34,7 @@ function addSuggestion(formData) {
       formData.suRec || ""
     ];
 
-    Logger.log("寫入資料: " + JSON.stringify(rowData));
+    logSystemActivity('INFO', 'addSuggestion', "寫入資料: " + JSON.stringify(rowData));
     
     // 新增資料列
     tempSheet.appendRow(rowData);
@@ -45,7 +45,7 @@ function addSuggestion(formData) {
 
     return { success: true, message: "資料已寫入", data: rowData };
   } catch (e) {
-    Logger.log("addSuggestion 錯誤: " + e.toString());
+    logSystemActivity('ERROR', 'addSuggestion', "addSuggestion 錯誤: " + e.toString());
     return { success: false, message: "錯誤: " + e.toString() };
   }
 }

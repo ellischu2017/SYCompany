@@ -137,9 +137,15 @@
     // 在 Auth.html 內也定義 buildUrl 以防 Footer 尚未載入
     function buildUrl(pageName, extraParams = "") {
       const separator = SCRIPT_URL.indexOf('?') !== -1 ? '&' : '?';
-      if(!window.APP_VERSION) window.APP_VERSION = '2.1.0';
+      // 安全檢查：若 SCRIPT_URL 為空，嘗試從當前網址取得基礎路徑，防止跳轉至 userCodeAppPanel
+      let baseUrl = SCRIPT_URL;
+      if (!baseUrl || baseUrl === "null" || baseUrl === "") {
+        baseUrl = window.location.href.split('?')[0].split('#')[0];
+        console.warn("SCRIPT_URL 為空，使用當前網址作為備援:", baseUrl);
+      }
+      if(!window.APP_VERSION) window.APP_VERSION = '2.2.0';
       const cacheBuster = "v=" + window.APP_VERSION;
-      let url = SCRIPT_URL + separator + "page=" + pageName + "&" + cacheBuster;
+      let url = baseUrl + separator + "page=" + pageName + "&" + cacheBuster;
       if (extraParams) {
         url += (extraParams.startsWith('&') ? '' : '&') + extraParams;
       }
@@ -147,13 +153,14 @@
     }
 
     // 內部 showLoading 封裝，確保 Auth 頁面在 Footer 載入前也能運作
-    function authLoading(title, text) {
+    function authLoading(title, text, icon = null) {
       if (typeof showPageLoading === 'function') {
         showPageLoading(title, text);
       } else {
         Swal.fire({
           title: title,
           text: text,
+          icon: icon,
           allowOutsideClick: false,
           didOpen: () => { Swal.showLoading(); }
         });
@@ -213,8 +220,9 @@
     });
 
     function checkLocalStorageLogin() {
-      authLoading('自動登入中', '正在確認您的憑證...');
+      // 移除開頭的 authLoading，因為 localStorage 讀取是瞬間的，避免畫面閃爍
       let loginData;
+      
       // 優先檢查 sessionStorage (本次瀏覽器會話)，再檢查 localStorage (長期記憶)
       try {
         loginData = JSON.parse(sessionStorage.getItem('Login'));
@@ -250,7 +258,7 @@
     }
 
     function showLoginPage() {
-      authLoading('載入登入畫面', '正在準備使用者清單...');
+      // 直接顯示登入區塊，載入動畫交給 loadAuthData 處理
       $('#loginSection').fadeIn();
       loadAuthData();
     }
@@ -260,9 +268,11 @@
       const cachedUsers = sessionStorage.getItem('AuthUser');
       if (cachedUsers) {
         populateUserDropdown(JSON.parse(cachedUsers));
-        Swal.close();
         return;
       }
+
+      // 只有當快取不存在，需要從伺服器抓取時才顯示載入中
+      authLoading('載入中', '正在獲取使用者名單...');
 
       // If not in session, fetch from server
       google.script.run
@@ -285,9 +295,27 @@
       $select.append('<option></option>');
 
       if (users && users.length > 0) {
-        users.forEach(function (user) {
-          $select.append(`<option value="${user.User}">${user.User}</option>`);
-        });
+        // 將使用者分類：管理員與一般居服員，並進行排序 (中文語系排序)
+        const admins = users.filter(u => String(u.Role).toLowerCase() === 'admin').sort((a, b) => a.User.localeCompare(b.User, 'zh-Hant'));
+        const caregivers = users.filter(u => String(u.Role).toLowerCase() !== 'admin').sort((a, b) => a.User.localeCompare(b.User, 'zh-Hant'));
+
+        // 1. 建立居服員分組 (使用 optgroup 提供標準區隔)
+        if (caregivers.length > 0) {
+          const $careGroup = $('<optgroup label="居服員名單"></optgroup>');
+          caregivers.forEach(function (user) {
+            $careGroup.append(`<option value="${user.User}">${user.User}</option>`);
+          });
+          $select.append($careGroup);
+        }
+
+        // 2. 建立管理員分組 (使用 optgroup 作為更美觀且穩定的區隔方式)
+        if (admins.length > 0) {
+          const $adminGroup = $('<optgroup label="管理員名單"></optgroup>');
+          admins.forEach(function (user) {
+            $adminGroup.append(`<option value="${user.User}">${user.User}</option>`);
+          });
+          $select.append($adminGroup);
+        }
 
         // 初始化 Select2 (搜尋功能)
         $select.select2({
@@ -332,27 +360,38 @@
     }
 
     function redirectToPage(role) {
-      authLoading('跳轉中', '正在導向您的工作區...');
+      authLoading('驗證成功', '正在為您導向工作頁面，請稍候...', 'success');
+      const r = String(role).toLowerCase();
       let page = '';
-      if (role === 'Admin') {
+      if (r === 'admin') {
         page = 'Index';
-      } else if (role === 'user') {
+      } else if (r === 'user') {
         page = 'SR_server01';
       }
 
       if (page) {
-        window.top.location.href = buildUrl(page);
+        const targetUrl = buildUrl(page);
+        // 使用 setTimeout 確保 Loading 動畫流暢顯示後再執行耗時的網址轉向
+        setTimeout(() => {
+          window.top.location.href = targetUrl;
+        }, 100);
       } else {
         Swal.close();
         Swal.fire('錯誤', '角色錯誤，無法導向頁面', 'error');
       }
     }
 
-    // 綁定 Enter 鍵觸發登入：當在密碼框按下 Enter 時，自動點擊登入按鈕
-    $('#inputPassword').on('keypress', function (e) {
-      if (e.which === 13) {
+    // 綁定 Enter 鍵觸發登入：當在密碼框按下 Enter 時，阻止預設行為並觸發登入按鈕
+    $('#inputPassword').on('keydown', function (e) {
+      if (e.which === 13 || e.key === 'Enter') {
+        e.preventDefault(); // 重要：阻止表單預設提交行為，防止跳轉至 userCodeAppPanel
         $('#btnLogin').click();
       }
+    });
+
+    // 全域防止表單透過任何方式觸發預設提交行為 (例如在其他欄位按 Enter)
+    $('#loginForm').on('submit', function (e) {
+      e.preventDefault();
     });
 
     $('#btnLogin').click(function () {
@@ -418,7 +457,7 @@
         icon: 'success',
         title: '登入成功',
         html: msgHtml,
-        timer: 2000,
+        timer: 1000, // 將等待時間從 2秒 縮短至 1秒
         showConfirmButton: false
       }).then(() => {
         // 根據「記住帳號」勾選狀態決定儲存位置

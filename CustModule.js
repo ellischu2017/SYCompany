@@ -51,9 +51,154 @@ function getFormattedDataFromSheet(sheetName) {
  * @returns {Object} { active: Array<Object>, archived: Array<Object> }
  */
 function getAllCustData() {
+  // 載入前先執行全量同步與資料清理
+  syncAllCustDataFromSource();
   const activeData = getFormattedDataFromSheet("Cust");
   const archivedData = getFormattedDataFromSheet("OldCust");
   return { active: activeData, archived: archivedData };
+}
+
+/**
+ * 從來源 (Case Reports) 同步個案資料，並執行去重、衝突處理與編碼合併
+ * 流程符合 1-8 步驟要求
+ */
+function syncAllCustDataFromSource() {
+  logSystemActivity('INFO', 'CustModule', '開始執行全量個案資料同步與清理...');
+  let sourceSS;
+  try {
+    const sourceObj = getTargetsheet("SYTemp", "Case_Reports");
+    if (!sourceObj || !sourceObj.Spreadsheet) throw new Error("在 SYTemp 中找不到 Case_Reports 的設定");
+    sourceSS = sourceObj.Spreadsheet;
+  } catch (e) {
+    logSystemActivity('ERROR', 'CustModule', '同步中止，無法取得來源試算表: ' + e.toString());
+    return;
+  }
+  
+  const activeSource = sourceSS.getSheetByName("個案清單");
+  const archiveSource = sourceSS.getSheetByName("結案個案清單");
+  const custSheet = MainSpreadsheet.getSheetByName("Cust");
+  const oldCustSheet = MainSpreadsheet.getSheetByName("OldCust");
+
+  const performSync = (srcSheet, tarSheet) => {
+    if (!srcSheet || !tarSheet) return null;
+    const srcData = srcSheet.getDataRange().getValues();
+    const tarData = tarSheet.getDataRange().getValues();
+    const srcHeaders = srcData[0];
+    const tarHeaders = tarData[0];
+    const srcRows = srcData.slice(1);
+    const tarRows = tarData.slice(1);
+
+    const srcIdx = { name: 0, sex: 1, bd: 2, add: 3, formurl: 4, ltc: 5 };
+    const tarColMap = getColIndicesMap(tarHeaders, ["Cust_N", "Cust_Sex", "Cust_BD", "Cust_Add", "Cust_LTC_Code", "Form_Url", "LTC_Code"]);
+    
+    if (tarColMap.Cust_N === -1) return null;
+
+    const tarNameMap = new Map();
+    tarRows.forEach((row, i) => {
+      const name = String(row[tarColMap.Cust_N] || "").trim();
+      if (name) tarNameMap.set(name, i);
+    });
+
+    srcRows.forEach(sRow => {
+      const sName = String(sRow[srcIdx.name] || "").trim();
+      if (!sName) return;
+      
+      const sBD = sRow[srcIdx.bd] instanceof Date 
+        ? Utilities.formatDate(sRow[srcIdx.bd], "GMT+8", "yyyy/M/d") 
+        : sRow[srcIdx.bd];
+
+      const newData = { sex: sRow[srcIdx.sex], bd: sBD, add: sRow[srcIdx.add], ltc: sRow[srcIdx.ltc], formurl: sRow[srcIdx.formurl] };
+
+      if (tarNameMap.has(sName)) {
+        const idx = tarNameMap.get(sName);
+        tarRows[idx][tarColMap.Cust_Sex] = newData.sex;
+        tarRows[idx][tarColMap.Cust_BD] = newData.bd;
+        tarRows[idx][tarColMap.Cust_Add] = newData.add;
+        tarRows[idx][tarColMap.Cust_LTC_Code] = newData.ltc;
+        tarRows[idx][tarColMap.Form_Url] = newData.formurl;
+      } else {
+        const newRow = new Array(tarHeaders.length).fill("");
+        newRow[tarColMap.Cust_N] = sName;
+        newRow[tarColMap.Cust_Sex] = newData.sex;
+        newRow[tarColMap.Cust_BD] = newData.bd;
+        newRow[tarColMap.Cust_Add] = newData.add;
+        newRow[tarColMap.Cust_LTC_Code] = newData.ltc;
+        newRow[tarColMap.Form_Url] = newData.formurl;
+        tarRows.push(newRow);
+      }
+    });
+    return { headers: tarHeaders, rows: tarRows, colMap: tarColMap };
+  };
+
+  let activeRes = performSync(activeSource, custSheet);
+  let archiveRes = performSync(archiveSource, oldCustSheet);
+  if (!activeRes || !archiveRes) return;
+
+  // 5. & 6. 清理重複：確保 Cust_N 唯一
+  const dedupe = (res) => {
+    const seen = new Set();
+    res.rows = res.rows.filter(row => {
+      const n = String(row[res.colMap.Cust_N] || "").trim();
+      if (!n || seen.has(n)) return false;
+      seen.add(n);
+      return true;
+    });
+  };
+  dedupe(activeRes); dedupe(archiveRes);
+
+  // 8. 處理 LTC_Code 合併：將 Cust_LTC_Code 的編碼增量存入 LTC_Code (先行處理以便後續拷貝)
+  const processCodes = (res) => {
+    res.rows.forEach(row => {
+      row[res.colMap.LTC_Code] = mergeLtcCodeStrings(
+        row[res.colMap.Cust_LTC_Code],
+        row[res.colMap.LTC_Code]
+      );
+    });
+  };
+  processCodes(activeRes); processCodes(archiveRes);
+
+  // 7. 交叉檢查與遷移：若發現 OldCust 中有相同個案，則從 Cust 拷貝資料到 OldCust，再刪除 Cust 中的資料
+  const activeMap = new Map();
+  activeRes.rows.forEach(r => {
+    const n = String(r[activeRes.colMap.Cust_N] || "").trim().toUpperCase();
+    if (n) activeMap.set(n, r);
+  });
+
+  const finalArchiveNames = new Set();
+  archiveRes.rows.forEach(arcRow => {
+    const n = String(arcRow[archiveRes.colMap.Cust_N] || "").trim().toUpperCase();
+    if (!n) return;
+    finalArchiveNames.add(n);
+
+    if (activeMap.has(n)) {
+      const actRow = activeMap.get(n);
+      // 執行「拷貝」動作：將執行中表的最新資料覆蓋至結案表
+      arcRow[archiveRes.colMap.Cust_Sex] = actRow[activeRes.colMap.Cust_Sex];
+      arcRow[archiveRes.colMap.Cust_BD] = actRow[activeRes.colMap.Cust_BD];
+      arcRow[archiveRes.colMap.Cust_Add] = actRow[activeRes.colMap.Cust_Add];
+      arcRow[archiveRes.colMap.Form_Url] = actRow[activeRes.colMap.Form_Url];
+      arcRow[archiveRes.colMap.LTC_Code] = mergeLtcCodeStrings(actRow[activeRes.colMap.LTC_Code], arcRow[archiveRes.colMap.LTC_Code]);
+    }
+  });
+
+  // 執行「刪除」動作：從 activeRes 中過濾掉所有已存在於 OldCust 的名單
+  activeRes.rows = activeRes.rows.filter(r => {
+    const n = String(r[activeRes.colMap.Cust_N] || "").trim().toUpperCase();
+    return !finalArchiveNames.has(n);
+  });
+
+  const finalize = (sheet, res) => {
+    sheet.clearContents();
+    const out = [res.headers, ...res.rows];
+    sheet.getRange(1, 1, out.length, res.headers.length).setValues(out);
+    sheet.getRange(2, 1, res.rows.length, res.headers.length).sort({ column: 1, ascending: true });
+  };
+  finalize(custSheet, activeRes); finalize(oldCustSheet, archiveRes);
+
+  CacheService.getScriptCache().remove("CustInfoMap");
+  CacheService.getScriptCache().remove("CustN_All");
+  CacheService.getScriptCache().remove("SRServer01_InitData");
+  logSystemActivity('INFO', 'CustModule', '全量個案同步與清理完成。');
 }
 
 /**

@@ -163,7 +163,10 @@
 
           <div class="mb-3">
             <label for="inputLtcCode" class="form-label">服務項目快取 (LTC_Code)</label>
-            <input type="text" class="form-control" id="inputLtcCode" disabled>
+            <div class="input-group">
+              <input type="text" class="form-control" id="inputLtcCode" disabled>
+              <button class="btn btn-outline-secondary" type="button" id="btnExtractLtc"><i class="fas fa-magic"></i> 提取</button>
+            </div>
           </div>
 
           <div class="mb-3">
@@ -275,6 +278,31 @@
             switchToDetailMode('add');
           }
         });
+      });
+
+      // 新增：提取按鈕事件
+      $('#btnExtractLtc').click(function() {
+        const rawStr = $('#inputcustLtcCode').val();
+        const currentLtc = $('#inputLtcCode').val();
+        
+        if (!rawStr.trim()) {
+          Swal.fire('提示', '服務項目 (Cust_LTC_Code) 為空，無需提取。', 'info');
+          return;
+        }
+
+        showPageLoading('正在提取', '正在清理並合併服務編碼...');
+
+        google.script.run
+          .withSuccessHandler(function(mergedResult) {
+            $('#inputLtcCode').val(mergedResult);
+            Swal.close();
+            showToast('success', '編碼提取並合併完成');
+          })
+          .withFailureHandler(function(err) {
+            Swal.close();
+            Swal.fire('提取失敗', err.message, 'error');
+          })
+          .mergeLtcCodeStrings(rawStr, currentLtc);
       });
 
       // 儲存/更新按鈕事件
@@ -731,6 +759,17 @@
       } else {
         populateDropdowns(); // 僅從快取重新整理下拉選單
       }
+    }
+
+    function showToast(icon, title) {
+      Swal.fire({
+        icon: icon,
+        title: title,
+        timer: 1500,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
     }
 
   </script>

@@ -62,7 +62,7 @@ function getCustN(yearmonth) {
   try {
     cache.put(cacheKey, JSON.stringify(custNames), 1200);
   } catch (e) {
-    Logger.log("快取失敗 (資料過大): " + e.toString());
+    logSystemActivity('WARN', 'getCustN', "快取失敗 (資料過大): " + e.toString());
   }
   return custNames;
 }
@@ -313,7 +313,7 @@ async function genPdfFile(yearmonth, custn, regen) {
     allSheetNames.push(allSheets[i].getName());
   }
   allSheetNames.splice(allSheetNames.indexOf("Template"), 1);
-  //Logger.log("所有個案工作表名稱: " + allSheetNames.join(", ") + "，總數: " + allSheetNames.length + "個");
+
   if (custn !== "all") {
     // 取得該個案的Pdf Url 
     var pdfUrl = getTarget("PdfUrl", "PD" + yearmonth + "_" + custn);
@@ -515,7 +515,7 @@ async function processSinglePdf(yearmonth, custn, regen) {
     });
 
     if (response.getResponseCode() === 429) {
-      Logger.log("PDF Export encountered 429 Too Many Requests. Retrying... Attempt " + (attempt + 1));
+      logSystemActivity('WARN', 'processSinglePdf', "PDF Export encountered 429 Too Many Requests. Retrying... Attempt " + (attempt + 1));
       Utilities.sleep(5000 * Math.pow(2, attempt)); // 指數退避: 5s, 10s, 20s, 40s, 80s
       attempt++;
     } else if (response.getResponseCode() !== 200) {
@@ -585,16 +585,16 @@ async function processSinglePdf(yearmonth, custn, regen) {
  */
 async function ensureEvenPages(pdfDoc) {
   const pageCount = pdfDoc.getPageCount();
-  Logger.log("原始頁數: " + pageCount);
+  logSystemActivity('INFO', 'ensureEvenPages', "原始頁數: " + pageCount);
 
   if (pageCount % 2 !== 0) {
-    Logger.log("偵測到奇數頁，正在加入空白頁以符合雙面列印需求...");
+    logSystemActivity('INFO', 'ensureEvenPages', "偵測到奇數頁，正在加入空白頁以符合雙面列印需求...");
     const pages = pdfDoc.getPages();
     const lastPage = pages[pages.length - 1];
     const { width, height } = lastPage.getSize();
     pdfDoc.addPage([width, height]);
   } else {
-    Logger.log("頁數已是偶數，無需補頁。");
+    logSystemActivity('INFO', 'ensureEvenPages', "頁數已是偶數，無需補頁。");
   }
   return pdfDoc;
 }
@@ -663,7 +663,7 @@ function getAllDataMapFromSources(yearmonth) {
   try {
     cache.put(cacheKey, JSON.stringify(dataMap), 1800); // 1800 秒 = 30 分鐘
   } catch (e) {
-    Logger.log("快取失敗 (資料過大): " + e.toString());
+    logSystemActivity('WARN', 'getAllDataMapFromSources', "快取失敗 (資料過大): " + e.toString());
     // 資料過大時直接返回，不快取
   }
   return dataMap;
@@ -698,7 +698,7 @@ function getCustInfoMap() {
 
     // 確保關鍵欄位存在
     if (colMap["Cust_N"] === -1) {
-      console.warn(`[getCustInfoMap] 工作表 ${sheetName} 缺少 'Cust_N' 欄位，略過處理。`);
+      logSystemActivity('WARN', 'getCustInfoMap', `工作表 ${sheetName} 缺少 'Cust_N' 欄位，略過處理。`);
       return;
     }
 
@@ -723,7 +723,7 @@ function getCustInfoMap() {
   try {
     cache.put(cacheKey, JSON.stringify(result), 21600);
   } catch (e) {
-    Logger.log("快取失敗 (資料過大): " + e.toString());
+    logSystemActivity('WARN', 'getCustInfoMap', "快取失敗 (資料過大): " + e.toString());
   }
   return result;
 }

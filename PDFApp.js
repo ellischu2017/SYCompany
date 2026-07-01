@@ -473,11 +473,11 @@ class PDFApp {
       try {
         const pdfData = await self.getPDFObjectFromBlob_(pdfBlob).catch(err => reject(err));
         const pageLength = pdfData.getPageCount();
-        console.log(`Total pages: ${pageLength}`);
+        logSystemActivity('INFO', 'convertPDFToPng', `Total pages: ${pageLength}`);
         const obj = { imageBlobs: [], fileIds: [] };
         const token = ScriptApp.getOAuthToken();
         for (let i = 0; i < pageLength; i++) {
-          console.log(`Processing page: ${i + 1}`);
+          logSystemActivity('INFO', 'convertPDFToPng', `Processing page: ${i + 1}`);
           const pdfDoc = await self.PDFLib.PDFDocument.create();
           const [page] = await pdfDoc.copyPages(pdfData, [i]);
           pdfDoc.addPage(page);
@@ -789,10 +789,10 @@ class PDFApp {
       try {
         const pdfData = await self.getPDFObjectFromBlob_(pdfBlob).catch(err => reject(err));
         const pageLength = pdfData.getPageCount();
-        console.log(`Total pages: ${pageLength}`);
+        logSystemActivity('INFO', 'splitPDF', `Total pages: ${pageLength}`);
         const pdfBlobs = [];
         for (let i = 0; i < pageLength; i++) {
-          console.log(`Processing page: ${i + 1}`);
+          logSystemActivity('INFO', 'splitPDF', `Processing page: ${i + 1}`);
           const pdfDoc = await self.PDFLib.PDFDocument.create();
           const [page] = await pdfDoc.copyPages(pdfData, [i]);
           pdfDoc.addPage(page);

@@ -17,7 +17,7 @@ function getAllUserData() {
 
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const targetFields = ["User_N", "User_Email", "User_Tel"];
+  const targetFields = ["User_N", "User_Email", "User_Tel", "Pass", "Role"];
   const colMap = getColIndicesMap(headers, targetFields);
 
   if (colMap["User_N"] === -1) return [];
@@ -30,7 +30,9 @@ function getAllUserData() {
       result.push({
         User_N: name.toString(),
         User_Email: colMap["User_Email"] !== -1 ? String(row[colMap["User_Email"]]) : "",
-        User_Tel: colMap["User_Tel"] !== -1 ? String(row[colMap["User_Tel"]]) : ""
+        User_Tel: colMap["User_Tel"] !== -1 ? String(row[colMap["User_Tel"]]) : "",
+        Pass: colMap["Pass"] !== -1 ? String(row[colMap["Pass"]]) : "",
+        Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "User"
       });
     }
   }
@@ -39,7 +41,7 @@ function getAllUserData() {
   try {
     cache.put("UserData", JSON.stringify(result), 1800);
   } catch (e) {
-    console.log("快取 UserData 失敗: " + e.toString());
+    logSystemActivity('WARN', 'getAllUserData', "快取 UserData 失敗: " + e.toString());
   }
   return result;
 }
@@ -51,7 +53,7 @@ function queryUserData(userName) {
   const sheet = MainSpreadsheet.getSheetByName("User");
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const targetFields = ["User_N", "User_Email", "User_Tel"];
+  const targetFields = ["User_N", "User_Email", "User_Tel", "Pass", "Role"];
   const colMap = getColIndicesMap(headers, targetFields);
   
   if (colMap["User_N"] === -1) return { found: false };
@@ -65,6 +67,8 @@ function queryUserData(userName) {
           User_N: row[colMap["User_N"]],
           User_Email: colMap["User_Email"] !== -1 ? row[colMap["User_Email"]] : "",
           User_Tel: colMap["User_Tel"] !== -1 ? String(row[colMap["User_Tel"]]) : "",
+          Pass: colMap["Pass"] !== -1 ? String(row[colMap["Pass"]]) : "",
+          Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "User",
         },
       };
     }
@@ -79,11 +83,21 @@ function addUserData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("User");
   // 改用動態讀取標題與資料，避免依賴 getUserList 的硬編碼順序
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  let headers = data[0];
+  
+  // 自動確保 Pass 和 Role 欄位存在
+  if (getColIndex(headers, "Pass") === -1 || getColIndex(headers, "Role") === -1) {
+    const lastCol = sheet.getLastColumn();
+    if (getColIndex(headers, "Pass") === -1) sheet.getRange(1, lastCol + 1).setValue("Pass");
+    if (getColIndex(headers, "Role") === -1) sheet.getRange(1, sheet.getLastColumn() + 1).setValue("Role");
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
   
   const idxName = getColIndex(headers, "User_N");
   const idxEmail = getColIndex(headers, "User_Email");
   const idxTel = getColIndex(headers, "User_Tel");
+  const idxPass = getColIndex(headers, "Pass");
+  const idxRole = getColIndex(headers, "Role");
 
   if (idxName === -1) return { success: false, message: "錯誤：找不到 User_N 欄位" };
 
@@ -99,6 +113,8 @@ function addUserData(formObj) {
   newRow[idxName] = formObj.userName;
   if (idxEmail !== -1) newRow[idxEmail] = formObj.userEmail;
   if (idxTel !== -1) newRow[idxTel] = "'" + formObj.userTel;
+  if (idxPass !== -1) newRow[idxPass] = "'" + (formObj.userPass || "123");
+  if (idxRole !== -1) newRow[idxRole] = formObj.userRole || "User";
 
   sheet.appendRow(newRow);
   
@@ -122,10 +138,21 @@ function addUserData(formObj) {
 function updateUserData(formObj) {
   const sheet = MainSpreadsheet.getSheetByName("User");
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  let headers = data[0];
+
+  // 自動確保 Pass 和 Role 欄位存在
+  if (getColIndex(headers, "Pass") === -1 || getColIndex(headers, "Role") === -1) {
+    const lastCol = sheet.getLastColumn();
+    if (getColIndex(headers, "Pass") === -1) sheet.getRange(1, lastCol + 1).setValue("Pass");
+    if (getColIndex(headers, "Role") === -1) sheet.getRange(1, sheet.getLastColumn() + 1).setValue("Role");
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
   const idxName = getColIndex(headers, "User_N");
   const idxEmail = getColIndex(headers, "User_Email");
   const idxTel = getColIndex(headers, "User_Tel");
+  const idxPass = getColIndex(headers, "Pass");
+  const idxRole = getColIndex(headers, "Role");
 
   if (idxName === -1) return { success: false, message: "錯誤：找不到 User_N 欄位" };
 
@@ -134,6 +161,8 @@ function updateUserData(formObj) {
       const rowNum = i + 1;
       if (idxEmail !== -1) sheet.getRange(rowNum, idxEmail + 1).setValue(formObj.userEmail);
       if (idxTel !== -1) sheet.getRange(rowNum, idxTel + 1).setValue("'" + formObj.userTel);
+      if (idxPass !== -1) sheet.getRange(rowNum, idxPass + 1).setNumberFormat("@").setValue(formObj.userPass);
+      if (idxRole !== -1) sheet.getRange(rowNum, idxRole + 1).setValue(formObj.userRole);
       CacheService.getScriptCache().remove("SRServer01_InitData");
       CacheService.getScriptCache().remove("UserData");
       return { success: true, message: "資料更新成功！" };

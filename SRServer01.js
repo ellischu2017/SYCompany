@@ -15,21 +15,19 @@ function getSRServer01InitData(userName) {
       var rawUsers = userSheet.getDataRange().getValues();
       if (rawUsers.length > 0) {
         var headers = rawUsers[0];
-        const userFields = ["User_N", "User_Email", "Email", "Cust_N"];
+        const userFields = ["User_N", "Cust_N"];
         const colMap = getColIndicesMap(headers, userFields);
 
         var idxName = colMap["User_N"];
-        var idxEmail = colMap["User_Email"] !== -1 ? colMap["User_Email"] : colMap["Email"];
         var idxCust = colMap["Cust_N"];
 
         if (idxName !== -1) {
           for (var i = 1; i < rawUsers.length; i++) {
             var row = rawUsers[i];
-            var name = String(row[idxName]).trim();
+            var name = String(row[idxName]).replace(/[\s,]/g, "");
             if (name) {
               userMap.set(name, {
                 name: name,
-                email: idxEmail !== -1 ? String(row[idxEmail]).trim() : "",
                 favCustStr: idxCust !== -1 ? String(row[idxCust]) : ""
               });
             }
@@ -48,38 +46,29 @@ function getSRServer01InitData(userName) {
         var tempUsers = tempUserSheet.getDataRange().getValues();
         if (tempUsers.length > 0) {
           var tHeaders = tempUsers[0];
-          const tFields = ["User_N", "User_Email", "Email"];
+          const tFields = ["User_N"];
           const tColMap = getColIndicesMap(tHeaders, tFields);
 
           var tNameIdx = tColMap["User_N"];
-          var tEmailIdx = tColMap["User_Email"] !== -1 ? tColMap["User_Email"] : tColMap["Email"];
 
-          if (tNameIdx !== -1 && tEmailIdx !== -1) {
+          if (tNameIdx !== -1) {
             for (var j = 1; j < tempUsers.length; j++) {
               var tRow = tempUsers[j];
-              var tName = String(tRow[tNameIdx]).trim();
-              var tEmail = String(tRow[tEmailIdx]).trim();
+              var tName = String(tRow[tNameIdx]).replace(/[\s,]/g, "");
 
-              if (tName) {
-                if (userMap.has(tName)) {
-                  // 若主名單已有，則更新 Email (以 Temp 為準)
-                  var uObj = userMap.get(tName);
-                  if (tEmail) uObj.email = tEmail;
-                } else {
-                  // 若主名單沒有，則新增 (視需求，通常只會更新既有員工的綁定)
+              if (tName && !userMap.has(tName)) {
+                  // 若主名單沒有，則新增
                   userMap.set(tName, {
                     name: tName,
-                    email: tEmail,
                     favCustStr: "" // Temp 表可能沒有個案關聯資料
                   });
-                }
               }
             }
           }
         }
       }
     } catch (e) {
-      console.log("讀取 SYTemp > User 失敗: " + e.toString());
+      logSystemActivity('ERROR', 'getSRServer01InitData', "讀取 SYTemp > User 失敗: " + e.toString());
     }
 
     // 轉回陣列
@@ -171,7 +160,7 @@ function getSRDataByUser(userName) {
     var filteredData = [headers];
     for (var i = 1; i < allValues.length; i++) {
       var row = allValues[i];
-      if (String(row[userNIdx]).trim() === String(userName).trim()) {
+      if (String(row[userNIdx]).replace(/[\s,]/g, "") === String(userName).replace(/[\s,]/g, "")) {
         // 格式化日期為字串，確保 JSON 傳輸穩定
         if (dateColIdx > -1 && row[dateColIdx] instanceof Date) {
           row[dateColIdx] = Utilities.formatDate(row[dateColIdx], Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -182,7 +171,7 @@ function getSRDataByUser(userName) {
     
     return filteredData;
   } catch (e) {
-    console.error("getSRDataByUser 發生錯誤: " + e.toString());
+    logSystemActivity('ERROR', 'getSRDataByUser', "getSRDataByUser 發生錯誤: " + e.toString());
     return [];
   }
 }
@@ -192,13 +181,6 @@ function getSRDataByUser(userName) {
  * 修改點：若為新綁定 (isNewBinding)，寫入 SYTemp > User
  */
 function processSR01Data(formObj, actionType) {
-  // 根據日期預先產生快取 key，以便後續清除
-  let yearmonth = "";
-  if (formObj && formObj.date) {
-    const d = new Date(formObj.date);
-    yearmonth = Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyyMM");
-  }
-
   const maxRetries = 3;
   for (var attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -231,7 +213,7 @@ function processSR01Data(formObj, actionType) {
         // 檢查是否已存在於 SYTemp，若有則更新
         for (var k = 1; k < tData.length; k++) {
           if (String(tData[k][tNameIdx]) === formObj.userName) {
-            tempUserSheet.getRange(k + 1, tEmailIdx + 1).setValue(formObj.email);
+            tempUserSheet.getRange(k + 1, tEmailIdx + 1).setValue(String(formObj.email).replace(/[\s,]/g, ""));
             tempUserSheet.getRange(k + 1, tTelIdx + 1).setValue(formObj.userTel);
             foundInTemp = true;
             break;
@@ -241,7 +223,7 @@ function processSR01Data(formObj, actionType) {
         // 若 SYTemp 中沒有此人，則新增
         if (!foundInTemp) {
           var newRow = [];
-          newRow[tNameIdx] = formObj.userName;
+          newRow[tNameIdx] = String(formObj.userName).replace(/[\s,]/g, "");
           newRow[tEmailIdx] = formObj.email;
           newRow[tTelIdx] = formObj.userTel;
           tempUserSheet.appendRow(newRow);
@@ -261,7 +243,7 @@ function processSR01Data(formObj, actionType) {
         formObj.date,
         formObj.SRTimes || "1",
         formObj.custName,
-        formObj.userName,
+        String(formObj.userName).replace(/[\s,]/g, ""),
         formObj.payType || "補助",
         formObj.srId,
         formObj.srRec || "",
@@ -273,12 +255,6 @@ function processSR01Data(formObj, actionType) {
       if (actionType === "add") {
         targetSheet.appendRow(rowData);
         UpdateRawResponse(formObj);
-        // 清除對應月份的案主列表快取
-        if (yearmonth) {
-          CacheService.getScriptCache().remove("CustN_" + yearmonth);
-          // 同步清除報表資料來源快取，確保月報表能抓到最新資料
-          CacheService.getScriptCache().remove("DataMap_" + yearmonth);
-        }
         return { success: true, message: "新增紀錄成功" };
       }
 
@@ -299,9 +275,9 @@ function processSR01Data(formObj, actionType) {
 
         if (
           sheetDate === formObj.date &&
-          String(row[colMap["SRTimes"]]).trim() === formObj.SRTimes.trim() &&
+          String(row[colMap["SRTimes"]]).trim() === String(formObj.SRTimes || "1").trim() &&
           String(row[colMap["CUST_N"]]).trim() === formObj.custName.trim() &&
-          String(row[colMap["USER_N"]]).trim() === formObj.userName.trim() &&
+          String(row[colMap["USER_N"]]).replace(/[\s,]/g, "") === String(formObj.userName).replace(/[\s,]/g, "") &&
           String(row[colMap["Pay_Type"]]).trim() === formObj.payType.trim() &&
           String(row[colMap["SR_ID"]]).trim() === formObj.srId.trim()
         ) {
@@ -331,21 +307,9 @@ function processSR01Data(formObj, actionType) {
             });
 
             UpdateRawResponse(formObj);
-            // 清除對應月份的案主列表快取
-            if (yearmonth) {
-              CacheService.getScriptCache().remove("CustN_" + yearmonth);
-              // 同步清除報表資料來源快取
-              CacheService.getScriptCache().remove("DataMap_" + yearmonth);
-            }
             return { success: true, message: "資料已更新" };
           } else if (actionType === "delete") {
             targetSheet.deleteRow(i + 1);
-            // 清除對應月份的案主列表快取
-            if (yearmonth) {
-              CacheService.getScriptCache().remove("CustN_" + yearmonth);
-              // 同步清除報表資料來源快取
-              CacheService.getScriptCache().remove("DataMap_" + yearmonth);
-            }
             return { success: true, message: "資料已刪除" };
           }
         }
@@ -357,7 +321,7 @@ function processSR01Data(formObj, actionType) {
         return { success: false, message: "操作失敗，找不到該筆資料" };
       }
     } catch (e) {
-      console.warn(`processSR01Data 執行失敗 (第 ${attempt} 次重試): ${e.toString()}`);
+      logSystemActivity('WARN', 'SRServer01', `processSR01Data 執行失敗 (第 ${attempt} 次重試): ${e.toString()}`);
       if (attempt === maxRetries) {
         return { success: false, message: "錯誤 (已重試 " + maxRetries + " 次)：" + e.toString() };
       }
@@ -396,7 +360,7 @@ function getSPCONS(formObj) {
       }
     }
   } catch (e) {
-    console.log("取得特殊狀況失敗: " + e.toString());
+    logSystemActivity('WARN', 'getSPCONS', "取得特殊狀況失敗: " + e.toString());
   }
   return { data: { loc: "清醒", mood: "穩定", spcons: "無" } };
 }

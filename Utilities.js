@@ -22,7 +22,7 @@
 // ├── SYCompany.gxlsx : 這個腳本綁定的試算表，包含 SYTemp、User、Cust 等工作表
 // ├── SYTemp : 存放臨時資料的工作表，包含 SYSuggest 等設定
 //  * 此檔案匯入所有模組化的 .gs 檔案
-/* 
+/*
  * 模組結構：
  * - Utilities.gs: 共用工具函式
  * - Auth.gs: 認證和權限檢查
@@ -33,14 +33,13 @@
  * - RecUrl.gs: 網址管理
  * - SRServer.gs: 服務紀錄管理
  * - Maintenance.gs: 維護和同步任務
-*/
+ */
 
 // 全域試算表參考 SYCompany
 const MainSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
 // 全域執行時間限制 (分鐘)，比 Apps Script 的 6 分鐘限制少一點以策安全
 const EXECUTION_TIMEOUT_MINUTES = 5;
-
 
 /**
  * 從試算表動態取得意見反應連結並生成 Footer HTML
@@ -77,7 +76,11 @@ function includeFooter() {
         }
       }
     } catch (e) {
-      console.log("取得意見反應網址失敗: " + e.message);
+      logSystemActivity(
+        "ERROR",
+        "includeFooter",
+        "取得意見反應網址失敗: " + e.message,
+      );
     }
   }
 
@@ -140,8 +143,8 @@ function createReportFolder(targetName) {
 }
 
 /**
-* 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物
- * @param {*} sheetName SYCompany 中的工作表名稱 
+ * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物
+ * @param {*} sheetName SYCompany 中的工作表名稱
  * @param {*} targetName 試算表名稱（如 RecUrl 中的 SY202401）
  * @returns {Object} 包含 url、id、Spreadsheet 物件的物件
  * @throws {Error} 如果找不到對應的工作表或試算表，會丟出錯誤
@@ -157,7 +160,7 @@ function getTargetDir(sheetName, targetName) {
   var folderId = getIdFromUrl(res);
 
   // 2. 檢查解析出來的 ID 是否有效
-  if (!folderId || typeof folderId !== 'string') {
+  if (!folderId || typeof folderId !== "string") {
     throw new Error("無法從 URL 解析出有效的 ID: " + res);
   }
 
@@ -169,10 +172,13 @@ function getTargetDir(sheetName, targetName) {
       url: res,
       id: folderId,
       folder: folder,
-      folderName: folder.getName() // 順便測試是否真的抓到了
+      folderName: folder.getName(), // 順便測試是否真的抓到了
     };
   } catch (e) {
-    throw new Error("DriveApp 找不到該 ID 的資料夾，請檢查權限或 ID 是否正確。錯誤訊息: " + e.message);
+    throw new Error(
+      "DriveApp 找不到該 ID 的資料夾，請檢查權限或 ID 是否正確。錯誤訊息: " +
+        e.message,
+    );
   }
 }
 
@@ -184,9 +190,16 @@ function getTargetDir(sheetName, targetName) {
  * @param {Folder} destinationFolder 目標資料夾物件
  * @returns {string} 新建立檔案的 URL
  */
-function createSheetFromTemplate(registrySheetName, newFileName, templateName, destinationFolder) {
+function createSheetFromTemplate(
+  registrySheetName,
+  newFileName,
+  templateName,
+  destinationFolder,
+) {
   // 1. 取得模板檔案
-  const templateFile = DriveApp.getFileById(getTargetsheet(registrySheetName, templateName).id);
+  const templateFile = DriveApp.getFileById(
+    getTargetsheet(registrySheetName, templateName).id,
+  );
 
   // 2. 複製模板
   const newFile = templateFile.makeCopy(newFileName, destinationFolder);
@@ -205,32 +218,43 @@ function getTargetsheet(sheetName, targetName) {
   if (!res) {
     if (sheetName === "ReportsUrl") {
       const destinationFolder = getTargetDir("FolderUrl", targetName).folder;
-      res = createSheetFromTemplate(sheetName, targetName, "RPSample", destinationFolder);
+      res = createSheetFromTemplate(
+        sheetName,
+        targetName,
+        "RPSample",
+        destinationFolder,
+      );
     } else if (sheetName === "RecUrl") {
       const destinationFolder = getTargetDir("FolderUrl", "LTCRecord").folder;
-      res = createSheetFromTemplate(sheetName, targetName, "SYSample", destinationFolder);
+      res = createSheetFromTemplate(
+        sheetName,
+        targetName,
+        "SYSample",
+        destinationFolder,
+      );
     }
   }
 
   if (!res) {
-    console.log(
+    logSystemActivity(
+      "WARN",
+      "getTargetsheet",
       "無法在" + sheetName + "工作表中找到名稱為" + targetName + "的對應網址",
     );
     return;
   }
 
   var fileId = getIdFromUrl(res);
-  if (!fileId || typeof fileId !== 'string') {
+  if (!fileId || typeof fileId !== "string") {
     throw new Error("無法從 URL 解析出有效的 ID: " + res);
   }
   var spreadsheet = SpreadsheetApp.openById(fileId);
   return {
     url: res,
     id: fileId,
-    Spreadsheet: spreadsheet
+    Spreadsheet: spreadsheet,
   };
 }
-
 
 /**
  * 輔助函式：從 SYCompany (本腳本綁定之試算表) 的 sheetName 工作表取得外部試算表物件
@@ -270,7 +294,7 @@ function getTarget(sheetName, targetName) {
 function setTargetUrl(sheetName, targetName, url) {
   var sheet = MainSpreadsheet.getSheetByName(sheetName);
   if (!sheet) throw new Error("找不到 SYCompany 中的" + sheetName + "工作表");
-  var data = sheet.getDataRange().getValues();// 讀取整個資料範圍，包含標題列
+  var data = sheet.getDataRange().getValues(); // 讀取整個資料範圍，包含標題列
   var headers = data[0];
 
   // 動態偵測欄位
@@ -302,19 +326,24 @@ function setTargetUrl(sheetName, targetName, url) {
   // 寫回整個資料範圍，包含標題列
   sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   // 以 Key 欄排序
-  sheet.getRange(2, 1, data.length - 1, data[0].length).sort({ column: idxKey + 1, ascending: true });
+  sheet
+    .getRange(2, 1, data.length - 1, data[0].length)
+    .sort({ column: idxKey + 1, ascending: true });
 }
-
 
 /**
  * 清除 SR_Data 工作表中的重複資料，根據 Date、SRTimes、CUST_N、USER_N、SR_ID 這幾個欄位的組合來判斷是否重複
- * @param {*} sheet 
- * @returns 
+ * @param {*} sheet
+ * @returns
  */
 function removeSRDuplicates(sheet) {
   // const ss = SpreadsheetApp.getActiveSpreadsheet();
   // const sheet = ss.getSheetByName("SR_Data");
-  console.log("開始處理 SR_Data 重複資料...");
+  logSystemActivity(
+    "INFO",
+    "removeSRDuplicates",
+    "開始處理 SR_Data 重複資料...",
+  );
   const data = sheet.getDataRange().getValues();
 
   if (data.length < 2) return; // 如果沒資料就結束
@@ -331,7 +360,11 @@ function removeSRDuplicates(sheet) {
   // 檢查是否所有欄位都存在
   if (indices.includes(-1)) {
     const missing = targetFields.filter((_, i) => indices[i] === -1);
-    console.error("removeSRDuplicates 錯誤: 找不到欄位 " + missing.join(", "));
+    logSystemActivity(
+      "ERROR",
+      "removeSRDuplicates",
+      "removeSRDuplicates 錯誤: 找不到欄位 " + missing.join(", "),
+    );
     return;
   }
 
@@ -353,17 +386,23 @@ function removeSRDuplicates(sheet) {
   const output = [headers].concat(uniqueRows);
   sheet.getRange(1, 1, output.length, headers.length).setValues(output);
 
-  console.log("處理完成！剩餘筆數：" + uniqueRows.length);
+  logSystemActivity(
+    "INFO",
+    "removeSRDuplicates",
+    "處理完成！剩餘筆數：" + uniqueRows.length,
+  );
 }
 
 // 在 Utilities.js 加入
 var startTime = new Date().getTime();
- 
-/** 
+
+/**
  * 檢查執行時間是否接近超時限制
  */
 function isNearTimeout() {
-  return new Date().getTime() - startTime > EXECUTION_TIMEOUT_MINUTES * 60 * 1000;
+  return (
+    new Date().getTime() - startTime > EXECUTION_TIMEOUT_MINUTES * 60 * 1000
+  );
 }
 
 /** 儲存/讀取進度 (PropertiesService 會存在雲端專案屬性中)
@@ -378,7 +417,7 @@ function saveProgress(propname, data) {
 
 /**
  * 讀取進度
- * @ returns {Object|null} 進度物件，如果沒有則回傳 null * 
+ * @ returns {Object|null} 進度物件，如果沒有則回傳 null *
  */
 function getProgress(propname) {
   var p = PropertiesService.getScriptProperties().getProperty(propname);
@@ -407,7 +446,7 @@ function sortSheetsDesc(ss) {
 
 /**
  * 將試算表分頁依名稱升冪排序 (A -> Z, 0 -> 9)
- * @param {*} ss spreadsheet 物件 
+ * @param {*} ss spreadsheet 物件
  */
 function sortSheetsAsc(ss) {
   var sheets = ss.getSheets();
@@ -428,7 +467,7 @@ function sortSheetsAsc(ss) {
  * 尋找欄位索引（不分大小寫與底線）
  * @param {Array} headers 欄位名稱陣列
  * @param {string} name 欄位名稱
- * @return {number} 欄位索引，找不到則回傳 -1 
+ * @return {number} 欄位索引，找不到則回傳 -1
  */
 function getColIndex(headers, name) {
   // 1. 優先進行最快、最精確的比對 (大小寫完全相符)
@@ -441,7 +480,10 @@ function getColIndex(headers, name) {
   const cleanName = name.toString().replace(/[_ ]/g, "").toLowerCase();
   for (let i = 0; i < headers.length; i++) {
     // 確保 header[i] 是字串，避免因空儲存格導致錯誤
-    const cleanHeader = (headers[i] || "").toString().replace(/[_ ]/g, "").toLowerCase();
+    const cleanHeader = (headers[i] || "")
+      .toString()
+      .replace(/[_ ]/g, "")
+      .toLowerCase();
     if (cleanHeader === cleanName) {
       return i;
     }
@@ -458,7 +500,7 @@ function getColIndex(headers, name) {
  */
 function getColIndicesMap(headers, targetFields) {
   var map = {};
-  targetFields.forEach(function(field) {
+  targetFields.forEach(function (field) {
     map[field] = getColIndex(headers, field);
   });
   return map;
@@ -472,9 +514,9 @@ function getColIndicesMap(headers, targetFields) {
  * @returns {Array} 標準化後的資料陣列
  */
 function normalizeRow(row, colIndicesMap, targetFields) {
-  return targetFields.map(function(field) {
+  return targetFields.map(function (field) {
     var idx = colIndicesMap[field];
-    return (idx !== -1 && row[idx] !== undefined) ? row[idx] : "";
+    return idx !== -1 && row[idx] !== undefined ? row[idx] : "";
   });
 }
 
@@ -484,7 +526,7 @@ function normalizeRow(row, colIndicesMap, targetFields) {
  * @return {string} 試算表 ID
  */
 function getIdFromUrl(url) {
-  if (!url || typeof url !== 'string') return "";
+  if (!url || typeof url !== "string") return "";
 
   // 優先匹配 /d/ID, /folders/ID, 或 id=ID 的格式
   const match = url.match(/(?:d|folders)\/([-\w]{25,})|id=([-\w]{25,})/);
@@ -503,14 +545,26 @@ function getIdFromUrl(url) {
  * @returns {string} - 格式化後的字串 (e.g., "BA01,BA02a-1")
  */
 function formatLtcCodeString(rawStr) {
-  if (!rawStr || typeof rawStr !== 'string') return "";
+  if (!rawStr || typeof rawStr !== "string") return "";
 
   const items = rawStr.split(",");
 
   const processedArr = items
     .map((item) => {
-      // 1. 去除空白並提取有效部分
-      const match = item.trim().match(/^[a-zA-Z0-9-]+/);
+      // 1. 移除所有非英文字母、數字及 '-' 的字元，並修正連字號格式 (如果 '-' 後面不是數字，則移除該 '-')
+      let clean = item.replace(/[^a-zA-Z0-9-]/g, "").replace(/-+(?!\d)/g, "");
+
+      if (clean.length < 2) return null;
+
+      // 2. 格式化：前2碼大寫，後面小寫
+      const formatted =
+        clean.substring(0, 2).toUpperCase() + clean.substring(2).toLowerCase();
+
+      // 3. 驗證格式：2位大寫字母 + 至少一個數字 + [可選的小寫字母/數字] + [可選的 -數字組合]
+      // 符合例子: BA01, BA17d1, BA17d2, BA05-1, BA09a, BA08 (修正後的 BA08- 會變成 BA08)
+      const match = formatted.match(
+        /^[A-Z]{2}\d+[a-z0-9]*(-[0-9]+[a-z0-9]*)*$/,
+      );
       return match ? match[0] : null;
     })
     .filter((val) => val !== null); // 2. 移除不符合規則的項目
@@ -520,6 +574,17 @@ function formatLtcCodeString(rawStr) {
 
   // 4. 結合
   return uniqueSortedArr.join(",");
+}
+
+/**
+ * 合併兩個 LTC Code 字串並進行格式標準化、去重與排序
+ * @param {string} str1 - 第一個 LTC Code 字串
+ * @param {string} str2 - 第二個 LTC Code 字串
+ * @returns {string} 合併且格式化後的字串
+ */
+function mergeLtcCodeStrings(str1, str2) {
+  const combined = String(str1 || "") + "," + String(str2 || "");
+  return formatLtcCodeString(combined);
 }
 
 /**
@@ -564,8 +629,8 @@ function processCustLTCCodes() {
 }
 
 /**
- * 
- * @returns 
+ *
+ * @returns
  */
 
 function UpdateUserCustName() {
@@ -584,16 +649,20 @@ function UpdateUserCustName() {
 
   // 1. 聚合來源資料：Map<User_N, Set<Cust_N>>
   const userMap = new Map();
+  const excludeKeywords = ["副本", "表單回覆", "Raw Responses"];
+
   const processData = (sheet) => {
     const values = sheet.getDataRange().getValues();
     const headers = values.shift();
     const colMap = getColIndicesMap(headers, ["USER_N", "CUST_N"]);
     const uIdx = colMap["USER_N"];
     const cIdx = colMap["CUST_N"];
-    values.forEach(row => {
-      const u = (uIdx !== -1) ? String(row[uIdx] || "").trim() : "";
-      const c = (cIdx !== -1) ? String(row[cIdx] || "").trim() : "";
-      if (u && c) {
+    values.forEach((row) => {
+      const u =
+        uIdx !== -1 ? String(row[uIdx] || "").replace(/[\s,]/g, "") : "";
+      const c = cIdx !== -1 ? String(row[cIdx] || "").trim() : "";
+
+      if (u && c && !excludeKeywords.some((k) => c.includes(k))) {
         if (!userMap.has(u)) userMap.set(u, new Set());
         userMap.get(u).add(c);
       }
@@ -613,7 +682,9 @@ function UpdateUserCustName() {
   const tarCustIdx = tarColMap["Cust_N"];
 
   if (tarUserIdx === -1 || tarCustIdx === -1) {
-    throw new Error("找不到目標欄位 User_N 或 Cust_N，請檢查標題名稱是否完全一致");
+    throw new Error(
+      "找不到目標欄位 User_N 或 Cust_N，請檢查標題名稱是否完全一致",
+    );
   }
 
   // 3. 準備更新後的資料陣列 (保留原始結構，僅修改 Cust_N 欄位)
@@ -621,8 +692,8 @@ function UpdateUserCustName() {
   const rowsToUpdate = tarData.slice(1);
   const processedUsers = new Set();
 
-  const updatedRows = rowsToUpdate.map(row => {
-    const userName = String(row[tarUserIdx] || "").trim();
+  const updatedRows = rowsToUpdate.map((row) => {
+    const userName = String(row[tarUserIdx] || "").replace(/[\s,]/g, "");
     if (userMap.has(userName)) {
       // 找到匹配的 User，更新其 Cust_N
       const custSet = userMap.get(userName);
@@ -643,12 +714,16 @@ function UpdateUserCustName() {
   });
 
   // 5. 將所有資料排序並寫回
-  updatedRows.sort((a, b) => String(a[tarUserIdx]).localeCompare(String(b[tarUserIdx])));
+  updatedRows.sort((a, b) =>
+    String(a[tarUserIdx]).localeCompare(String(b[tarUserIdx])),
+  );
 
   // 寫回目標區域 (從 A2 開始，涵蓋整張表的寬度)
-  tarSheet.getRange(2, 1, updatedRows.length, tarHeaders.length).setValues(updatedRows);
+  tarSheet
+    .getRange(2, 1, updatedRows.length, tarHeaders.length)
+    .setValues(updatedRows);
 
-  console.log("資料更新完成！");
+  logSystemActivity("INFO", "UpdateUserCustName", "資料更新完成！");
   CacheService.getScriptCache().remove("SRServer01_InitData");
 }
 
@@ -659,7 +734,7 @@ function UpdateUserCustName() {
  * @param {string} [timezone='Asia/Taipei'] - (選填) 時區，預設為 'Asia/Taipei'
  * @returns {string} 格式化後的日期字串，若輸入無效則回傳原始字串
  */
-function formatDate(date, format = 'yyyy-MM-dd', timezone = 'Asia/Taipei') {
+function formatDate(date, format = "yyyy-MM-dd", timezone = "Asia/Taipei") {
   if (!date) return "";
   try {
     const d = new Date(date);
@@ -679,8 +754,17 @@ function formatDate(date, format = 'yyyy-MM-dd', timezone = 'Asia/Taipei') {
  * 包含導航列、下拉選單快取、以及各模組的資料快取
  */
 function clearAllCaches() {
-  var userEmail = Session.getActiveUser().getEmail();
-  console.log(`[System] 開始手動清除快取... 觸發者: ${userEmail || 'Unknown'}，時間: ${new Date().toISOString()}`);
+  var userEmail = "Unknown";
+  try {
+    userEmail = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    // 當權限不足或處於受限環境（如匿名存取）時，忽略此錯誤以確保程式繼續執行
+  }
+  logSystemActivity(
+    "INFO",
+    "clearAllCaches",
+    `[System] 開始手動清除快取... 觸發者: ${userEmail || "Unknown"}，時間: ${new Date().toISOString()}`,
+  );
 
   const cache = CacheService.getScriptCache();
   const keysToRemove = [
@@ -691,10 +775,14 @@ function clearAllCaches() {
     "UserData",
     "CustInfoMap",
     "CustN_All",
-    "SRServer01_InitData"
+    "SRServer01_InitData",
   ];
   cache.removeAll(keysToRemove);
-  console.log(`[System] 快取清除完成。已移除以下鍵值: ${keysToRemove.join(', ')}`);
+  logSystemActivity(
+    "INFO",
+    "clearAllCaches",
+    `[System] 快取清除完成。已移除以下鍵值: ${keysToRemove.join(", ")}`,
+  );
 }
 
 /**
@@ -711,7 +799,7 @@ function getSettingValue(settingName) {
   const nameIdx = getColIndex(headers, "Key");
   const valIdx = getColIndex(headers, "Value");
   if (nameIdx === -1 || valIdx === -1) return "";
-  
+
   for (let i = 1; i < data.length; i++) {
     if (data[i][nameIdx] === settingName) {
       return data[i][valIdx];
@@ -721,42 +809,232 @@ function getSettingValue(settingName) {
 }
 
 /**
+ * 取得所有包含 'API_KEY' 字眼的設定值
+ * @returns {string[]} API Key 陣列
+ * @returns {Object[]} API Key 資訊陣列 {name, value}
+ */
+function getAllAPIKeys() {
+  const sheet = MainSpreadsheet.getSheetByName("Setting");
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+  const headers = data[0];
+  const nameIdx = getColIndex(headers, "Key");
+  const valIdx = getColIndex(headers, "Value");
+  if (nameIdx === -1 || valIdx === -1) return [];
+
+  return data
+    .slice(1)
+    .filter((row) => row[nameIdx].toString().toUpperCase().includes("API_KEY"))
+    .map((row) => ({
+      name: row[nameIdx].toString().trim(),
+      value: row[valIdx].toString().trim(),
+    }))
+    .filter((item) => item.value !== "");
+}
+
+/**
+ * 專用的 AI 執行日誌紀錄
+ */
+function logAIActivityToSheet(message, responseCode, model, apiKeyName) {
+  try {
+    let aiLogSheet = MainSpreadsheet.getSheetByName("AILog");
+    if (!aiLogSheet) {
+      aiLogSheet = MainSpreadsheet.insertSheet("AILog");
+      aiLogSheet.appendRow([
+        "時間",
+        "訊息",
+        "ResponseCode",
+        "中文解釋",
+        "模型名稱",
+        "APIKEY名稱",
+      ]);
+      aiLogSheet.setFrozenRows(1);
+    }
+
+    // 定義狀態碼中文解釋映射
+    const codeMap = {
+      200: "成功",
+      400: "請求錯誤",
+      401: "API金鑰無效",
+      403: "權限不足",
+      404: "找不到模型",
+      429: "配額已滿 (Token限制)",
+      500: "伺服器錯誤",
+      503: "服務暫時不可用"
+    };
+    const description = codeMap[responseCode] || "其他狀態";
+
+    aiLogSheet.appendRow([
+      new Date(),
+      message,
+      responseCode,
+      description,
+      model,
+      apiKeyName,
+    ]);
+  } catch (e) {
+    logSystemActivity('ERROR', 'AI_LOG', "無法寫入 AILog 工作表: " + e.toString());
+  }
+}
+
+/**
  * 呼叫 Gemini API 進行 AI 生成
  * @param {string} userPrompt 使用者輸入的 Prompt
  * @returns {string} AI 生成結果
  */
 function generateAIServiceRecord(userPrompt) {
-  const apiKey = getSettingValue("Genimi_API_KEY");
-  if (!apiKey) throw new Error("系統設定中找不到 Genimi_API_KEY");
+  const apiKeys = getAllAPIKeys();
+  if (apiKeys.length === 0)
+    throw new Error("系統設定中找不到任何包含 'API_KEY' 的金鑰設定");
 
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey;
+  // 定義模型清單 (優先使用您指定的版本，並保留現有穩定版作為備援)
+  const modelList = [
+    "gemini-3.1-flash-lite", // 1. 試算表設定的首選
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash", // 2. 使用者指定模型
+    "gemini-3-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemma-4-26B-A4B-it",
+    "gemma-4-31b-it",
+    "gemini-2.0-flash-exp", // 3. 官方現有實驗版
+    "gemini-1.5-flash-latest", // 4. 官方現有穩定版
+    "gemini-1.5-flash",
+    "gemini-1.5-pro-latest", // 5. 強力分析備援
+  ].filter((v, i, a) => v && a.indexOf(v) === i); // 移除空值與重複項
 
-  const payload = {
-    "contents": [{
-      "parts": [{ "text": userPrompt }]
-    }],
-    "system_instruction": {
-      "parts": [{ "text": "你是一位專業的長照個管師，回答時請保持專業且邏輯嚴謹，並使用繁體中文。" }]
+  let lastError = null;
+
+  for (let model of modelList) {
+    for (let keyObj of apiKeys) {
+      const apiKey = keyObj.value;
+      const apiKeyName = keyObj.name;
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: [{ parts: [{ text: userPrompt }] }],
+          system_instruction: {
+            parts: [{ text: "你是長照居服員督導。" }],
+          },
+        };
+
+        const response = UrlFetchApp.fetch(url, {
+          method: "post",
+          contentType: "application/json",
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true,
+        });
+
+        const responseCode = response.getResponseCode();
+        const resJson = JSON.parse(response.getContentText());
+
+        if (responseCode === 200) {
+          if (resJson.candidates && resJson.candidates[0].content) {
+            const resultText =
+              resJson.candidates[0].content.parts[0].text.trim();
+
+            // 成功紀錄 (同時寫入 AILog 與系統日誌)
+            logAIActivityToSheet("成功", 200, model, apiKeyName);
+            logSystemActivity('INFO', 'AI', `成功: ${model} [${apiKeyName}]`);
+
+            return resultText;
+          }
+          logSystemActivity('ERROR', 'AI', `AI 回傳格式不正確: ${model}`);
+          throw new Error("AI 回傳格式不正確");
+        }
+
+        let errorMsg = resJson.error
+          ? resJson.error.message
+          : response.getContentText();
+
+        // 失敗紀錄 (同時寫入 AILog 與系統日誌)
+        logAIActivityToSheet(
+          `失敗: ${errorMsg}`,
+          responseCode,
+          model,
+          apiKeyName,
+        );
+        logSystemActivity('WARN', 'AI', `失敗(${responseCode}): ${model} [${apiKeyName}] - ${errorMsg}`);
+
+        // 處理模型不存在 (HTTP 404): 跳過此模型，嘗試下一個 Module
+        if (responseCode === 404) {
+          break;
+        }
+
+        // 處理配額不足或其他錯誤: 繼續內層迴圈嘗試下一個 API Key
+        if (responseCode === 429) {
+          // 繼續下一組 Key
+        }
+      } catch (e) {
+        lastError = e;
+        logAIActivityToSheet(`執行異常: ${e.message}`, 500, model, apiKeyName);
+        logSystemActivity('ERROR', 'AI', `執行異常: ${model} [${apiKeyName}] - ${e.message}`);
+        // 發生其他錯誤時，繼續下一個循環
+      }
     }
-  };
-
-  const options = {
-    "method": "post",
-    "contentType": "application/json",
-    "payload": JSON.stringify(payload),
-    "muteHttpExceptions": true
-  };
-
-  const response = UrlFetchApp.fetch(url, options);
-  const resJson = JSON.parse(response.getContentText());
-  
-  if (response.getResponseCode() !== 200) {
-    throw new Error("Gemini API 請求失敗: " + (resJson.error ? resJson.error.message : response.getContentText()));
   }
 
-  if (resJson.candidates && resJson.candidates[0].content && resJson.candidates[0].content.parts) {
-    return resJson.candidates[0].content.parts[0].text.trim();
-  } else {
-    throw new Error("AI 回傳格式不正確");
+  // 如果所有模型都嘗試失敗
+  throw new Error(
+    "所有 AI 模型嘗試均失敗。最後一個錯誤訊息：" + lastError.message,
+  );
+}
+
+/**
+ * 專業日誌紀錄系統
+ * @param {string} level - 級別: 'INFO', 'WARN', 'ERROR'
+ * @param {string} module - 所屬模組 (例如: 'Maintenance', 'AI')
+ * @param {string} message - 日誌訊息
+ */
+function logSystemActivity(level, module, message) {
+  const timestamp = new Date();
+  let userEmail = "System";
+  try {
+    userEmail = Session.getEffectiveUser().getEmail() || "System";
+  } catch (e) {
+    // 當權限不足以獲取 Email 時 (常見於自動觸發器環境)，預設顯示為 System
+  }
+
+  // 1. 同步輸出到控制台 (Cloud Logging)
+  const logMsg = `[${level}] [${module}] ${message}`;
+  if (level === "ERROR") console.error(logMsg);
+  else if (level === "WARN") console.warn(logMsg);
+  else console.log(logMsg);
+
+  // 2. 寫入到試算表 (永久保存)
+  try {
+    let logSheet = MainSpreadsheet.getSheetByName("SystemLog");
+    if (!logSheet) {
+      logSheet = MainSpreadsheet.insertSheet("SystemLog");
+      logSheet.appendRow(["時間", "層級", "模組", "訊息", "執行者"]);
+      logSheet.setFrozenRows(1);
+    }
+    logSheet.appendRow([timestamp, level, module, message, userEmail]);
+
+    // 保持日誌大小，例如只保留最近 2000 筆
+    const lastRow = logSheet.getLastRow();
+    if (lastRow > 2005) {
+      logSheet.deleteRows(2, 100);
+    }
+  } catch (e) {
+    console.error("無法寫入日誌表: " + e.toString());
+  }
+
+  // 3. 如果是關鍵錯誤，可以額外發送通知 (此處以 Log 為例)
+  if (level === "ERROR") {
+    try {
+      let errSheet = MainSpreadsheet.getSheetByName("ErrorLog");
+      if (!errSheet) {
+        errSheet = MainSpreadsheet.insertSheet("ErrorLog");
+        errSheet.appendRow(["時間", "模組", "錯誤訊息", "執行者"]);
+        errSheet.setFrozenRows(1);
+        errSheet.setColumnWidth(3, 500); // 增加訊息欄寬度
+      }
+      errSheet.appendRow([timestamp, module, message, userEmail]);
+    } catch (e) {
+      console.error("無法寫入 ErrorLog 表: " + e.toString());
+    }
   }
 }

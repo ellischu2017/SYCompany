@@ -88,6 +88,17 @@
             <label class="form-label">電話 (User_Tel)</label>
             <input type="text" class="form-control" id="inputUserTel" placeholder="0900000000">
           </div>
+          <div class="mb-3">
+            <label class="form-label">密碼 (Pass)</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="inputUserPass" placeholder="不設定密碼請留空白">
+              <button class="btn btn-outline-secondary" type="button" id="togglePass"><i class="fas fa-eye"></i></button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">角色 (Role)</label>
+            <input type="text" class="form-control" id="inputUserRole" value="User" readonly>
+          </div>
           <div class="d-flex gap-3 mt-4">
             <button type="button" class="btn btn-success flex-grow-1" id="btnSave"><i class="fas fa-save"></i> 更新資料</button>
             <button type="button" class="btn btn-danger flex-grow-1" id="btnDelete"><i class="fas fa-trash"></i> 刪除</button>
@@ -132,6 +143,8 @@
           $('#inputUserName').val(user.User_N);
           $('#inputUserEmail').val(user.User_Email);
           $('#inputUserTel').val(user.User_Tel);
+          $('#inputUserPass').val(user.Pass || '');
+          $('#inputUserRole').val(user.Role || 'User');
           switchToDetailMode('update');
         } else {
           Swal.fire('錯誤', '找不到該居服員資料，請重新整理頁面', 'error');
@@ -159,6 +172,8 @@
             $('#userForm')[0].reset();
             $('#displayUserName').text(result.value);
             $('#inputUserName').val(result.value);
+            $('#inputUserPass').val('');
+            $('#inputUserRole').val('User');
             switchToDetailMode('add');
           }
         });
@@ -170,7 +185,9 @@
         const data = {
           userName: $('#inputUserName').val(),
           userEmail: $('#inputUserEmail').val(),
-          userTel: $('#inputUserTel').val()
+          userTel: $('#inputUserTel').val(),
+          userPass: $('#inputUserPass').val(),
+          userRole: 'User'
         };
 
         if (!data.userName) return Swal.fire('提示', '姓名不能為空', 'warning');
@@ -276,7 +293,9 @@
         users.push({
           User_N: data.userName,
           User_Email: data.userEmail,
-          User_Tel: data.userTel
+          User_Tel: data.userTel,
+          Pass: data.userPass,
+          Role: data.userRole
         });
         // 排序
         users.sort((a, b) => a.User_N.localeCompare(b.User_N));
@@ -285,6 +304,8 @@
         if (idx !== -1) {
           users[idx].User_Email = data.userEmail;
           users[idx].User_Tel = data.userTel;
+          users[idx].Pass = data.userPass;
+          users[idx].Role = data.userRole;
         }
       }
       
@@ -330,6 +351,19 @@
       $('#searchSection').show();
       populateDropdown();
     }
+
+    // 切換密碼顯示/隱藏
+    $('#togglePass').click(function () {
+      const passwordInput = $('#inputUserPass');
+      const icon = $(this).find('i');
+      if (passwordInput.attr('type') === 'password') {
+        passwordInput.attr('type', 'text');
+        icon.removeClass('fa-eye').addClass('fa-eye-slash');
+      } else {
+        passwordInput.attr('type', 'password');
+        icon.removeClass('fa-eye-slash').addClass('fa-eye');
+      }
+    });
 
   </script>
 </body>

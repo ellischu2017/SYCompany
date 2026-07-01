@@ -4,9 +4,10 @@
  */
 
 // 定義試算表 URL (來自 Transfer.md)
-const SS_URL_RAW_RESPONSES =
-  "https://docs.google.com/spreadsheets/d/1Lg57GtSMtZRi3dTWX2-Xr-3slc1__UT7H1kExwAh_eM/edit?usp=drive_link";
+//const SS_URL_RAW_RESPONSES =  "https://docs.google.com/spreadsheets/d/1Lg57GtSMtZRi3dTWX2-Xr-3slc1__UT7H1kExwAh_eM/edit?usp=drive_link";
 // const SS_URL_CASE_REPORTS = "https://docs.google.com/spreadsheets/d/1ib8q-lKJgLEhRVrwncnRqOyKNauMqaV2wtYEpGlmRlk";
+// const SS_URL_RAW_RESPONSES = getTargetsheet("SYTemp","Raw_Responses").Spreadsheet.getUrl();
+// const SS_URL_CASE_REPORTS = getTargetsheet("SYTemp","Case_Reports").Spreadsheet.getUrl();
 
 // 假設本腳本綁定在 SYTemp 所在的試算表，或者透過 getTargetsheet 獲取
 // 這裡為了獨立運作，假設 MainSpreadsheet 是 SYTemp (或包含 SYTemp sheet 的檔案)
@@ -15,6 +16,11 @@ const SS_URL_RAW_RESPONSES =
 /**
  * 取得 Raw Responses 試算表中的所有 Sheet 名稱 (即案主名單)
  * 用於前端下拉選單
+ * 注意：此函式會過濾掉包含特定關鍵字的 Sheet 名稱，以避免將系統隱藏表或說明表納入案主名單。
+ * 過濾關鍵字包括但不限於 "Raw Responses", "表單回覆", "副本"，可根據實際情況調整。
+ * 若未來有新增的系統表單，請將其關鍵字加入 excludeKeywords 陣列中，以確保不會被誤認為案主。
+ * 參數說明：無參數，直接從 SS_URL_RAW_RESPONSES 指定的試算表中讀取 Sheet 名稱。
+ * 回傳值：一個陣列，包含所有符合條件的 Sheet 名稱 (案主名單)。
  */
 function getRawResponseSheetNames() {
   try {
@@ -22,8 +28,10 @@ function getRawResponseSheetNames() {
     const ss = getTargetsheet("SYTemp", "Raw_Responses").Spreadsheet;
     const sheets = ss.getSheets();
     // 過濾掉可能的系統隱藏表或說明表，假設大部分是案主名
-    // 這裡回傳所有 Sheet Name
-    return sheets.map((s) => s.getName());
+    const excludeKeywords = ["Raw Responses", "表單回覆", "副本"];
+    return sheets
+      .map((s) => s.getName())
+      .filter((name) => !excludeKeywords.some((k) => name.trim().includes(k)));
   } catch (e) {
     throw new Error("無法存取 Raw Responses 試算表: " + e.message);
   }
@@ -34,8 +42,10 @@ function getRawResponseSheetNames() {
  * @param {string} custName 案主名稱 (對應 Sheet 名稱)
  * @param {boolean} isUpdateOnly 是否僅更新 (true: > TDate, false: <= TDate)
  */
-function processTransferData(custName, isUpdateOnly) {
-  console.log(`processTransferData 開始處理: ${custName}, UpdateOnly: ${isUpdateOnly}`);
+function processTransferData(custName, isUpdateOnly){
+  logSystemActivity('INFO', 'processTransferData', 
+    `processTransferData 開始處理: ${custName}, UpdateOnly: ${isUpdateOnly}`,
+  );
   // 初始化結果物件
   const globalResult = { success: true, count: 0, log: "", message: "" };
 
@@ -62,19 +72,24 @@ function processTransferData(custName, isUpdateOnly) {
     }
 
     // 來源試算表 (Raw Responses) 也只開啟一次
-    const ssRaw = SpreadsheetApp.openByUrl(SS_URL_RAW_RESPONSES);
+    //const ssRaw = SpreadsheetApp.openByUrl(SS_URL_RAW_RESPONSES);
+    const ssRaw = getTargetsheet("SYTemp", "Raw_Responses").Spreadsheet;
 
     // [Batch Optimization 1] 預先讀取所有案主的 TDate (Transfer_Response)
     const tDateData = sheetTransResp.getDataRange().getValues();
     const tDateMap = new Map(); // Key: CustName, Value: Date
     if (tDateData.length > 1) {
       const h = tDateData[0];
-      const iName = getColIndex(h, "Cust_N") > -1 ? getColIndex(h, "Cust_N") : 0;
+      const iName =
+        getColIndex(h, "Cust_N") > -1 ? getColIndex(h, "Cust_N") : 0;
       const iDate = getColIndex(h, "TDate") > -1 ? getColIndex(h, "TDate") : 1;
       for (let i = 1; i < tDateData.length; i++) {
         const d = new Date(tDateData[i][iDate]);
         // 若日期無效則設為很久以前
-        tDateMap.set(tDateData[i][iName], isNaN(d.getTime()) ? new Date("2000-01-01") : d);
+        tDateMap.set(
+          tDateData[i][iName],
+          isNaN(d.getTime()) ? new Date("2000-01-01") : d,
+        );
       }
     }
 
@@ -90,7 +105,9 @@ function processTransferData(custName, isUpdateOnly) {
       const exUser = existingData[r][3];
       const exId = existingData[r][5];
       // Key 規則需與下方 processSingleCustomerInternal 一致
-      existingKeys.add(`${exDate}_${existingData[r][1]}_${exCust}_${exUser}_${exId}`);
+      existingKeys.add(
+        `${exDate}_${existingData[r][1]}_${exCust}_${exUser}_${exId}`,
+      );
 
       // existingKeys.add(`${exDate}_${exSRTimes}_${exCust}_${exUser}_${exId}`);
     }
@@ -104,8 +121,8 @@ function processTransferData(custName, isUpdateOnly) {
     for (const customer of customersToProcess) {
       // 防呆機制：檢查執行時間是否即將超時 (引用 Utilities.js 中的 isNearTimeout)
       // 預設 EXECUTION_TIMEOUT_MINUTES 為 5 分鐘，保留 1 分鐘緩衝進行收尾
-      if (typeof isNearTimeout === 'function' && isNearTimeout()) {
-        console.warn("系統執行時間即將逾時，為避免 Quota Exceeded 錯誤已中止後續處理。");
+      if (typeof isNearTimeout === "function" && isNearTimeout()) {
+        logSystemActivity('WARN', 'processTransferData', "系統執行時間即將逾時，為避免 Quota Exceeded 錯誤已中止後續處理。");
         globalResult.log += `[System] 執行時間即將逾時，已中止於案主: ${customer} (後續未處理)\n`;
         globalResult.message += " (因時間限制部分中斷)";
         break;
@@ -113,16 +130,16 @@ function processTransferData(custName, isUpdateOnly) {
 
       // 呼叫單一處理邏輯
       const result = processSingleCustomerInternal(
-        ssRaw,          // 傳入已開啟的 Spreadsheet 物件
+        ssRaw, // 傳入已開啟的 Spreadsheet 物件
         customer,
         isUpdateOnly,
         // sheetSRData,
         // sheetTransResp,
         tDateMap.get(customer) || new Date("2000-01-01"), // 直接傳入 TDate
         existingKeys,
-        batchRowsToAdd,    // 收集新增資料
+        batchRowsToAdd, // 收集新增資料
         batchTDateUpdates, // 收集 TDate 更新
-        batchMonthsToClear // 收集受影響月份
+        batchMonthsToClear, // 收集受影響月份
       );
 
       // 累加結果
@@ -140,7 +157,13 @@ function processTransferData(custName, isUpdateOnly) {
     // 1. 批次寫入 SR_Data
     if (batchRowsToAdd.length > 0) {
       const lastRow = sheetSRData.getLastRow();
-      sheetSRData.getRange(lastRow + 1, 1, batchRowsToAdd.length, batchRowsToAdd[0].length)
+      sheetSRData
+        .getRange(
+          lastRow + 1,
+          1,
+          batchRowsToAdd.length,
+          batchRowsToAdd[0].length,
+        )
         .setValues(batchRowsToAdd);
       globalResult.log += `> [Batch] 成功寫入 ${batchRowsToAdd.length} 筆資料至 SR_Data。\n`;
     }
@@ -153,14 +176,11 @@ function processTransferData(custName, isUpdateOnly) {
 
     // 3. 批次清除 Cache
     if (batchMonthsToClear.size > 0) {
-      batchMonthsToClear.forEach(ym => {
+      batchMonthsToClear.forEach((ym) => {
         CacheService.getScriptCache().remove("CustN_" + ym);
       });
       globalResult.log += `> [Batch] 清除快取月份: ${Array.from(batchMonthsToClear).join(", ")}\n`;
     }
-
-
-
 
     globalResult.log += `[Done] 所有作業完成。總新增筆數: ${globalResult.count}`;
   } catch (err) {
@@ -174,7 +194,26 @@ function processTransferData(custName, isUpdateOnly) {
 
 /**
  * 內部核心邏輯：處理單一案主
-  * (修改為純內存處理，不直接寫入 Sheet)
+ * (修改為純內存處理，不直接寫入 Sheet)
+ * 注意：此函式專注於處理單一案主的資料過濾與轉換邏輯，並將結果加入批次容器中。實際的寫入動作由外部統一處理，以提升效能。
+ * 參數說明：
+ *   ssRaw: 已開啟的 Raw Responses 試算表物件
+ *   custName: 案主名稱
+ *   isUpdateOnly: 是否僅更新已有資料 (true: 只處理日期 > TDate 的資料)
+ *   tDate: 該案主的 TDate (由外部預先讀取並傳入)
+ *   existingKeys: 用於檢查重複資料的 Set (由外部維護)
+ *   batchRowsToAdd: 用於收集符合條件的資料列，最後由外部一次性寫入 SR_Data
+ *   batchTDateUpdates: 用於收集需要更新 TDate 的案主名稱與新日期，最後由外部一次性更新 Transfer_Response
+ *   batchMonthsToClear: 用於收集受影響月份的 Set，最後由外部一次性清除相關快取
+ * 回傳值：一個物件，包含處理結果的成功狀態、處理筆數、日誌訊息與錯誤訊息（如有）
+ * 注意事項：
+ * - 此函式不直接與 Sheet 進行讀寫操作，所有資料處理均在內存中完成，最後將結果加入批次容器中。
+ * - 在處理過程中，會根據 isUpdateOnly 參數來決定哪些資料列符合條件，並且會檢查 existingKeys 以避免重複新增。
+ * - 此函式假設傳入的 ssRaw 已經是開啟狀態，並且 custName 對應的 Sheet 存在（如果不存在，會在外部處理並跳過）。
+ * - 在處理完資料後，會將需要更新 TDate 的案主名稱與新日期加入 batchTDateUpdates Map，供外部統一更新 Transfer_Response。
+ * - 同時會將受影響的月份加入 batchMonthsToClear Set，供外部統一清除相關快取。
+ * - 此函式的設計目的是為了在處理大量資料時提升效能，避免在迴圈內頻繁讀寫 Sheet，從而減少 API 呼叫次數與執行時間。
+ *
  */
 function processSingleCustomerInternal(
   ssRaw,
@@ -182,11 +221,11 @@ function processSingleCustomerInternal(
   isUpdateOnly,
   // sheetSRData,
   // sheetTransResp,
-  tDate,          // 直接傳入 Date 物件
+  tDate, // 直接傳入 Date 物件
   existingKeys,
-  batchRowsToAdd,    // 接收陣列
+  batchRowsToAdd, // 接收陣列
   batchTDateUpdates, // 接收 Map
-  batchMonthsToClear // 接收 Set
+  batchMonthsToClear, // 接收 Set
 ) {
   const result = { success: false, count: 0, log: "", message: "" };
 
@@ -222,7 +261,10 @@ function processSingleCustomerInternal(
     const idxMood = getColIndex(headers, "身心狀況");
     const idxSpCons = getColIndex(headers, "有特殊狀況，請說明及處理");
     const idxHasTemp = getColIndex(headers, "是否有其他臨時服務項目");
-    const idxTempItem = getColIndex(headers, "臨時服務項目(請填寫服務代碼+項目名稱)");
+    const idxTempItem = getColIndex(
+      headers,
+      "臨時服務項目(請填寫服務代碼+項目名稱)",
+    );
     const idxTempDesc = getColIndex(headers, "說明");
 
     if (idxDate === -1) {
@@ -339,10 +381,14 @@ function processSingleCustomerInternal(
         // --- 清除相關月份的快取 ---
         // const addedMonths = new Set();
         // 收集受影響月份
-        uniqueRows.forEach(row => {
+        uniqueRows.forEach((row) => {
           // 日期在第一欄 (index 0)
           const d = new Date(row[0]);
-          const yyyyMM = Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyyMM");
+          const yyyyMM = Utilities.formatDate(
+            d,
+            Session.getScriptTimeZone(),
+            "yyyyMM",
+          );
           // addedMonths.add(yyyyMM);
           batchMonthsToClear.add(yyyyMM);
         });
@@ -362,7 +408,6 @@ function processSingleCustomerInternal(
         if (isUpdateOnly && maxDateProcessed) {
           // updateTDate(sheetTransResp, custName, maxDateProcessed);
           batchTDateUpdates.set(custName, maxDateProcessed);
-
         }
       } else {
         result.log += `> 資料皆已存在，無新增。\n`;
@@ -383,7 +428,6 @@ function processSingleCustomerInternal(
   return result;
 }
 
-
 /**
  * 輔助：批次更新 Transfer_Response 的 TDate
  */
@@ -394,7 +438,7 @@ function batchUpdateTDate(sheet, updatesMap) {
     sheet.appendRow(["Cust_N", "TDate"]);
     data.push(["Cust_N", "TDate"]);
   }
-  
+
   const headers = data[0];
   let idxName = getColIndex(headers, "Cust_N");
   let idxDate = getColIndex(headers, "TDate");
@@ -421,26 +465,33 @@ function batchUpdateTDate(sheet, updatesMap) {
   });
 
   // 3. 一次性寫回
-  sheet.getRange(1, 1, updatedRows.length, headers.length).setValues(updatedRows);
+  sheet
+    .getRange(1, 1, updatedRows.length, headers.length)
+    .setValues(updatedRows);
 }
 
 /**
- * 更新 Raw Responses 
- * @param {*} formObj 
- * @returns 
+ * 更新 Raw Responses
+ * @param {*} formObj
+ * @returns
  */
 function UpdateRawResponse(formObj) {
-  //Raw Response::  https://docs.google.com/spreadsheets/d/1Lg57GtSMtZRi3dTWX2-Xr-3slc1__UT7H1kExwAh_eM/edit?usp=drive_link
-  //Tset:: https://docs.google.com/spreadsheets/d/1Srk5AVQ2mFmHsHIsdEbSQEFZaVhEMCPLdhpnJ6Y2AhM/edit?usp=drive_link
-  const RAW_RESPONSES_URL = "https://docs.google.com/spreadsheets/d/1Srk5AVQ2mFmHsHIsdEbSQEFZaVhEMCPLdhpnJ6Y2AhM/edit?usp=drive_link";
+  // Raw Response::  https://docs.google.com/spreadsheets/d/1Lg57GtSMtZRi3dTWX2-Xr-3slc1__UT7H1kExwAh_eM/edit?usp=drive_link
+  // Tset:: https://docs.google.com/spreadsheets/d/1Srk5AVQ2mFmHsHIsdEbSQEFZaVhEMCPLdhpnJ6Y2AhM/edit?usp=drive_link
+  // const RAW_RESPONSES_URL = "https://docs.google.com/spreadsheets/d/1Srk5AVQ2mFmHsHIsdEbSQEFZaVhEMCPLdhpnJ6Y2AhM/edit?usp=drive_link";
+  const RAW_RESPONSES_URL = getTargetsheet(
+    "SYTemp",
+    "Raw_Responses",
+  ).Spreadsheet.getUrl();
   const targetSs = SpreadsheetApp.openByUrl(RAW_RESPONSES_URL);
+
   const sheet = targetSs.getSheetByName(formObj.custName);
-  Logger.log("UpdateRawResponse Running");
+  logSystemActivity('INFO', 'UpdateRawResponse', "UpdateRawResponse Running");
   if (!sheet) return;
   try {
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    //先讀取所有欄位名稱   
+    //先讀取所有欄位名稱
     const idxstamp = getColIndex(headers, "時間戳記");
     const idxDate = getColIndex(headers, "日期");
     const idxUser = getColIndex(headers, "居服員姓名");
@@ -449,32 +500,63 @@ function UpdateRawResponse(formObj) {
     const idxSpCons = getColIndex(headers, "特殊狀況");
     const idxSpConsDeal = getColIndex(headers, "有特殊狀況，請說明及處理");
     const idxHasTemp = getColIndex(headers, "是否有其他臨時服務項目");
-    const idxTempItem = getColIndex(headers, "臨時服務項目(請填寫服務代碼+項目名稱)");
+    const idxTempItem = getColIndex(
+      headers,
+      "臨時服務項目(請填寫服務代碼+項目名稱)",
+    );
     const idxTempDesc = getColIndex(headers, "說明");
     var update = false;
     //篩選 data Date === formObj.date 及 User === formObj.userName 的資料
     for (let i = 1; i < data.length; i++) {
       var rowDate = data[i][idxDate];
-      var sheetDate = (rowDate instanceof Date) ? Utilities.formatDate(rowDate, "Asia/Taipei", "yyyy-MM-dd") : String(rowDate);
-      if (sheetDate === formObj.date && String(data[i][idxUser]).trim() === formObj.userName) {
+      var sheetDate =
+        rowDate instanceof Date
+          ? Utilities.formatDate(rowDate, "Asia/Taipei", "yyyy-MM-dd")
+          : String(rowDate);
+      if (
+        sheetDate === formObj.date &&
+        String(data[i][idxUser]).trim() === formObj.userName
+      ) {
         update = true;
-        if (idxstamp !== -1) sheet.getRange(i + 1, idxstamp + 1).setValue(Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy/M/d hh:mm:ss"));
-        if (idxDate !== -1) sheet.getRange(i + 1, idxDate + 1).setValue(Utilities.formatDate(rowDate, "Asia/Taipei", "yyyy/M/d"));
-        if (idxLoc !== -1) sheet.getRange(i + 1, idxLoc + 1).setValue(formObj.loc || "清醒");
-        if (idxMood !== -1) sheet.getRange(i + 1, idxMood + 1).setValue(formObj.mood || "穩定");
+        if (idxstamp !== -1)
+          sheet
+            .getRange(i + 1, idxstamp + 1)
+            .setValue(
+              Utilities.formatDate(
+                new Date(),
+                "Asia/Taipei",
+                "yyyy/M/d HH:mm:ss",
+              ),
+            );
+        if (idxDate !== -1)
+          sheet
+            .getRange(i + 1, idxDate + 1)
+            .setValue(Utilities.formatDate(rowDate, "Asia/Taipei", "yyyy/M/d"));
+        if (idxLoc !== -1)
+          sheet.getRange(i + 1, idxLoc + 1).setValue(formObj.loc || "清醒");
+        if (idxMood !== -1)
+          sheet.getRange(i + 1, idxMood + 1).setValue(formObj.mood || "穩定");
         if (formObj.spcons !== "無") {
-          if (idxSpCons !== -1) sheet.getRange(i + 1, idxSpCons + 1).setValue("有");
-          if (idxSpConsDeal !== -1) sheet.getRange(i + 1, idxSpConsDeal + 1).setValue(formObj.spcons);
+          if (idxSpCons !== -1)
+            sheet.getRange(i + 1, idxSpCons + 1).setValue("有");
+          if (idxSpConsDeal !== -1)
+            sheet.getRange(i + 1, idxSpConsDeal + 1).setValue(formObj.spcons);
         }
         var found = false;
         for (let c = 0; c < headers.length; c++) {
           const header = headers[c];
           // The header in the Raw Response sheet might be "BA01a" or "BA01a - Description".
           // We check if the header starts with the service ID from the form.
-          if (formObj.srId && header.trim().startsWith(formObj.srId.substring(0, 4))) {
+          if (
+            formObj.srId &&
+            header.trim().startsWith(formObj.srId.substring(0, 4))
+          ) {
             // If a match is found, update the cell in that column with the service record.
             sheet.getRange(i + 1, c + 1).setValue(formObj.srRec || "");
-            if (idxHasTemp !== -1 && sheet.getRange(i + 1, idxHasTemp + 1).getValue() !== "是") {
+            if (
+              idxHasTemp !== -1 &&
+              sheet.getRange(i + 1, idxHasTemp + 1).getValue() !== "是"
+            ) {
               sheet.getRange(i + 1, idxHasTemp + 1).setValue("否");
             }
             found = true;
@@ -485,7 +567,7 @@ function UpdateRawResponse(formObj) {
           sheet.getRange(i + 1, idxHasTemp + 1).setValue("是");
           sheet.getRange(i + 1, idxTempItem + 1).setValue(formObj.srId);
           sheet.getRange(i + 1, idxTempDesc + 1).setValue(formObj.srRec);
-          // Assuming one srId corresponds to only one column, we can stop searching.            
+          // Assuming one srId corresponds to only one column, we can stop searching.
         }
       }
     }
@@ -493,8 +575,18 @@ function UpdateRawResponse(formObj) {
     if (!update) {
       // 建立一個與標題等長的空陣列，確保欄位對應正確
       var newRow = new Array(headers.length).fill("");
-      if (idxstamp !== -1) newRow[idxstamp] = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy/M/d hh:mm:ss");
-      if (idxDate !== -1) newRow[idxDate] = Utilities.formatDate(new Date(formObj.date), "Asia/Taipei", "yyyy/M/d");
+      if (idxstamp !== -1)
+        newRow[idxstamp] = Utilities.formatDate(
+          new Date(),
+          "Asia/Taipei",
+          "yyyy/M/d HH:mm:ss",
+        );
+      if (idxDate !== -1)
+        newRow[idxDate] = Utilities.formatDate(
+          new Date(formObj.date),
+          "Asia/Taipei",
+          "yyyy/M/d",
+        );
       if (idxUser !== -1) newRow[idxUser] = formObj.userName;
       if (idxLoc !== -1) newRow[idxLoc] = formObj.loc || "清醒";
       if (idxMood !== -1) newRow[idxMood] = formObj.mood || "穩定";
@@ -510,6 +602,7 @@ function UpdateRawResponse(formObj) {
         const header = headers[c];
         if (header.trim().startsWith(formObj.srId.substring(0, 4))) {
           newRow[c] = formObj.srRec || "";
+          if (idxHasTemp !== -1) newRow[idxHasTemp] = "否";
           found = true;
           break;
         }
@@ -521,13 +614,10 @@ function UpdateRawResponse(formObj) {
       }
       sheet.appendRow(newRow);
     }
-
   } catch (e) {
-    Logger.log("更新 Raw Response 失敗: " + e.toString());
+    logSystemActivity('ERROR', 'UpdateRawResponse', "更新 Raw Response 失敗: " + e.toString());
   }
 }
-
-
 
 /**
  * 輔助：從 Transfer_Response 取得特定案主的上次更新日期

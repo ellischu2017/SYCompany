@@ -979,7 +979,7 @@
           const currentVal = $el.val();
           if (!currentVal) return showToast('info', '請先輸入內容再使用 AI');
           
-          const prompt = `請將以下服務紀錄內容：「${currentVal}」，優化為符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式，並限制在50個字以內。請直接輸出優化後的內容，不包含任何額外說明、開頭語句或結尾語句，且內容不包含長照編碼。`;
+          const prompt = `請將以下服務紀錄內容：「${currentVal}」，優化為符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式。請直接輸出優化後的內容，不包含任何額外說明、開頭語句或結尾語句，且內容不包含長照編碼，回覆限制在45-55個字。`;
           
           showPageLoading('AI 處理中', '正在為您優化服務紀錄...');
           

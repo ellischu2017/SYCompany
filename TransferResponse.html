@@ -121,8 +121,8 @@
           var select = $('#selCustName').empty().append('<option value="" selected disabled>請選擇案主...</option>');
           select.append('<option value="all" style="font-weight:bold; color:blue;">全部更新 (Update All)</option>');
           if (names && names.length > 0) {
-            const excepname = ["Raw Responses", "表單回覆 171"];
-            names.filter(n => !excepname.includes(n)).forEach(n => select.append($('<option></option>').val(n).text(n)));
+            const keywords = ["Raw Responses", "表單回覆", "副本"];
+            names.filter(n => !keywords.some(k => n.trim().includes(k))).forEach(n => select.append($('<option></option>').val(n).text(n)));
           }
         })
         .withFailureHandler(function (err) {
