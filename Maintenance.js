@@ -196,12 +196,12 @@ function dailyMaintenanceJob() {
       step = 8;
     }
 
-    // Step 8: 資料遷移 (目前註解中，保留位置)
-    // if (step <= 8) {
-    //   if (checkTimeoutAndScheduleResume(8)) return;
-    //   processSRDataMigration(MainSpreadsheet, ssSYTemp);
-    //   step = 9;
-    // }
+    // Step 8: 資料遷移 (搬走上個月的資料至年度試算表)
+    if (step <= 8) {
+      if (checkTimeoutAndScheduleResume(8)) return;
+      processSRDataMigration();
+      step = 9;
+    }
 
     // Step 9: 清理舊日誌 (Cleanup Old Logs)
     if (step <= 9) {

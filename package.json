@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "push:gas": "node -r ./clasp-fix.js \"%USERPROFILE%\\AppData\\Roaming\\npm\\node_modules\\@google\\clasp\\build\\src\\index.js\" push",
-    "pull:gas": "node -r ./clasp-fix.js \"%USERPROFILE%\\AppData\\Roaming\\npm\\node_modules\\@google\\clasp\\build\\src\\index.js\" pull",
+    "push:gas": "node -r ./clasp-fix.cjs \"%USERPROFILE%\\AppData\\Roaming\\npm\\node_modules\\@google\\clasp\\build\\src\\index.js\" push",
+    "pull:gas": "node -r ./clasp-fix.cjs \"%USERPROFILE%\\AppData\\Roaming\\npm\\node_modules\\@google\\clasp\\build\\src\\index.js\" pull",
     "deploy:gas": "powershell -File deploy.ps1"
   },
   "devDependencies": {

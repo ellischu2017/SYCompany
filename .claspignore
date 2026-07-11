@@ -1,7 +1,8 @@
 **/.git/**
 **/node_modules/**
 **/doc/**
-**/package.json
 **/package-lock.json
 **/jsconfig.json
-clasp-fix.js
+**/package.json
+clasp-fix.*
+

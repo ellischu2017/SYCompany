@@ -13,10 +13,20 @@ npm run pull:gas    # clasp pull
 npm run deploy:gas  # clasp deploy → 自動加入版本號說明 (v{version})
 ```
 
-**注意**：公司網路可能阻擋 `oauth2.googleapis.com`，所有 clasp 指令已透過 `clasp-fix.js` 繞過 SSL 驗證。若需手動執行 clasp，請先設：
+## Deployment URLs
+
+- **正式版** (production): `https://script.google.com/macros/s/AKfycbyB_lTyo6_Zmo9O1SKq8hjj828xNyvwj1UzAIaGzIrtchH8Gv0byCZqctE6fa1YxhNB/exec`
+- **測試版** (staging): `https://script.google.com/macros/s/AKfycbwg5Y_TP-r3jElOo5kX7QWUMo8F7RihgVl8-lnzhjsNuqOwHcf9qZ1Pt-zMaJji9GMo/exec`
+
+**部署規則**：`npm run deploy:gas` 預設部署到測試版。若需部署到正式版，必須先向使用者確認。
+
+## clasp SSL 繞過
+
 ```bash
-$env:NODE_OPTIONS='-r E:\MyProg\GAS\SYCompany\Code\clasp-fix.js'
+$env:NODE_OPTIONS='-r E:\MyProg\GAS\SYCompany\Code\clasp-fix.cjs'
 ```
+
+**注意**：所有 `clasp` 指令需搭配以上環境變數繞過 SSL 驗證（公司網路可能阻擋 `oauth2.googleapis.com`）。
 
 There are **no** test, lint, build, or typecheck scripts.
 
