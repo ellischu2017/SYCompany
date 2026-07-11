@@ -196,10 +196,12 @@ function dailyMaintenanceJob() {
       step = 8;
     }
 
-    // Step 8: 資料遷移 (搬走上個月的資料至年度試算表)
+    // Step 8: 資料遷移 — 每月10日後才搬走上個月的資料 (結算日前保留)
     if (step <= 8) {
       if (checkTimeoutAndScheduleResume(8)) return;
-      processSRDataMigration();
+      if (new Date().getDate() >= 10) {
+        processSRDataMigration();
+      }
       step = 9;
     }
 
