@@ -1,5 +1,5 @@
 # clasp deploy wrapper — 自動在部署說明中加入版本號 (v{version})
-$env:NODE_OPTIONS = '-r E:\MyProg\GAS\SYCompany\Code\clasp-fix.js'
+$env:NODE_OPTIONS = '-r E:\MyProg\GAS\SYCompany\Code\clasp-fix.cjs'
 
 # `clasp deploy` 每次會建立一個新版本，所以預測版本號 = 目前最新 + 1
 $versions = clasp versions 2>&1 | Out-String
