@@ -513,11 +513,15 @@ function getRawTimestampFormat() {
  *（getNumberFormat 實際回傳 24h 格式，無法直接對應中文上午/下午）
  */
 function formatRawTimestamp(date) {
-  var ampm = date.getHours() < 12 ? "上午" : "下午";
+  var taipei = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+  var h24 = taipei.getHours();
+  var ampm = h24 < 12 ? "上午" : "下午";
+  var h12 = h24 % 12;
+  if (h12 === 0) h12 = 12;
   var datePart = Utilities.formatDate(date, "Asia/Taipei", "yyyy/M/d");
-  var timePart = Utilities.formatDate(date, "Asia/Taipei", "h:mm:ss");
-
-  return datePart + " " + ampm + " " + timePart;
+  var mm = ("0" + taipei.getMinutes()).slice(-2);
+  var ss = ("0" + taipei.getSeconds()).slice(-2);
+  return datePart + " " + ampm + " " + h12 + ":" + mm + ":" + ss;
 }
 
 /**
