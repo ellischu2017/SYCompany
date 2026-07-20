@@ -471,6 +471,61 @@ function batchUpdateTDate(sheet, updatesMap) {
 }
 
 /**
+ * 取得並快取 Raw Responses 試算表的時間戳記 NumberFormat
+ * 首次呼叫時從第一筆資料讀取，之後從 PropertiesService 讀取快取
+ */
+function getRawTimestampFormat() {
+  const props = PropertiesService.getScriptProperties();
+  const key = "RAW_TS_NUMBER_FORMAT";
+  let fmt = props.getProperty(key);
+  if (fmt) return fmt;
+
+  const RAW_RESPONSES_URL = getTargetsheet("SYTemp", "Raw_Responses").Spreadsheet.getUrl();
+  const ss = SpreadsheetApp.openByUrl(RAW_RESPONSES_URL);
+  const sheets = ss.getSheets().filter(s => {
+    const name = s.getName();
+    return !["Raw Responses", "表單回覆", "副本"].some(k => name.includes(k));
+  });
+
+  if (sheets.length > 0) {
+    const data = sheets[0].getDataRange().getValues();
+    const headers = data[0];
+    const idxstamp = getColIndex(headers, "時間戳記");
+    if (idxstamp !== -1 && data.length > 1) {
+      const cell = sheets[0].getRange(2, idxstamp + 1);
+      fmt = cell.getNumberFormat();
+      if (fmt) {
+        props.setProperty(key, fmt);
+        return fmt;
+      }
+    }
+  }
+
+  fmt = 'yyyy"/"m"/"d" "am/pm" "h":"mm":"ss';
+  props.setProperty(key, fmt);
+  return fmt;
+}
+
+/**
+ * 將 Date 格式化為 Raw Responses 試算表所用的時間戳記字串
+ * 支援中文上午/下午（getNumberFormat 中 am/pm 標記）
+ */
+function formatRawTimestamp(date) {
+  const sheetFmt = getRawTimestampFormat();
+  const hasAmPm = /am\/pm|AM\/PM/i.test(sheetFmt);
+
+  if (!hasAmPm) {
+    return Utilities.formatDate(date, "Asia/Taipei", sheetFmt);
+  }
+
+  var ampm = date.getHours() < 12 ? "上午" : "下午";
+  var datePart = Utilities.formatDate(date, "Asia/Taipei", "yyyy/M/d");
+  var timePart = Utilities.formatDate(date, "Asia/Taipei", "h:mm:ss");
+
+  return datePart + " " + ampm + " " + timePart;
+}
+
+/**
  * 更新 Raw Responses
  * @param {*} formObj
  * @returns
@@ -521,13 +576,7 @@ function UpdateRawResponse(formObj) {
         if (idxstamp !== -1)
           sheet
             .getRange(i + 1, idxstamp + 1)
-            .setValue(
-              Utilities.formatDate(
-                new Date(),
-                "Asia/Taipei",
-                "yyyy/M/d HH:mm:ss",
-              ),
-            );
+            .setValue(formatRawTimestamp(new Date()));
         if (idxDate !== -1)
           sheet
             .getRange(i + 1, idxDate + 1)
@@ -576,11 +625,7 @@ function UpdateRawResponse(formObj) {
       // 建立一個與標題等長的空陣列，確保欄位對應正確
       var newRow = new Array(headers.length).fill("");
       if (idxstamp !== -1)
-        newRow[idxstamp] = Utilities.formatDate(
-          new Date(),
-          "Asia/Taipei",
-          "yyyy/M/d HH:mm:ss",
-        );
+        newRow[idxstamp] = formatRawTimestamp(new Date());
       if (idxDate !== -1)
         newRow[idxDate] = Utilities.formatDate(
           new Date(formObj.date),
