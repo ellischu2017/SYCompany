@@ -508,16 +508,11 @@ function getRawTimestampFormat() {
 
 /**
  * 將 Date 格式化為 Raw Responses 試算表所用的時間戳記字串
- * 支援中文上午/下午（getNumberFormat 中 am/pm 標記）
+ * 格式範例：2026/7/20 下午 9:39:47
+ * 直接硬編碼以確保與 Google 表單回覆的顯示格式一致
+ *（getNumberFormat 實際回傳 24h 格式，無法直接對應中文上午/下午）
  */
 function formatRawTimestamp(date) {
-  const sheetFmt = getRawTimestampFormat();
-  const hasAmPm = /am\/pm|AM\/PM/i.test(sheetFmt);
-
-  if (!hasAmPm) {
-    return Utilities.formatDate(date, "Asia/Taipei", sheetFmt);
-  }
-
   var ampm = date.getHours() < 12 ? "上午" : "下午";
   var datePart = Utilities.formatDate(date, "Asia/Taipei", "yyyy/M/d");
   var timePart = Utilities.formatDate(date, "Asia/Taipei", "h:mm:ss");
