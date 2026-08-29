@@ -62,7 +62,7 @@ function getAuthUsers() {
           const pass = (idxPass !== -1) ? String(row[idxPass]).trim() : "";
           // 若 Role 欄位不存在或為空，預設為 'User' (統一首字大寫)
           let role = (idxRole !== -1) ? String(row[idxRole]).trim() : "";
-          if (!role) role = "User";
+          if (!role) role = "user";
 
           authList.push({
             User: name,

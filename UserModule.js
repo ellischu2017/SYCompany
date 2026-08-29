@@ -32,7 +32,7 @@ function getAllUserData() {
         User_Email: colMap["User_Email"] !== -1 ? String(row[colMap["User_Email"]]) : "",
         User_Tel: colMap["User_Tel"] !== -1 ? String(row[colMap["User_Tel"]]) : "",
         Pass: colMap["Pass"] !== -1 ? String(row[colMap["Pass"]]) : "",
-        Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "User"
+        Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "user"
       });
     }
   }
@@ -68,7 +68,7 @@ function queryUserData(userName) {
           User_Email: colMap["User_Email"] !== -1 ? row[colMap["User_Email"]] : "",
           User_Tel: colMap["User_Tel"] !== -1 ? String(row[colMap["User_Tel"]]) : "",
           Pass: colMap["Pass"] !== -1 ? String(row[colMap["Pass"]]) : "",
-          Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "User",
+          Role: colMap["Role"] !== -1 ? String(row[colMap["Role"]]) : "user",
         },
       };
     }
@@ -114,7 +114,7 @@ function addUserData(formObj) {
   if (idxEmail !== -1) newRow[idxEmail] = formObj.userEmail;
   if (idxTel !== -1) newRow[idxTel] = "'" + formObj.userTel;
   if (idxPass !== -1) newRow[idxPass] = "'" + (formObj.userPass || "123");
-  if (idxRole !== -1) newRow[idxRole] = formObj.userRole || "User";
+  if (idxRole !== -1) newRow[idxRole] = formObj.userRole || "user";
 
   sheet.appendRow(newRow);
   
