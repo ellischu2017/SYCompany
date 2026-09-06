@@ -978,22 +978,33 @@
         } else if (action === 'addAI') {
           const currentVal = $el.val();
           if (!currentVal) return showToast('info', '請先輸入內容再使用 AI');
-          
-          const prompt = `請將以下服務紀錄內容：「${currentVal}」，優化為符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式。請直接輸出優化後的內容，包含做了什麼、怎麼做、個案反應、異常與處理。不包含任何額外說明、開頭語句或結尾語句，且內容不包含長照編碼，回覆限制在45-55個字。`;
-          
+
+          const basePrompt = `請將以下服務紀錄內容：「${currentVal}」，優化為符合長照 ${srid.id}${srid.cont} 電子服務紀錄單的格式。`;
+
           showPageLoading('AI 處理中', '正在為您優化服務紀錄...');
-          
+
           google.script.run
-            .withSuccessHandler(function(aiResult) {
-              $el.val(aiResult).trigger('input');
-              Swal.close();
-              showToast('success', 'AI 優化完成');
+            .withSuccessHandler(function(promptKey) {
+              const prompt = basePrompt + promptKey;
+              // 除錯：記錄完整 prompt 至 SystemLog（除錯完成後移除）
+              google.script.run.logSystemActivity('DEBUG', 'handleClipboard', prompt);
+              google.script.run
+                .withSuccessHandler(function(aiResult) {
+                  $el.val(aiResult).trigger('input');
+                  Swal.close();
+                  showToast('success', 'AI 優化完成');
+                })
+                .withFailureHandler(function(err) {
+                  Swal.close();
+                  Swal.fire('AI 執行失敗', err.message, 'error');
+                })
+                .generateAIServiceRecord(prompt);
             })
             .withFailureHandler(function(err) {
               Swal.close();
               Swal.fire('AI 執行失敗', err.message, 'error');
             })
-            .generateAIServiceRecord(prompt);
+            .getSettingValue('PromptKey');
         }
       } catch (err) {
         console.error('剪貼簿操作失敗:', err);
