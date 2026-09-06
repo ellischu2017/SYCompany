@@ -986,8 +986,8 @@
           google.script.run
             .withSuccessHandler(function(promptKey) {
               const prompt = basePrompt + promptKey;
-              // 除錯：記錄完整 prompt 至 SystemLog（除錯完成後移除）
-              google.script.run.logSystemActivity('DEBUG', 'handleClipboard', prompt);
+              // 除錯：記錄完整 prompt 至 SystemLog（已暫時關閉，需除錯時取消註解）
+              // google.script.run.logSystemActivity('DEBUG', 'handleClipboard', prompt);
               google.script.run
                 .withSuccessHandler(function(aiResult) {
                   $el.val(aiResult).trigger('input');
