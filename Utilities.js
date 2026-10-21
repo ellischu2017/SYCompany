@@ -842,6 +842,77 @@ function getSettingValue(settingName) {
 }
 
 /**
+ * 預設 AI 模型清單（Setting 工作表的 modelList 未設定時的後備清單）
+ * 主要為目前免費層可呼叫的主流模型，依推薦優先順序排列
+ */
+const DEFAULT_MODEL_LIST = [
+  "gemini-3.8-flash", // 1. 免費層最新主力模型（推薦）
+  "gemini-3.6-flash", // 2. 穩定前代 Flash 模型
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite", // 3. 極致輕量、回應最快
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash", // 4. 前一代輕量模型（相容性用）
+  "gemini-2.5-flash-lite",
+  "gemma-4-26b", // 5. 開源權重模型（每日 3,000 次免費額度）
+  "gemma-4-31b",
+  "gemini-1.5-flash-latest", // 6. 強力分析備援
+  "gemini-1.5-pro-latest",
+];
+
+/**
+ * 解析模型清單字串
+ * 支援以逗號、斜線分號或換行分隔，並自動移除註解、空值與重複項
+ * @param {string} raw 原始字串，例如 "gemini-3.8-flash, gemini-3.5-flash"
+ * @returns {string[]} 模型名稱陣列
+ */
+function parseModelList(raw) {
+  if (!raw) return [];
+
+  const parts = String(raw)
+    .split(/[,;\n\r]+/)
+    .map((s) =>
+      s
+        .split("#")[0]
+        .split("//")[0]
+        .trim(),
+    )
+    .filter((s) => s.length > 0 && !/\s/.test(s)); // 含空白的視為註解，自動略過
+
+  return parts.filter((v, i, a) => a.indexOf(v) === i); // 移除重複項
+}
+
+/**
+ * 取得 AI 模型清單（優先讀取 Setting 工作表的 modelList 設定值）
+ * Setting 工作表：Key = "modelList"，Value = 以逗號或換行分隔的模型名稱
+ * @returns {string[]} 模型名稱陣列
+ */
+function getModelList() {
+  let raw = "";
+  try {
+    raw = getSettingValue("modelList");
+  } catch (e) {
+    logSystemActivity(
+      "WARN",
+      "AI",
+      "讀取 Setting.modelList 失敗，改用預設清單: " + e.message,
+    );
+  }
+
+  const list = parseModelList(raw);
+
+  if (list.length === 0) {
+    logSystemActivity(
+      "WARN",
+      "AI",
+      "Setting.modelList 未設定或無有效模型，改用預設模型清單",
+    );
+    return DEFAULT_MODEL_LIST.slice();
+  }
+
+  return list;
+}
+
+/**
  * 取得所有包含 'API_KEY' 字眼的設定值
  * @returns {string[]} API Key 陣列
  * @returns {Object[]} API Key 資訊陣列 {name, value}
@@ -921,22 +992,8 @@ function generateAIServiceRecord(userPrompt) {
   if (apiKeys.length === 0)
     throw new Error("系統設定中找不到任何包含 'API_KEY' 的金鑰設定");
 
-  // 定義模型清單 (優先使用您指定的版本，並保留現有穩定版作為備援)
-  const modelList = [
-    "gemini-3.1-flash-lite", // 1. 試算表設定的首選
-    "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash", // 2. 使用者指定模型
-    "gemini-3-flash",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemma-4-26B-A4B-it",
-    "gemma-4-31b-it",
-    "gemini-2.0-flash-exp", // 3. 官方現有實驗版
-    "gemini-1.5-flash-latest", // 4. 官方現有穩定版
-    "gemini-1.5-flash",
-    "gemini-1.5-pro-latest", // 5. 強力分析備援
-  ].filter((v, i, a) => v && a.indexOf(v) === i); // 移除空值與重複項
+  // 模型清單由 Setting 工作表 (Key = modelList) 動態取得，未設定時使用預設清單
+  const modelList = getModelList();
 
   let lastError = null;
 
@@ -948,10 +1005,13 @@ function generateAIServiceRecord(userPrompt) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const payload = {
           contents: [{ parts: [{ text: userPrompt }] }],
-          system_instruction: {
-            parts: [{ text: "你是長照居服員督導。" }],
-          },
         };
+        // Gemma 系列不支援 system_instruction，帶上會回傳 400
+        if (!/^gemma/i.test(model)) {
+          payload.system_instruction = {
+            parts: [{ text: "你是長照居服員督導。" }],
+          };
+        }
 
         const response = UrlFetchApp.fetch(url, {
           method: "post",
@@ -1011,7 +1071,8 @@ function generateAIServiceRecord(userPrompt) {
 
   // 如果所有模型都嘗試失敗
   throw new Error(
-    "所有 AI 模型嘗試均失敗。最後一個錯誤訊息：" + lastError.message,
+    "所有 AI 模型嘗試均失敗。最後一個錯誤訊息：" +
+      (lastError ? lastError.message : "無例外紀錄（可能所有模型皆回傳 404/429）"),
   );
 }
 
